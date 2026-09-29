@@ -42,6 +42,9 @@ export interface RecommendationItem {
     /** 'sourced' | 'estimated' for the real dataset; 'record' for legacy flat data. */
     field_origin?: Record<string, 'sourced' | 'estimated' | 'record'>;
     provenance?: ProvenanceEntry[];
+    labels?: Record<string, string>;
+    data_quality?: { issues: any[]; penalty_points: number; confidence: number };
+    buying_intent?: { score: number; strong: any[]; medium: any[]; negative: any[]; definition: string };
     external_signal?: {
       title: string;
       source: string;
@@ -51,6 +54,8 @@ export interface RecommendationItem {
       freshness_status: string;
       source_type?: string;
       impact_summary: string;
+      relevance_score?: number;
+      relevance_basis?: string | null;
     };
   };
   suggested_action: string;
@@ -58,6 +63,10 @@ export interface RecommendationItem {
   stale_data_warning?: string;
   external_context_available: boolean;
   external_context_fetched: boolean;
+  confidence?: number;
+  review_required?: boolean;
+  warnings?: string[];
+  data_quality_issues?: Array<{ issue_type: string; severity: string; details: string }>;
 }
 
 export interface DecisionRunData {
@@ -72,6 +81,9 @@ export interface DecisionRunData {
   stale_warning_count: number;
   recommendations: RecommendationItem[];
   generated_at: string;
+  dataset_key?: string;
+  snapshot_id?: string;
+  policy?: Record<string, any>;
 }
 
 export interface SimulationParams {
@@ -100,7 +112,56 @@ export interface SimulationResult {
   }>;
   uncertainty_band_percent: number;
   disclaimer: string;
+  label?: string;
+  assumptions?: string[];
+  opportunities_total?: number;
+  opportunities_in_scope?: number;
+  opportunities_covered?: number;
+  opportunities_missed?: number;
+  missed_expected_value?: number;
+  excluded_invalid_records?: number;
+  scenario_expected_value_no_assumptions?: number;
+  baseline_params?: Record<string, number>;
+  scenario_params?: Record<string, number>;
+  full_pipeline_expected_value?: number;
 }
+
+export interface QueryResult {
+  question: string;
+  answer: string;
+  intent: string;
+  confidence: number;
+  human_review_required: boolean;
+  plan: { intent: string; planner: string; planner_error?: string | null; analytics_tools: string[]; rag_required: boolean; decision_run_required: boolean };
+  matched_ids: string[];
+  analytics: Array<{ tool: string; definition: string; timestamp: string; source: any }>;
+  rag: { status: string; message?: string; evidence: Array<{ doc_id: string; record_id: string; source_type: string; text: string; relevance: number | null; company_name?: string }> };
+  warnings: string[];
+  fallbacks: string[];
+  trace: Array<{ step: string; latency_ms: number }>;
+  snapshot_id: string;
+  data_snapshot: string;
+  decision_run_id?: string | null;
+  policy_version?: string | null;
+  basis: string;
+}
+
+export interface DecisionSummary {
+  hasRun: boolean;
+  decisionRunId?: string;
+  datasetKey?: string;
+  policyVersion?: string;
+  immediateActions?: number;
+  staleOpportunities?: number;
+  reviewRequired?: number;
+  awaitingApproval?: number;
+  requiresAttention?: number;
+  pipelineTotal?: number;
+  weightedExpectedValue?: number;
+  message?: string;
+}
+
+export type DatasetKey = 'real' | 'synthetic' | 'legacy';
 
 export interface DecisionPolicy {
   id: string;
@@ -123,8 +184,28 @@ export const decisionForgeService = {
     return res.data;
   },
 
-  async resetDemoData() {
-    const res = await api.post('/decision-forge/reset-demo');
+  async resetDemoData(dataset: DatasetKey = 'real', clearHistory = false) {
+    const res = await api.post('/decision-forge/reset-demo', { dataset, clearHistory });
+    return res.data;
+  },
+
+  async getQuality() {
+    const res = await api.get('/decision-forge/quality');
+    return res.data;
+  },
+
+  async getSummary(): Promise<DecisionSummary> {
+    const res = await api.get('/decision-forge/summary');
+    return res.data;
+  },
+
+  async queryDecision(question: string): Promise<QueryResult> {
+    const res = await api.post('/decision-forge/decisions/query', { question });
+    return res.data;
+  },
+
+  async startReview(id: string, decisionRunId?: string) {
+    const res = await api.post(`/decision-forge/recommendations/${id}/review`, { decisionRunId });
     return res.data;
   },
 
@@ -159,7 +240,7 @@ export const decisionForgeService = {
 
   async fetchExternalContext(opportunityId: string) {
     const res = await api.post(`/decision-forge/opportunities/${opportunityId}/fetch-context`);
-    return res.data as { status: 'fetched' | 'no_signal'; message: string; signal: any };
+    return res.data as { status: 'fetched' | 'no_signal' | 'unavailable'; message: string; signal: any };
   },
 
   async simulateTwin(inputs: SimulationParams): Promise<SimulationResult> {

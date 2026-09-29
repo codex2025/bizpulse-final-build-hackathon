@@ -18,7 +18,7 @@ import { EvidenceDrawer } from './EvidenceDrawer';
 import { ApprovalModal } from './ApprovalModal';
 import { PolicyModal } from './PolicyModal';
 import { decisionForgeService } from '../../services/decisionForgeService';
-import type { DecisionRunData, RecommendationItem } from '../../services/decisionForgeService';
+import type { DatasetKey, DecisionRunData, RecommendationItem } from '../../services/decisionForgeService';
 
 export interface ScoreFlash {
   opportunityId: string;
@@ -41,6 +41,8 @@ export const DecisionForgePage: React.FC = () => {
   // Per-opportunity "fetch fresh context" state
   const [fetchingContextId, setFetchingContextId] = useState<string | null>(null);
   const [scoreFlash, setScoreFlash] = useState<ScoreFlash | null>(null);
+  // recommendation_id -> approval status, so reviewed items keep their badge across re-runs
+  const [approvalStatus, setApprovalStatus] = useState<Record<string, string>>({});
 
   const fetchDecisions = async () => {
     setIsLoading(true);
@@ -54,17 +56,42 @@ export const DecisionForgePage: React.FC = () => {
     }
   };
 
+  const refreshApprovals = async () => {
+    try {
+      const rows: Array<{ recommendationId: string; status: string }> = await decisionForgeService.getApprovals();
+      setApprovalStatus(Object.fromEntries(rows.map((r) => [r.recommendationId, r.status])));
+    } catch {
+      // Non-fatal: badges simply don't render.
+    }
+  };
+
   useEffect(() => {
     fetchDecisions();
+    refreshApprovals();
   }, []);
 
-  const handleResetDemo = async () => {
+  // Opening the approval dialog moves the recommendation DRAFT -> REVIEW (best effort).
+  const handleOpenApproval = (item: RecommendationItem) => {
+    setApprovalItem(item);
+    decisionForgeService
+      .startReview(item.recommendation_id, item.decision_run_id)
+      .then(refreshApprovals)
+      .catch(() => undefined);
+  };
+
+  const handleResetDemo = async (dataset: DatasetKey = (decisionData?.dataset_key as DatasetKey) || 'real') => {
+    if (!window.confirm('Reset the demo? This reloads the dataset and clears your decision runs and approvals. The audit log is kept.')) {
+      return;
+    }
     setIsLoading(true);
     try {
-      await decisionForgeService.resetDemoData();
+      await decisionForgeService.resetDemoData(dataset, true);
+      setApprovalStatus({});
       setScoreFlash(null);
       await fetchDecisions();
-      showNotification('Clean Industrial B2B benchmark dataset loaded & analyzed.');
+      showNotification(dataset === 'synthetic'
+        ? 'Synthetic B2B dataset (520 opportunities) loaded & analyzed.'
+        : 'Real cited dataset loaded & analyzed.');
     } catch (err: any) {
       alert(err.message || 'Failed to reset demo dataset');
     } finally {
@@ -89,8 +116,8 @@ export const DecisionForgePage: React.FC = () => {
     const before = rec.priority_score;
     try {
       const result = await decisionForgeService.fetchExternalContext(rec.opportunity_id);
-      if (result.status === 'no_signal') {
-        showNotification(`No validated external signal is available for ${rec.company_name}.`);
+      if (result.status === 'no_signal' || result.status === 'unavailable') {
+        showNotification(result.message || `External context unavailable for ${rec.company_name}. Decision calculated from internal business data.`);
         return;
       }
 
@@ -99,6 +126,11 @@ export const DecisionForgePage: React.FC = () => {
 
       const updated = refreshed.recommendations.find((r) => r.opportunity_id === rec.opportunity_id);
       const after = updated?.priority_score ?? before;
+      // An open evidence drawer holds a snapshot of the old recommendation; point it at the
+      // refreshed one so it shows the fetched signal and the new score instead of the stale state.
+      if (updated) {
+        setEvidenceItem((current) => (current && current.opportunity_id === rec.opportunity_id ? updated : current));
+      }
       setScoreFlash({ opportunityId: rec.opportunity_id, before, after });
       showNotification(
         `${rec.company_name}: fresh context retrieved — score ${before} → ${after} ${after >= before ? '▲' : '▼'}`
@@ -140,7 +172,7 @@ export const DecisionForgePage: React.FC = () => {
               Evidence-Backed Recommendations & Decision Twin
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
-              Synthesizes CRM sales data, rep notes (RAG), and fresh external signals into deterministic decisions with scenario simulations and human governance.
+              Combines CRM records, deterministic analytics, retrieved rep notes and optional cited external context into explainable decisions, what-if scenarios and human approval.
             </p>
           </div>
 
@@ -154,7 +186,7 @@ export const DecisionForgePage: React.FC = () => {
               Decision Policy
             </button>
             <button
-              onClick={handleResetDemo}
+              onClick={() => handleResetDemo()}
               disabled={isLoading}
               className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-sm"
               title="One-click reset to verified demo CRM benchmark"
@@ -201,7 +233,7 @@ export const DecisionForgePage: React.FC = () => {
             }`}
           >
             <Sliders className="w-4 h-4" />
-            Decision Twin Simulator
+            Decision Twin
             <span className="px-1.5 py-0.2 text-[9px] uppercase tracking-wider rounded bg-rose-500 text-white font-extrabold">
               What-If
             </span>
@@ -216,7 +248,7 @@ export const DecisionForgePage: React.FC = () => {
             }`}
           >
             <UploadCloud className="w-4 h-4" />
-            CRM Ingestion & Quality
+            Data Quality
           </button>
 
           <button
@@ -228,7 +260,7 @@ export const DecisionForgePage: React.FC = () => {
             }`}
           >
             <History className="w-4 h-4" />
-            Approvals & Audit Replay
+            Evidence & Audit
           </button>
         </div>
       </div>
@@ -239,11 +271,12 @@ export const DecisionForgePage: React.FC = () => {
           decisionData={decisionData}
           isLoading={isLoading}
           onOpenEvidence={(item) => setEvidenceItem(item)}
-          onOpenApproval={(item) => setApprovalItem(item)}
+          onOpenApproval={handleOpenApproval}
           onRunDecisions={fetchDecisions}
           onFetchContext={handleFetchContext}
           fetchingContextId={fetchingContextId}
           scoreFlash={scoreFlash}
+          approvalStatus={approvalStatus}
         />
       )}
 
@@ -251,9 +284,10 @@ export const DecisionForgePage: React.FC = () => {
 
       {activeTab === 'ingestion' && (
         <DataIngestionTab
+          activeDataset={decisionData?.dataset_key}
           onDatasetUpdated={() => {
             fetchDecisions();
-            showNotification('New CRM dataset activated and analyzed.');
+            showNotification('Dataset activated and analyzed.');
           }}
         />
       )}
@@ -264,7 +298,7 @@ export const DecisionForgePage: React.FC = () => {
       <EvidenceDrawer
         recommendation={evidenceItem}
         onClose={() => setEvidenceItem(null)}
-        onApprove={(item) => setApprovalItem(item)}
+        onApprove={handleOpenApproval}
         onFetchContext={handleFetchContext}
         fetchingContextId={fetchingContextId}
       />
@@ -275,7 +309,9 @@ export const DecisionForgePage: React.FC = () => {
         onClose={() => setApprovalItem(null)}
         onSuccess={(msg) => {
           showNotification(msg);
-          fetchDecisions();
+          // Keep the current run (and its recommendation ids) so the reviewed card shows its
+          // status; re-running would mint a new run id and orphan the approval.
+          refreshApprovals();
         }}
         onOpenBilling={handleOpenBilling}
       />

@@ -7,6 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { Topbar } from '../common/Topbar';
 import { analyticsService } from '../../services/analyticsService';
+import { decisionForgeService } from '../../services/decisionForgeService';
 import { invoiceService, expenseService } from '../../services/invoiceService';
 import { AntigravityInsights } from './AntigravityInsights';
 import { ForecastWidget } from './ForecastWidget';
@@ -140,6 +141,15 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { persona, config } = usePersona();
 
+  // Live DecisionForge counts. If the decision service is down the banner simply says so;
+  // it never shows placeholder numbers.
+  const { data: dfSummary, isError: dfError } = useQuery({
+    queryKey: ['decision-forge-summary'],
+    queryFn: () => decisionForgeService.getSummary(),
+    retry: false,
+    staleTime: 30_000,
+  });
+
   const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['dashboard-metrics', persona],
     queryFn: () => analyticsService.getDashboard(),
@@ -232,8 +242,22 @@ export const DashboardPage: React.FC = () => {
               <span className="text-xs text-slate-300">B2B Deal Prioritization</span>
             </div>
             <p className="text-sm font-bold text-white mt-0.5">
-              High-Value Opportunities Ready for Review • $2.17M Pipeline Analyzed
+              {dfError || (dfSummary && !dfSummary.hasRun)
+                ? 'Decision data is temporarily unavailable.'
+                : !dfSummary
+                ? 'Loading decisions…'
+                : dfSummary.requiresAttention
+                ? `${dfSummary.requiresAttention} decision${dfSummary.requiresAttention === 1 ? '' : 's'} require attention`
+                : 'No decisions need attention right now'}
             </p>
+            {dfSummary?.hasRun && (
+              <p className="text-xs text-slate-300 mt-0.5">
+                {dfSummary.immediateActions} immediate action{dfSummary.immediateActions === 1 ? '' : 's'} ·{' '}
+                {dfSummary.staleOpportunities} stale · {dfSummary.awaitingApproval} awaiting approval ·{' '}
+                ${Math.round(dfSummary.pipelineTotal || 0).toLocaleString()} pipeline
+                {dfSummary.datasetKey && dfSummary.datasetKey !== 'real' ? ' (synthetic data)' : ''}
+              </p>
+            )}
           </div>
         </div>
 

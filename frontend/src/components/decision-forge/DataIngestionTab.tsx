@@ -1,10 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { UploadCloud, FileSpreadsheet, CheckCircle, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { decisionForgeService } from '../../services/decisionForgeService';
+import type { DatasetKey } from '../../services/decisionForgeService';
 
 interface DataIngestionTabProps {
   onDatasetUpdated: () => void;
+  activeDataset?: string;
 }
+
+const ISSUE_LABEL: Record<string, string> = {
+  MISSING_PROBABILITY: 'Missing probability',
+  CONFLICTING_PROBABILITY: 'Conflicting probability',
+  INVALID_DEAL_VALUE: 'Invalid deal value',
+  DUPLICATE: 'Duplicate',
+  STALE_CONTACT: 'Stale contact',
+  MISSING_CONTACT: 'Missing contact',
+};
+const SEVERITY_CLASS: Record<string, string> = {
+  high: 'bg-red-50 text-red-700 border-red-200',
+  medium: 'bg-amber-50 text-amber-700 border-amber-200',
+  low: 'bg-slate-50 text-slate-600 border-slate-200',
+};
 
 const gradeBadgeClass = (grade?: string) => {
   if (!grade) return 'bg-slate-100 text-slate-600 border-slate-200';
@@ -14,17 +30,20 @@ const gradeBadgeClass = (grade?: string) => {
   return 'bg-red-50 text-red-700 border-red-200';
 };
 
-export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpdated }) => {
+export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpdated, activeDataset }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [qualityReport, setQualityReport] = useState<any>(null);
   const [activated, setActivated] = useState(false);
+  const [issues, setIssues] = useState<any[]>([]);
+  const [issueFilter, setIssueFilter] = useState<string>('ALL');
 
   const loadCurrentQuality = async () => {
     try {
-      const dataset = await decisionForgeService.getDataset();
-      setQualityReport(dataset.quality_report);
+      const q = await decisionForgeService.getQuality();
+      setQualityReport(q);
+      setIssues(q.issues || []);
     } catch {
       // Non-fatal -- the scorecard just stays empty until a run succeeds.
     }
@@ -68,10 +87,10 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
     }
   };
 
-  const handleResetDemo = async () => {
+  const handleResetDemo = async (dataset: DatasetKey) => {
     setIsUploading(true);
     try {
-      await decisionForgeService.resetDemoData();
+      await decisionForgeService.resetDemoData(dataset);
       setUploadResult(null);
       setActivated(false);
       await loadCurrentQuality();
@@ -130,17 +149,32 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
             </p>
           </div>
 
-          {/* Quick Demo Dataset Action */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-600">
-            <span>Want to test immediately with industrial equipment deals?</span>
-            <button
-              onClick={handleResetDemo}
-              disabled={isUploading}
-              className="font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1.5 transition"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Load Verified Industrial Dataset
-            </button>
+          {/* Deterministic demo datasets */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
+            <span>
+              Active dataset: <strong className="text-slate-800">{activeDataset || '—'}</strong>
+              {activeDataset && activeDataset !== 'real' ? ' (synthetic)' : ''}
+            </span>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => handleResetDemo('real')}
+                disabled={isUploading}
+                className="font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1.5 transition"
+                title="12 real companies with cited public announcements"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Load real cited dataset
+              </button>
+              <button
+                onClick={() => handleResetDemo('synthetic')}
+                disabled={isUploading}
+                className="font-bold text-sky-700 hover:text-sky-800 flex items-center gap-1.5 transition"
+                title="520 generated opportunities with planted data-quality cases"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Load synthetic 500+ dataset
+              </button>
+            </div>
           </div>
         </div>
 
@@ -174,6 +208,18 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
               <span className="font-bold text-slate-800">{getIndicator('Completeness') || '—'} valid fields</span>
             </div>
             <div className="flex justify-between text-xs">
+              <span className="text-slate-500">Missing probability:</span>
+              <span className="font-bold text-slate-800">{qualityReport?.missing_probability_count ?? 0}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500">Invalid / conflicting:</span>
+              <span className="font-bold text-slate-800">{(qualityReport?.missing_value_count ?? 0) + (qualityReport?.conflicting_probability_count ?? 0)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-slate-500">Stale records:</span>
+              <span className="font-bold text-amber-600">{qualityReport?.stale_record_count ?? 0}</span>
+            </div>
+            <div className="flex justify-between text-xs">
               <span className="text-slate-500">Freshness:</span>
               <span className="font-bold text-amber-600">{getIndicator('Freshness') || '—'} active touchpoints</span>
             </div>
@@ -189,6 +235,94 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Validation report for the file just uploaded */}
+      {uploadResult?.validation_report && (
+        <div className="bg-white/90 rounded-2xl border border-slate-200 p-5 shadow-sm">
+          <h4 className="text-sm font-bold text-slate-900 mb-3">Validation report — {uploadResult.filename}</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-xs">
+            {[
+              ['Records', uploadResult.validation_report.records_parsed],
+              ['Invalid', uploadResult.validation_report.invalid_records],
+              ['Duplicates', uploadResult.validation_report.duplicates],
+              ['Missing probability', uploadResult.validation_report.missing_probability],
+              ['Missing/invalid value', uploadResult.validation_report.missing_or_invalid_value],
+              ['Stale', uploadResult.validation_report.stale_records],
+            ].map(([label, value]) => (
+              <div key={label as string} className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-slate-400 block text-[10px] uppercase">{label}</span>
+                <span className="font-bold text-slate-800 text-base">{value as number}</span>
+              </div>
+            ))}
+          </div>
+          {uploadResult.validation_report.warnings?.map((w: string, i: number) => (
+            <p key={i} className="text-[11px] text-amber-700 mt-2">{w}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Issues in the ACTIVE dataset: shown, never hidden. They lower decision confidence. */}
+      <div className="bg-white/90 rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h4 className="text-sm font-bold text-slate-900">Data quality issues ({qualityReport?.issues_total ?? issues.length})</h4>
+            <p className="text-xs text-slate-500">
+              The decision engine sees these too: records with problems get a confidence reduction and, for missing or
+              conflicting values, a score penalty. Nothing is silently filled in.
+            </p>
+          </div>
+          <select
+            value={issueFilter}
+            onChange={(e) => setIssueFilter(e.target.value)}
+            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700"
+          >
+            <option value="ALL">All issue types</option>
+            {Object.keys(qualityReport?.issue_counts || {}).map((k) => (
+              <option key={k} value={k}>{ISSUE_LABEL[k] || k} ({qualityReport.issue_counts[k]})</option>
+            ))}
+          </select>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-400 uppercase text-[10px] border-b border-slate-100">
+                <th className="py-2 pr-3">Record</th>
+                <th className="py-2 pr-3">Company</th>
+                <th className="py-2 pr-3">Issue</th>
+                <th className="py-2 pr-3">Severity</th>
+                <th className="py-2">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {issues
+                .filter((i) => issueFilter === 'ALL' || i.issue_type === issueFilter)
+                .slice(0, 50)
+                .map((i, idx) => (
+                  <tr key={`${i.record_id}-${i.issue_type}-${idx}`} className="border-b border-slate-50">
+                    <td className="py-2 pr-3 font-mono text-slate-500">{i.record_id}</td>
+                    <td className="py-2 pr-3 text-slate-700">{i.company_name}</td>
+                    <td className="py-2 pr-3 font-semibold text-slate-800">{ISSUE_LABEL[i.issue_type] || i.issue_type}</td>
+                    <td className="py-2 pr-3">
+                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${SEVERITY_CLASS[i.severity] || SEVERITY_CLASS.low}`}>
+                        {i.severity}
+                      </span>
+                    </td>
+                    <td className="py-2 text-slate-500">{i.details}</td>
+                  </tr>
+                ))}
+              {issues.length === 0 && (
+                <tr><td colSpan={5} className="py-6 text-center text-slate-400">No data quality issues detected in the active dataset.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {issues.length > 50 && <p className="text-[11px] text-slate-400">Showing the first 50 of {qualityReport?.issues_total ?? issues.length} issues.</p>}
+        <div className="flex justify-end">
+          <button onClick={loadCurrentQuality} className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
         </div>
       </div>
 

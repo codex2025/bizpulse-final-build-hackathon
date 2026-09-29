@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sliders, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Sliders, TrendingUp, TrendingDown, AlertTriangle, RefreshCw } from 'lucide-react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -66,7 +66,7 @@ export const DecisionTwinTab: React.FC = () => {
             Simulate "What-If" Strategic Outcomes Before Acting
           </h2>
           <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-            Test policy adjustments against sales capacity, conversion velocity, and deal thresholds. 
+            Test strategy changes against team capacity, response time and deal thresholds, using stated assumptions. 
             Compare alternative strategies side-by-side without mutating baseline business records.
           </p>
         </div>
@@ -237,11 +237,19 @@ export const DecisionTwinTab: React.FC = () => {
             <div className="p-4 bg-white/90 rounded-2xl border border-slate-200 shadow-sm">
               <span className="text-xs text-slate-400 font-semibold block">Scenario Expected Value</span>
               <div className="text-xl font-bold text-slate-900 mt-1">
-                ${result?.scenario_expected_value?.toLocaleString() || '0'}
+                ${Math.round(result?.scenario_expected_value ?? 0).toLocaleString()}
               </div>
-              <div className="flex items-center gap-1 text-[11px] font-bold mt-1 text-emerald-600">
-                <TrendingUp className="w-3 h-3" />
-                <span>{result?.delta_revenue_percent ? `${result.delta_revenue_percent > 0 ? '+' : ''}${result.delta_revenue_percent}% vs baseline` : '0%'}</span>
+              <div
+                className={`flex items-center gap-1 text-[11px] font-bold mt-1 ${
+                  (result?.delta_revenue_percent ?? 0) < 0 ? 'text-amber-700' : 'text-emerald-600'
+                }`}
+              >
+                {(result?.delta_revenue_percent ?? 0) < 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
+                <span>
+                  {result?.delta_revenue_percent
+                    ? `${result.delta_revenue_percent > 0 ? '+' : '−'}${Math.abs(result.delta_revenue_percent)}% vs baseline`
+                    : '0% vs baseline'}
+                </span>
               </div>
             </div>
 
@@ -251,7 +259,7 @@ export const DecisionTwinTab: React.FC = () => {
                 {result?.rep_capacity_utilization_percent || 0}%
               </div>
               <span className="text-[11px] text-slate-500 block mt-1">
-                Target healthy: 70% – 95%
+                Rule of thumb: 70% – 95%
               </span>
             </div>
 
@@ -260,9 +268,18 @@ export const DecisionTwinTab: React.FC = () => {
               <div className="text-xl font-bold text-rose-600 mt-1">
                 {result?.expected_closed_deals || 0} Deals
               </div>
-              <span className="text-[11px] text-slate-500 block mt-1">In next 60 days</span>
+              <span className="text-[11px] text-slate-500 block mt-1">Probability-weighted, covered deals</span>
             </div>
           </div>
+
+          {result?.baseline_params && (
+            <p className="text-[11px] text-slate-500 -mt-3">
+              Compared against the baseline strategy: {String(result.baseline_params.sales_reps_count)} reps ×{' '}
+              {String(result.baseline_params.contacts_per_day)} contacts/day, minimum deal $
+              {Number(result.baseline_params.min_deal_value).toLocaleString()}, {String(result.baseline_params.followup_window_days)}-day
+              response, priority cutoff {String(result.baseline_params.priority_threshold)}. Both run through the same model.
+            </p>
+          )}
 
           {/* Visual Recharts Comparison */}
           <div className="bg-white/90 rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
@@ -319,9 +336,37 @@ export const DecisionTwinTab: React.FC = () => {
               </table>
             </div>
 
-            <p className="text-[10px] text-slate-400 italic mt-4 pt-3 border-t border-slate-100">
-              * {result?.disclaimer} (Uncertainty threshold: ±{result?.uncertainty_band_percent}%)
-            </p>
+            {result && (
+              <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+                <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-bold">
+                    {result.label || 'Scenario estimate'}
+                  </span>
+                  {result.opportunities_covered !== undefined && (
+                    <span className="text-slate-600">
+                      Covers <strong>{result.opportunities_covered}</strong> of {result.opportunities_in_scope} in-scope opportunities within team
+                      capacity; <strong>{result.opportunities_missed}</strong> valid opportunities not covered
+                      (${Math.round(result.missed_expected_value || 0).toLocaleString()} expected value).
+                    </span>
+                  )}
+                </div>
+                {result.scenario_expected_value_no_assumptions !== undefined && (
+                  <p className="text-[11px] text-slate-600">
+                    Without the assumptions below the covered opportunities are worth{' '}
+                    <strong>${Math.round(result.scenario_expected_value_no_assumptions).toLocaleString()}</strong>; the assumptions move that
+                    figure by {result.uncertainty_band_percent}%.
+                  </p>
+                )}
+                {result.assumptions && result.assumptions.length > 0 && (
+                  <ul className="list-disc pl-4 text-[11px] text-slate-500 space-y-0.5">
+                    {result.assumptions.map((a, i) => (
+                      <li key={i}>{a}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[10px] text-slate-400 italic">* {result.disclaimer} Runs on a copy of the data; your records are not changed.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

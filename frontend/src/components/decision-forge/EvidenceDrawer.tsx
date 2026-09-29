@@ -324,6 +324,13 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
                     <strong className="text-slate-800">Impact Assessment: </strong>
                     {ext.impact_summary}
                   </p>
+                  {ext.relevance_score !== undefined && (
+                    <p className="text-[11px] text-slate-500">
+                      <strong className="text-slate-700">Signal relevance {ext.relevance_score}</strong>
+                      {' '}(<span className="uppercase text-amber-700 font-semibold">modeled</span>){ext.relevance_basis ? `: ${ext.relevance_basis}` : ''} This
+                      value sets how much the external factor moves the score once fetched.
+                    </p>
+                  )}
 
                   <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 text-slate-500">
                     <span>Source: {ext.source}{ext.published_at ? ` · ${ext.published_at}` : ''}</span>

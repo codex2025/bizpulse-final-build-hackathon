@@ -11,6 +11,49 @@ const STATUS_STYLE: Record<string, string> = {
   REJECTED: 'bg-red-50 text-red-700 border-red-200',
 };
 
+const REPLAY_LABEL: Record<string, string> = {
+  question: 'User question',
+  query_plan: 'Query plan',
+  data_snapshot: 'Data snapshot',
+  analytics: 'Analytics (deterministic)',
+  rag_results: 'RAG results',
+  evidence: 'Evidence packs',
+  policy: 'Policy',
+  score: 'Score',
+  recommendation: 'Recommendation',
+  approval: 'Human approval',
+};
+
+const summarizeStep = (step: string, d: any): string => {
+  if (d === null || d === undefined) return 'Not recorded for this run.';
+  switch (step) {
+    case 'question':
+      return d.question ? `“${d.question}”` : d.note || 'No typed question.';
+    case 'query_plan':
+      return `Intent: ${String(d.intent || '').replace(/_/g, ' ')} · planner: ${d.planner} · tools: ${(d.analytics_tools || []).join(', ') || 'none'}`;
+    case 'data_snapshot':
+      return `Snapshot ${d.snapshotId || 'n/a'} · dataset ${d.datasetKey || 'n/a'} · ${d.recordsAnalyzed} records`;
+    case 'analytics':
+      return Array.isArray(d)
+        ? d.map((a: any) => a.tool).join(', ')
+        : `Pipeline $${Number(d.pipelineTotal || 0).toLocaleString()} · weighted $${Number(d.weightedExpectedValue || 0).toLocaleString()}`;
+    case 'rag_results':
+      return d.status ? `Retrieval ${d.status} · ${(d.evidence || []).length} note(s) cited` : `Notes attached to ${(d.notes || []).length} top opportunities`;
+    case 'evidence':
+      return `${Array.isArray(d) ? d.length : 0} evidence pack(s) frozen with the run`;
+    case 'policy':
+      return `Policy ${d.policyVersion}`;
+    case 'score':
+      return (d || []).map((r: any) => `${r.opportunityId}: ${r.priorityScore}`).join(' · ');
+    case 'recommendation':
+      return (d || []).map((r: any) => `${r.opportunityId}: ${String(r.decisionClass || '').replace(/_/g, ' ').toLowerCase()}`).join(' · ');
+    case 'approval':
+      return (d || []).length ? d.map((a: any) => `${a.opportunityId}: ${a.status}`).join(' · ') : 'No human decision recorded yet.';
+    default:
+      return '';
+  }
+};
+
 export const AuditTrailTab: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [approvals, setApprovals] = useState<any[]>([]);
@@ -83,10 +126,16 @@ export const AuditTrailTab: React.FC = () => {
     );
   };
 
-  const filteredApprovals = approvalFilter === 'ALL' ? approvals : approvals.filter((a) => a.status === approvalFilter);
+  const inReview = (status: string) => ['DRAFT', 'REVIEW', 'PENDING'].includes(status);
+  const filteredApprovals =
+    approvalFilter === 'ALL'
+      ? approvals
+      : approvalFilter === 'PENDING'
+      ? approvals.filter((a) => inReview(a.status))
+      : approvals.filter((a) => a.status === approvalFilter);
   const counts = {
     ALL: approvals.length,
-    PENDING: approvals.filter((a) => a.status === 'PENDING').length,
+    PENDING: approvals.filter((a) => inReview(a.status)).length,
     APPROVED: approvals.filter((a) => a.status === 'APPROVED').length,
     MODIFIED: approvals.filter((a) => a.status === 'MODIFIED').length,
     REJECTED: approvals.filter((a) => a.status === 'REJECTED').length,
@@ -99,7 +148,7 @@ export const AuditTrailTab: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <ShieldCheck className="w-5 h-5 text-rose-600" />
-            <h3 className="text-base font-bold text-slate-900">Approvals & Immutable Audit Ledger</h3>
+            <h3 className="text-base font-bold text-slate-900">Approvals & Audit Log</h3>
           </div>
           <p className="text-xs text-slate-500">
             Every human review decision and the chronological log of calculations, approvals, overrides, and Bizpulse client conversions behind it.
@@ -286,6 +335,33 @@ export const AuditTrailTab: React.FC = () => {
                   <span className="font-bold text-slate-800">{new Date(selectedRun.run?.createdAt).toLocaleString()}</span>
                 </div>
               </div>
+
+              {selectedRun.replay?.length > 0 && (
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-2">Why did the system make this decision?</h4>
+                  <ol className="space-y-2">
+                    {selectedRun.replay.map((r: any, i: number) => (
+                      <li key={r.step} className="p-3 border border-slate-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                            {i + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900">{REPLAY_LABEL[r.step] || r.step}</span>
+                            <p className="text-[11px] text-slate-600 mt-0.5 break-words">{summarizeStep(r.step, r.detail)}</p>
+                          </div>
+                        </div>
+                        <details className="mt-1.5 ml-7">
+                          <summary className="text-[10px] font-semibold text-slate-400 cursor-pointer">Raw record</summary>
+                          <pre className="text-[10px] bg-slate-50 border border-slate-100 rounded p-2 mt-1 overflow-x-auto max-h-48">
+                            {JSON.stringify(r.detail, null, 2)}
+                          </pre>
+                        </details>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
 
               {selectedRun.approvals?.length > 0 && (
                 <div>

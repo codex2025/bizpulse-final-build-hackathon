@@ -10,9 +10,13 @@ import {
   Search,
   X,
   Globe,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert,
 } from 'lucide-react';
-import type { DecisionRunData, RecommendationItem } from '../../services/decisionForgeService';
+import { decisionForgeService } from '../../services/decisionForgeService';
+import type { DecisionRunData, QueryResult, RecommendationItem } from '../../services/decisionForgeService';
 import type { ScoreFlash } from './DecisionForgePage';
 
 interface DecisionCenterTabProps {
@@ -24,6 +28,8 @@ interface DecisionCenterTabProps {
   onFetchContext: (item: RecommendationItem) => void;
   fetchingContextId: string | null;
   scoreFlash: ScoreFlash | null;
+  /** recommendation_id -> approval status, for badges on cards already reviewed. */
+  approvalStatus?: Record<string, string>;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -33,82 +39,16 @@ const SUGGESTED_QUESTIONS = [
   'Which regions are underperforming?',
 ];
 
-interface AskAnswer {
-  question: string;
-  text: string;
-  matchedIds: string[] | null;
-}
+const signed = (n: number) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
+const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
-function answerQuestion(question: string, recs: RecommendationItem[], data: DecisionRunData): AskAnswer {
-  const q = question.toLowerCase();
-  const top = (n: number) => [...recs].sort((a, b) => b.priority_score - a.priority_score).slice(0, n);
-  const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`;
-
-  if (/cold|stale|untouched|gone quiet/.test(q)) {
-    const stale = recs.filter((r) => r.stale_data_warning);
-    return {
-      question,
-      matchedIds: stale.map((r) => r.opportunity_id),
-      text: stale.length
-        ? `${stale.length} opportunit${stale.length === 1 ? 'y has' : 'ies have'} gone cold (no contact in 30+ days): ${stale.map((r) => r.company_name).join(', ')}.`
-        : `No opportunities are currently flagged stale — every account in this dataset was contacted within the last 30 days.`,
-    };
-  }
-
-  if (/highest.*(value|expected)|expected value|biggest deal|most valuable/.test(q)) {
-    const ranked = [...recs].sort((a, b) => b.deal_value * b.win_probability - a.deal_value * a.win_probability).slice(0, 3);
-    return {
-      question,
-      matchedIds: ranked.map((r) => r.opportunity_id),
-      text: `Ranked by expected value (deal size × win probability): ${ranked.map((r) => `${r.company_name} (${fmt(r.deal_value * r.win_probability)})`).join(', ')}.`,
-    };
-  }
-
-  if (/region|location|state|underperform/.test(q)) {
-    const groups: Record<string, RecommendationItem[]> = {};
-    recs.forEach((r) => {
-      const loc = (r.evidence_pack?.structured_data?.location as string) || 'Unknown';
-      const state = loc.split(',').pop()?.trim() || 'Unknown';
-      (groups[state] ||= []).push(r);
-    });
-    const ranked = Object.entries(groups)
-      .map(([state, items]) => ({ state, avg: items.reduce((s, r) => s + r.priority_score, 0) / items.length, items }))
-      .sort((a, b) => a.avg - b.avg);
-    const worst = ranked[0];
-    return {
-      question,
-      matchedIds: worst ? worst.items.map((r) => r.opportunity_id) : null,
-      text: worst
-        ? `${worst.state} has the lowest average priority score (${worst.avg.toFixed(1)}) across ${worst.items.length} opportunit${worst.items.length === 1 ? 'y' : 'ies'}: ${worst.items.map((r) => r.company_name).join(', ')}.`
-        : 'No location data available to group by region.',
-    };
-  }
-
-  if (/today|prioriti[sz]e|contact|act now|focus|deserve attention/.test(q)) {
-    const immediate = recs.filter((r) => r.decision_class === 'IMMEDIATE_ACTION');
-    const list = immediate.length ? immediate : top(3);
-    return {
-      question,
-      matchedIds: list.map((r) => r.opportunity_id),
-      text: `${list.length} opportunit${list.length === 1 ? 'y needs' : 'ies need'} attention today: ${list.map((r) => `${r.company_name} (${r.priority_score})`).join(', ')}.`,
-    };
-  }
-
-  if (/changed|this week|update|new/.test(q)) {
-    return {
-      question,
-      matchedIds: null,
-      text: `Run ${data.decision_run_id} (policy ${data.policy_version}, snapshot ${new Date(data.data_snapshot).toLocaleDateString()}): ${data.high_priority_count} of ${recs.length} opportunities are at "act now", ${data.stale_warning_count} carry stale-data warnings. Open Approvals & Audit Replay to compare against an earlier run.`,
-    };
-  }
-
-  const list = top(3);
-  return {
-    question,
-    matchedIds: list.map((r) => r.opportunity_id),
-    text: `Top ${list.length} by priority score: ${list.map((r) => `${r.company_name} (${r.priority_score})`).join(', ')}. Total pipeline ${fmt(data.pipeline_total_value)}, weighted by win probability ${fmt(data.weighted_pipeline_value)}.`,
-  };
-}
+const STATUS_STYLE: Record<string, string> = {
+  APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  REJECTED: 'bg-slate-100 text-slate-600 border-slate-300',
+  MODIFIED: 'bg-sky-50 text-sky-700 border-sky-200',
+  REVIEW: 'bg-amber-50 text-amber-700 border-amber-200',
+  DRAFT: 'bg-slate-50 text-slate-500 border-slate-200',
+};
 
 export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
   decisionData,
@@ -119,22 +59,40 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
   onFetchContext,
   fetchingContextId,
   scoreFlash,
+  approvalStatus = {},
 }) => {
   const [question, setQuestion] = useState('');
-  const [answer, setAnswer] = useState<AskAnswer | null>(null);
+  const [answer, setAnswer] = useState<QueryResult | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
+  const [showTrail, setShowTrail] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const recommendations = decisionData?.recommendations || [];
 
   const visibleRecommendations = useMemo(() => {
-    if (!answer?.matchedIds) return recommendations;
-    const idSet = new Set(answer.matchedIds);
-    return recommendations.filter((r) => idSet.has(r.opportunity_id));
+    const ids = answer?.matched_ids;
+    if (!ids || ids.length === 0) return recommendations;
+    const idSet = new Set(ids);
+    const filtered = recommendations.filter((r) => idSet.has(r.opportunity_id));
+    return filtered.length ? filtered : recommendations;
   }, [recommendations, answer]);
+  const isFiltered = visibleRecommendations.length !== recommendations.length;
 
-  const runAsk = (q: string) => {
+  const runAsk = async (q: string) => {
     const trimmed = q.trim();
-    if (!trimmed || !decisionData) return;
-    setAnswer(answerQuestion(trimmed, recommendations, decisionData));
+    if (!trimmed || asking) return;
+    setAsking(true);
+    setAskError(null);
+    setShowTrail(false);
+    try {
+      setAnswer(await decisionForgeService.queryDecision(trimmed));
+    } catch (err: any) {
+      setAnswer(null);
+      setAskError(err.response?.data?.message || err.response?.data?.detail || 'The question service is unavailable. Your dashboard data is unaffected.');
+    } finally {
+      setAsking(false);
+    }
   };
 
   if (isLoading) {
@@ -165,16 +123,30 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
   }
 
   const { pipeline_total_value, weighted_pipeline_value, high_priority_count, stale_warning_count } = decisionData;
+  const highThreshold = decisionData.policy?.high_priority_threshold ?? 75;
+  const staleDays = decisionData.policy?.stale_days_threshold ?? 30;
+  const isSynthetic = !!decisionData.dataset_key && decisionData.dataset_key !== 'real';
 
   return (
     <div className="space-y-6">
-      {/* Ask a Question Bar (FR-009 / UC-003) */}
+      {isSynthetic && (
+        <div className="flex items-start gap-2 text-xs text-sky-900 bg-sky-50 border border-sky-200 rounded-xl p-3">
+          <ShieldAlert className="w-4 h-4 text-sky-600 flex-shrink-0 mt-0.5" />
+          <span>
+            <strong>Synthetic dataset.</strong> Companies, deal values, activities and notes are generated for scale and
+            evaluation; they are not real customers or real sources.
+          </span>
+        </div>
+      )}
+
+      {/* Ask a Question Bar */}
       <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
         <div className="flex items-center gap-2">
           <input
             id="decision-center-ask-input"
             type="text"
             value={question}
+            maxLength={500}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && runAsk(question)}
             placeholder="Ask a question about this pipeline, e.g. “Which customers have gone cold?”"
@@ -182,10 +154,10 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
           />
           <button
             onClick={() => runAsk(question)}
-            disabled={!question.trim()}
+            disabled={!question.trim() || asking}
             className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition flex-shrink-0"
           >
-            <Search className="w-3.5 h-3.5" />
+            {asking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
             Ask
           </button>
         </div>
@@ -204,10 +176,16 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
           ))}
         </div>
 
+        {askError && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">{askError}</div>
+        )}
+
         {answer && (
-          <div className="p-4 bg-rose-50/60 border border-rose-200/70 rounded-xl space-y-1.5 animate-fadeIn">
+          <div className="p-4 bg-rose-50/60 border border-rose-200/70 rounded-xl space-y-2 animate-fadeIn">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Answer</span>
+              <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">
+                Answer · <span className="text-slate-500 normal-case">ANALYSIS (computed, not generated)</span>
+              </span>
               <button
                 onClick={() => setAnswer(null)}
                 className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 flex items-center gap-1"
@@ -215,9 +193,65 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
                 <X className="w-3 h-3" /> Clear filter, show all
               </button>
             </div>
-            <p className="text-xs text-slate-800 leading-relaxed">{answer.text}</p>
+            <p className="text-xs text-slate-800 leading-relaxed">{answer.answer}</p>
+
+            <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold">
+              <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
+                Confidence {Math.round(answer.confidence * 100)}%
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
+                Intent: {answer.plan.intent.replace(/_/g, ' ')}
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600">
+                Planner: {answer.plan.planner === 'rules_fallback' ? 'rules (LLM unavailable)' : answer.plan.planner}
+              </span>
+              {answer.human_review_required && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800">Human review required</span>
+              )}
+            </div>
+
+            {answer.rag.status === 'insufficient_evidence' && (
+              <p className="text-[11px] text-amber-800">Insufficient evidence from rep notes for this question.</p>
+            )}
+            {[...answer.warnings, ...answer.fallbacks].map((w, i) => (
+              <p key={i} className="text-[11px] text-amber-800 flex items-start gap-1">
+                <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" /> {w}
+              </p>
+            ))}
+
+            <button
+              onClick={() => setShowTrail((v) => !v)}
+              className="text-[11px] font-semibold text-slate-600 hover:text-slate-800 flex items-center gap-1"
+            >
+              {showTrail ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              How this answer was produced
+            </button>
+            {showTrail && (
+              <div className="text-[11px] text-slate-600 space-y-2 bg-white/70 border border-slate-200 rounded-lg p-3">
+                <p>
+                  <strong>Steps:</strong> {answer.trace.map((t) => `${t.step} (${t.latency_ms}ms)`).join(' → ')}
+                </p>
+                {answer.analytics.map((a, i) => (
+                  <p key={i}>
+                    <strong>{a.tool}:</strong> <span className="font-mono">{a.definition}</span>
+                  </p>
+                ))}
+                {answer.rag.evidence.length > 0 && (
+                  <div>
+                    <strong>Evidence (rep notes):</strong>
+                    <ul className="mt-1 space-y-1">
+                      {answer.rag.evidence.slice(0, 5).map((e) => (
+                        <li key={e.doc_id} className="border-l-2 border-rose-300 pl-2">
+                          “{e.text}” <span className="text-slate-400 font-mono">[{e.doc_id} · {e.record_id}]</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-[10px] font-mono text-slate-400">
-              Based on {recommendations.length} records from run {decisionData.decision_run_id} · deterministic template, no external retrieval triggered
+              Snapshot {answer.snapshot_id} · {answer.basis}
             </p>
           </div>
         )}
@@ -231,7 +265,7 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
             <Building className="w-4 h-4 text-slate-400" />
           </div>
           <div className="text-2xl font-bold text-slate-900">${pipeline_total_value.toLocaleString()}</div>
-          <span className="text-[11px] text-slate-500 mt-1 block">{recommendations.length} total active opportunities</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">{recommendations.length} active opportunities</span>
         </div>
 
         <div className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl border border-slate-200/80 shadow-sm">
@@ -240,7 +274,7 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
             <TrendingUp className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-2xl font-bold text-rose-600">${weighted_pipeline_value.toLocaleString()}</div>
-          <span className="text-[11px] text-slate-500 mt-1 block">Factored by historical win velocity</span>
+          <span className="text-[11px] text-slate-500 mt-1 block">Deal value × win probability (records with a valid probability)</span>
         </div>
 
         <div className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl border border-slate-200/80 shadow-sm">
@@ -249,7 +283,7 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
             <Sparkles className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-bold text-emerald-700">{high_priority_count} Deals</div>
-          <span className="text-[11px] text-emerald-600 font-medium mt-1 block">Priority Score ≥ 75.0</span>
+          <span className="text-[11px] text-emerald-600 font-medium mt-1 block">Priority Score ≥ {highThreshold}</span>
         </div>
 
         <div className="bg-white/80 backdrop-blur-sm p-5 rounded-2xl border border-slate-200/80 shadow-sm">
@@ -258,7 +292,7 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
             <AlertTriangle className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-2xl font-bold text-amber-700">{stale_warning_count} Deals</div>
-          <span className="text-[11px] text-amber-600 font-medium mt-1 block">Untouched &gt; 30 days</span>
+          <span className="text-[11px] text-amber-600 font-medium mt-1 block">Untouched &gt; {staleDays} days</span>
         </div>
       </div>
 
@@ -268,12 +302,13 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
           <div>
             <h3 className="text-base font-bold text-slate-900">
               Ranked Decision Recommendations
-              {answer?.matchedIds && (
+              {isFiltered && (
                 <span className="ml-2 text-xs font-semibold text-rose-600">({visibleRecommendations.length} matching your question)</span>
               )}
             </h3>
             <p className="text-xs text-slate-500">
-              Deterministic priority scoring based on deal size, win probability, engagement, recency, and fresh external signals.
+              Deterministic priority scoring · data as of {new Date(decisionData.data_snapshot).toLocaleDateString()}
+              {decisionData.snapshot_id ? ` · snapshot ${decisionData.snapshot_id}` : ''}
             </p>
           </div>
           <span className="text-xs font-mono bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200">
@@ -287,6 +322,10 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
             const isMedium = rec.decision_class === 'PROCEED_WITH_QUALIFICATION';
             const isFetchingThis = fetchingContextId === rec.opportunity_id;
             const flash = scoreFlash?.opportunityId === rec.opportunity_id ? scoreFlash : null;
+            const status = approvalStatus[rec.recommendation_id];
+            const isOpen = !!expanded[rec.recommendation_id];
+            const topFactors = [...rec.factors].sort((a, b) => b.weighted_contribution - a.weighted_contribution).slice(0, 2);
+            const warnings = rec.warnings || [];
 
             return (
               <div
@@ -296,7 +335,6 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
                 {/* Header Row */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    {/* Score Progress Badge */}
                     <div
                       className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-bold border ${
                         isHigh
@@ -324,6 +362,16 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
                         >
                           {rec.decision_class.replace(/_/g, ' ')}
                         </span>
+                        {status && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_STYLE[status] || STATUS_STYLE.DRAFT}`}>
+                            {status === 'REVIEW' ? 'IN REVIEW' : status}
+                          </span>
+                        )}
+                        {rec.review_required && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                            HUMAN REVIEW REQUIRED
+                          </span>
+                        )}
                         {flash && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-mono">
                             {flash.before} → {flash.after} {flash.after >= flash.before ? '▲' : '▼'}
@@ -334,6 +382,12 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
                         <span>Contact: <strong className="text-slate-700">{rec.contact_name}</strong></span>
                         <span>•</span>
                         <span>Industry: <strong className="text-slate-700">{rec.industry}</strong></span>
+                        {rec.confidence !== undefined && (
+                          <>
+                            <span>•</span>
+                            <span>Confidence: <strong className="text-slate-700">{Math.round(rec.confidence * 100)}%</strong></span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -341,36 +395,64 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
                   <div className="flex items-center gap-4 text-right">
                     <div>
                       <span className="text-xs text-slate-400 block">Opportunity Value</span>
-                      <span className="text-lg font-bold text-slate-900">${rec.deal_value.toLocaleString()}</span>
+                      <span className="text-lg font-bold text-slate-900">{money(rec.deal_value)}</span>
                     </div>
                     <div className="border-l border-slate-200 pl-4">
-                      <span className="text-xs text-slate-400 block">Est. Win Rate</span>
+                      <span className="text-xs text-slate-400 block">Win Probability</span>
                       <span className="text-lg font-bold text-rose-600">{Math.round(rec.win_probability * 100)}%</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Stale Warning Alert */}
+                {/* Why, in one line */}
+                <p className="text-xs text-slate-600">
+                  <strong className="text-slate-800">Why:</strong>{' '}
+                  strongest drivers are {topFactors.map((f) => `${f.name} (${signed(f.weighted_contribution)} pts)`).join(' and ')}.
+                </p>
+
+                {/* Warnings: stale data and data-quality problems are never hidden */}
                 {rec.stale_data_warning && (
                   <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center gap-2 text-xs text-amber-800">
                     <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
                     <span>{rec.stale_data_warning}</span>
                   </div>
                 )}
-
-                {/* Factor Contribution Chips */}
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                  {rec.factors.map((f, i) => (
-                    <div
-                      key={i}
-                      className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-1.5"
-                    >
-                      <span>{f.name}:</span>
-                      <span className="font-bold text-slate-800">{f.raw_value}</span>
-                      <span className="font-bold text-rose-600">(+{f.weighted_contribution})</span>
+                {warnings
+                  .filter((w) => w !== rec.stale_data_warning && !w.startsWith('Last contact was'))
+                  .map((w, i) => (
+                    <div key={i} className="p-2.5 bg-amber-50/60 border border-amber-200/70 rounded-lg flex items-center gap-2 text-[11px] text-amber-800">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                      <span>{w}</span>
                     </div>
                   ))}
-                </div>
+
+                {/* Expandable technical factors */}
+                <button
+                  onClick={() => setExpanded((e) => ({ ...e, [rec.recommendation_id]: !e[rec.recommendation_id] }))}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1"
+                >
+                  {isOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  Why this score?
+                </button>
+                {isOpen && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                    {rec.factors.map((f, i) => (
+                      <div
+                        key={i}
+                        className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-1.5"
+                      >
+                        <span>{f.name}:</span>
+                        <span className="font-bold text-slate-800">{f.raw_value}</span>
+                        <span className={`font-bold ${f.weighted_contribution < 0 ? 'text-amber-700' : 'text-rose-600'}`}>
+                          ({signed(f.weighted_contribution)})
+                        </span>
+                      </div>
+                    ))}
+                    <div className="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-bold">
+                      = {rec.priority_score} / 100
+                    </div>
+                  </div>
+                )}
 
                 {/* Recommended Action & CTA */}
                 <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/50 p-3 rounded-xl">
@@ -388,7 +470,7 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
                         onClick={() => onFetchContext(rec)}
                         disabled={isFetchingThis}
                         className="px-3.5 py-1.5 text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 disabled:opacity-60 rounded-lg shadow-sm transition flex items-center gap-1.5"
-                        title="Retrieve fresh public context for this account and recalculate its score"
+                        title="Retrieve the cited public context for this account and recalculate its score (optional)"
                       >
                         {isFetchingThis ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
                         {isFetchingThis ? 'Fetching...' : 'Fetch fresh context'}
@@ -398,13 +480,14 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
                       onClick={() => onOpenEvidence(rec)}
                       className="px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm transition"
                     >
-                      View Evidence Pack
+                      View Evidence
                     </button>
                     <button
                       onClick={() => onOpenApproval(rec)}
-                      className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 rounded-lg shadow-sm flex items-center gap-1.5 transition"
+                      disabled={status === 'APPROVED' || status === 'REJECTED'}
+                      className="px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 disabled:opacity-40 rounded-lg shadow-sm flex items-center gap-1.5 transition"
                     >
-                      Review & Approve
+                      {status === 'APPROVED' || status === 'REJECTED' ? 'Decided' : 'Review & Approve'}
                       <ArrowRight className="w-3 h-3" />
                     </button>
                   </div>

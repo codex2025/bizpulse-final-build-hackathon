@@ -35,7 +35,7 @@ const TwinSimulationCard: React.FC = () => {
             </button>
           ))}
         </div>
-        <span className="rounded-full border border-lp-border px-2.5 py-1 text-[0.72rem] font-semibold text-lp-subtle-fg">Estimate · ±12% band</span>
+        <span className="rounded-full border border-lp-border px-2.5 py-1 text-[0.72rem] font-semibold text-lp-subtle-fg">Scenario estimate · assumptions shown</span>
       </div>
 
       {/* Levers */}
