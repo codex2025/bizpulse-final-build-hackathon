@@ -1,0 +1,59 @@
+LOAN AGREEMENT
+
+I. THE PARTIES. This Loan Agreement ("Agreement") made this 20th day of April, 2024, is between:
+Borrower: Nexus Technologies LLC with a mailing address of 742 Evergreen Terrace, Austin, TX 78701 ("Borrower") and agrees to borrow money from:
+Lender: Apex Global Capital Inc. with a mailing address of 100 Wall Street, Suite 1400, New York, NY 10005 ("Lender") and agrees to lend money to the Borrower under the following terms:
+
+II. LOAN AMOUNT. The total amount of money being borrowed from the Lender to the Borrower is $500,000.00 ("Borrowed Money").
+
+III. INTEREST RATE. The Borrowed Money shall:
+[X] - Bear Interest. The Borrowed Money shall bear interest at a rate of 12.5% compounded:
+[X] - Monthly
+[ ] - Annually
+[ ] - NOT Bear Interest.
+
+IV. TERM. The total amount of the Borrowed Money, including principal and interest, shall be due and payable on April 20, 2027 ("Due Date").
+
+V. PAYMENTS. The Borrower agrees to repay the Borrowed Money to the Lender under the following payment schedule:
+[X] - Monthly Payments. The Borrower agrees to repay the Lender a payment of $16,727.00 on the 1st of each month until the Due Date.
+All payments made by the Borrower shall be first applied to any accrued interest and second to the principal balance.
+
+VI. LATE PAYMENT. If the Borrower is late by more than 10 days for any payment due, it shall be considered late. If a payment is late, the Borrower shall be:
+[X] - Charged a Late Fee. The Borrower shall be charged a late fee equal to: 3.5% of the overdue monthly installment amount.
+
+VII. PREPAYMENT. If the Borrower makes a payment prior to the Due Date, there shall be:
+[X] - No Prepayment Penalty. If the Borrower makes a payment prior to the Due Date, then there shall be no prepayment penalty of any kind. The Borrower may pay down principal early without penalty fees.
+
+VIII. SECURITY. As part of this Agreement, the Borrower agrees to:
+[X] - Pledge Security. The Borrower agrees to secure this Agreement by pledging the following collateral: All commercial equipment, business inventory, and accounts receivable ("Security").
+In the event the Borrower defaults under this Agreement, the Lender shall obtain possession of the Collateral:
+[X] - Equal to the amount owed of which a sale may be required.
+
+IX. REMEDIES. No delay or omission on part of the holder of this Agreement in exercising any right hereunder shall operate as a waiver of any such right. The rights and remedies of the Lender shall be cumulative and may be pursued singly, successively, or together, at the sole discretion of the Lender.
+
+X. ACCELERATION. The Lender shall have the right to declare the Borrowed Money to be immediately due and payable, including all interest owed, if any of the following events occur:
+a. Late Payment: If any payment is late that is due under the Payment Schedule of more than 15 days;
+b. Default: If the Borrower should default on any of the conditions of this Agreement; or
+c. Security: If assets or property that are pledged as Security as part of this Agreement are transferred or sold without prior written consent.
+
+XI. SUBORDINATION. The Borrower’s obligations under this Agreement are subordinated to all senior indebtedness of the Borrower to any institutional banking lender.
+
+XII. WAIVERS BY BORROWER. All parties to this Agreement, including the Borrower and any sureties, endorsers, and guarantors, hereby waive protest, presentment, notice of dishonor, and notice of acceleration of maturity.
+
+XIII. DISPUTES. In the event any payment under this Agreement is not paid when due, the Borrower agrees to pay, in addition to the principal and interest hereunder, reasonable attorney’s fees not exceeding the maximum legal rate in the State of Governing Law, plus all collection expenses incurred by Lender upon default.
+
+XIV. SEVERABILITY. If any provision of this Agreement is held invalid or unenforceable, the remainder of this Agreement shall not be affected thereby and shall be enforced to the maximum extent permitted by law.
+
+XV. GOVERNING LAW. This Agreement shall be construed and governed by the laws located in the State of New York ("Governing Law").
+
+XVI. SUCCESSORS. All of the foregoing is the promise of Borrower and shall bind Borrower’s successors and assigns. Lender may assign rights with notice.
+
+XVII. ENTIRE AGREEMENT. This Agreement contains all terms agreed to by the parties and replaces all prior oral or written discussions.
+
+GUARANTOR (PERSONAL GUARANTEE)
+The Guarantor, Johnathan Doe, agrees to be personally liable and pay the Borrowed Amount, including principal and interest, in the event of the Borrower’s default.
+
+IN WITNESS WHEREOF, Borrower, Lender, and Guarantor have executed this Agreement as of the date first above written.
+
+Borrower: Nexus Technologies LLC          Lender: Apex Global Capital Inc.
+Date: April 20, 2024                      Date: April 20, 2024

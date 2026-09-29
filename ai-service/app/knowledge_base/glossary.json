@@ -1,0 +1,402 @@
+[
+  {
+    "term": "Amortization",
+    "plain_definition": "The process of spreading out a loan into a series of equal regular monthly payments (EMIs) over time that cover both interest and principal.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Hypothecation",
+    "plain_definition": "Pledging an asset (like inventory, machinery, or vehicle) as security for a loan while you continue to keep and use the asset. The lender can seize it only if you default.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "Moratorium",
+    "plain_definition": "A temporary grace period granted by the lender during which you are not required to pay your monthly EMI. Note that interest may still accumulate during this time.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Prepayment Penalty / Foreclosure Charge",
+    "plain_definition": "A fee charged by the lender if you pay off the loan before its scheduled tenure ends.",
+    "category": "Fees & Penalties"
+  },
+  {
+    "term": "Floating Reference Rate / Benchmark Rate",
+    "plain_definition": "An interest rate linked to an external standard (like Repo Rate or MCLR) that moves up or down whenever central bank interest rates change.",
+    "category": "Interest & Pricing"
+  },
+  {
+    "term": "Negative Lien",
+    "plain_definition": "A promise by the borrower that they will not create any debt, mortgage, or claim over their specified assets to any other party without the lender's prior consent.",
+    "category": "Covenants"
+  },
+  {
+    "term": "Equated Monthly Installment (EMI)",
+    "plain_definition": "A fixed payment amount made by a borrower to a lender on a set date each calendar month until the total loan is cleared.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Annual Percentage Rate (APR)",
+    "plain_definition": "The true yearly cost of borrowing, which includes not just the interest rate but all processing fees, insurance, and administrative charges.",
+    "category": "Interest & Pricing"
+  },
+  {
+    "term": "Acceleration Clause",
+    "plain_definition": "A strict clause that allows the lender to demand immediate full repayment of the entire remaining loan balance if you miss payments or breach terms.",
+    "category": "Default & Remedies"
+  },
+  {
+    "term": "Personal Guarantee",
+    "plain_definition": "A legally binding promise where an individual (such as a company director or proprietor) pledges their own personal savings, home, and assets if the business cannot repay.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "Cross-Default",
+    "plain_definition": "A clause declaring that defaulting on any other separate loan or credit card with any bank automatically puts this loan into default as well.",
+    "category": "Default & Remedies"
+  },
+  {
+    "term": "Right of Set-Off",
+    "plain_definition": "The legal right of the bank to seize money from your savings, current, or fixed deposit accounts to recover past-due loan balances without needing prior court approval.",
+    "category": "Default & Remedies"
+  },
+  {
+    "term": "Penal Interest",
+    "plain_definition": "An extra punitive interest charge added on top of your standard loan interest rate for late or delayed payments.",
+    "category": "Fees & Penalties"
+  },
+  {
+    "term": "Covenants (Affirmative & Negative)",
+    "plain_definition": "Rules and conditions you agree to follow during the loan period, like maintaining minimum bank balances (affirmative) or not taking more debt (negative).",
+    "category": "Covenants"
+  },
+  {
+    "term": "Indemnity",
+    "plain_definition": "An agreement to compensate the bank for any legal costs, losses, damages, or claims arising from your use of the loan or breach of contract.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Unilateral Rate Revision",
+    "plain_definition": "A term granting the lender the power to increase interest rates, margins, or spreads at its sole discretion without needing your consent.",
+    "category": "Interest & Pricing"
+  },
+  {
+    "term": "Collateral",
+    "plain_definition": "Property, cash deposits, or valuable assets pledged to secure a loan, which the lender can take ownership of if the loan is not repaid.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "Disbursement",
+    "plain_definition": "The actual release or transfer of the sanctioned loan funds from the lender to the borrower's bank account.",
+    "category": "General"
+  },
+  {
+    "term": "Tenure",
+    "plain_definition": "The total duration or time period agreed upon for repaying the entire loan (e.g., 36 months, 5 years).",
+    "category": "Repayment"
+  },
+  {
+    "term": "Debt Service Coverage Ratio (DSCR)",
+    "plain_definition": "A financial metric measuring your business's available cash flow to pay off current debt obligations (interest and principal).",
+    "category": "Financial Metrics"
+  },
+  {
+    "term": "Margin / Haircut",
+    "plain_definition": "The borrower's own cash contribution towards an asset purchase, or the discount percentage a lender applies when valuing your collateral.",
+    "category": "Financial Metrics"
+  },
+  {
+    "term": "Pari Passu",
+    "plain_definition": "A Latin legal term meaning 'on equal footing'. It ensures multiple lenders sharing the same collateral have equal rights to claim proceeds.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Key Facts Statement (KFS)",
+    "plain_definition": "A standardized one-page summary mandated by the RBI detailing the all-inclusive APR, fees, recovery agents, and grievance redressal mechanisms.",
+    "category": "Regulatory"
+  },
+  {
+    "term": "MCLR (Marginal Cost of Funds Based Lending Rate)",
+    "plain_definition": "An internal benchmark used by Indian banks to determine minimum interest rates for various loans based on their cost of deposits.",
+    "category": "Interest & Pricing"
+  },
+  {
+    "term": "EBLR (External Benchmark Lending Rate)",
+    "plain_definition": "A transparent lending rate directly tied to the RBI's repo rate or government treasury yields, ensuring rapid rate transmission.",
+    "category": "Interest & Pricing"
+  },
+  {
+    "term": "Encumbrance",
+    "plain_definition": "A legal claim or restriction on a property or asset, such as a mortgage, lien, or tax liability.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Grievance Redressal / Banking Ombudsman",
+    "plain_definition": "The formal channel or government-appointed authority where borrowers can escalate complaints against unfair lender practices.",
+    "category": "Regulatory"
+  },
+  {
+    "term": "Processing Fee",
+    "plain_definition": "A one-time non-refundable charge levied by the bank to evaluate, underwrite, and process your loan application.",
+    "category": "Fees & Penalties"
+  },
+  {
+    "term": "Foreclosure",
+    "plain_definition": "Paying off the entire outstanding loan balance in a single lump sum before the end of the loan tenure to close the account.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Cooling-Off / Look-Up Period",
+    "plain_definition": "A mandatory window (typically 3 to 7 days) allowing the borrower to cancel the loan agreement without paying heavy penalties except nominal pro-rata costs.",
+    "category": "Borrower Rights"
+  },
+  {
+    "term": "Sanction Letter",
+    "plain_definition": "A formal offer letter from the lender confirming loan approval, sanctioned amount, interest rate, and terms prior to the execution of the full agreement.",
+    "category": "General"
+  },
+  {
+    "term": "SARFAESI Act",
+    "plain_definition": "An Indian law that allows secured lenders to take possession and auction pledged physical collateral upon default without having to go through prolonged civil court cases.",
+    "category": "Regulatory"
+  },
+  {
+    "term": "Escrow Account",
+    "plain_definition": "A specialized third-party bank account holding funds (such as taxes, insurance, or project revenue) that are released only when agreed conditions are met.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "Repricing Frequency",
+    "plain_definition": "How often the lender adjusts your floating interest rate based on changes in the benchmark index (e.g., quarterly or annually).",
+    "category": "Interest & Pricing"
+  },
+  {
+    "term": "Stamp Duty",
+    "plain_definition": "A government tax paid on loan agreements and mortgage deeds to give them legal evidentiary validity in courts.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Severability",
+    "plain_definition": "A legal clause stating that if any single term of the agreement is found illegal or unenforceable, the remaining contract remains fully valid.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Lien",
+    "plain_definition": "A legal right granted to the lender to hold possession of your property or funds until the debt balance is satisfied.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "Restructuring",
+    "plain_definition": "Modifying loan terms (such as extending tenure or reducing EMI) when a borrower faces severe financial distress.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Power of Attorney (POA)",
+    "plain_definition": "A clause authorizing the lender to act on your behalf to execute sale documents, transfer collateral, or enforce claims upon default.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Non-Performing Asset (NPA)",
+    "plain_definition": "A loan where interest or principal installments have remained overdue for 90 days or more.",
+    "category": "Regulatory"
+  },
+  {
+    "term": "Lock-in Period",
+    "plain_definition": "A fixed initial timeframe during which the borrower is strictly prohibited from prepaying or transferring the loan to another lender.",
+    "category": "Fees & Penalties"
+  },
+  {
+    "term": "Subordination",
+    "plain_definition": "An agreement ranking this loan below other primary debts so that senior lenders get paid first in a liquidation.",
+    "category": "Covenants"
+  },
+  {
+    "term": "Jurisdiction & Governing Law",
+    "plain_definition": "The specific state or city courts whose local laws will settle any legal conflicts arising from the contract.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Bounce / Dishonor Charges",
+    "plain_definition": "Fees applied when an automated NACH debit or check for your EMI fails due to insufficient funds.",
+    "category": "Fees & Penalties"
+  },
+  {
+    "term": "Working Capital Limit",
+    "plain_definition": "A revolving credit line sanctioned for day-to-day business operations (payroll, raw materials, inventory).",
+    "category": "General"
+  },
+  {
+    "term": "Loan-to-Value (LTV) Ratio",
+    "plain_definition": "The percentage of an asset's appraised value that the bank is willing to lend you (e.g. 75% LTV on a ₹1 Crore home means a ₹75 Lakh loan).",
+    "category": "Financial Metrics"
+  },
+  {
+    "term": "Debt-to-Income (DTI) Ratio",
+    "plain_definition": "The proportion of your gross monthly income that goes towards paying monthly recurring debt obligations.",
+    "category": "Financial Metrics"
+  },
+  {
+    "term": "Pre-EMI Interest",
+    "plain_definition": "Interest paid only on the disbursed portion of a home or construction loan before the full property is completed and regular full EMIs begin.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Tranche Disbursement",
+    "plain_definition": "Releasing the loan amount in multiple installments tied to milestones (like building construction progress) rather than all at once.",
+    "category": "General"
+  },
+  {
+    "term": "Equitable Mortgage",
+    "plain_definition": "A mortgage created simply by physically depositing original property title deeds with the lender, without registering a formal sale conveyance deed.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "Registered Mortgage",
+    "plain_definition": "A formal mortgage deed executed and registered at the sub-registrar office, giving public notice of the lender's legal charge on the property.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "Encumbrance Certificate (EC)",
+    "plain_definition": "An official government document showing all registered transactions, claims, and mortgages on a property over a specified historical period.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Demand Promissory Note (DPN)",
+    "plain_definition": "A signed legal promise by the borrower to repay the entire principal loan amount immediately whenever demanded by the lender.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Fixed Charge",
+    "plain_definition": "A security claim over specific, identifiable assets (like a designated factory land or specific machine) that the borrower cannot sell without prior bank approval.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "Floating Charge",
+    "plain_definition": "A security claim over fluctuating business assets (like inventory or accounts receivable) that becomes fixed only when a default occurs.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "e-Mandate / e-NACH",
+    "plain_definition": "An electronic authorization given to your bank to automatically deduct monthly loan EMIs directly from your account on the scheduled due date.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Days Past Due (DPD)",
+    "plain_definition": "A credit tracking number that shows exactly how many days have elapsed since a scheduled loan installment due date was missed.",
+    "category": "Regulatory"
+  },
+  {
+    "term": "SMA (Special Mention Account)",
+    "plain_definition": "Regulatory classification for early signs of loan stress (SMA-0: 1-30 days overdue, SMA-1: 31-60 days overdue, SMA-2: 61-90 days overdue).",
+    "category": "Regulatory"
+  },
+  {
+    "term": "Wilful Defaulter",
+    "plain_definition": "A borrower who has the financial capacity to pay debts but deliberately refuses, or who diverts loan funds for unauthorized purposes.",
+    "category": "Regulatory"
+  },
+  {
+    "term": "Debt Recovery Tribunal (DRT)",
+    "plain_definition": "Specialized quasi-judicial tribunals established in India for rapid recovery of debts due to banks and financial institutions above statutory thresholds.",
+    "category": "Regulatory"
+  },
+  {
+    "term": "Insolvency and Bankruptcy Code (IBC)",
+    "plain_definition": "The Indian law governing time-bound corporate insolvency resolution and liquidation processes before the National Company Law Tribunal (NCLT).",
+    "category": "Regulatory"
+  },
+  {
+    "term": "Cash Credit (CC) / Overdraft (OD)",
+    "plain_definition": "A revolving credit facility allowing businesses to withdraw funds beyond their bank balance up to a sanctioned limit against current assets.",
+    "category": "General"
+  },
+  {
+    "term": "Drawing Power (DP)",
+    "plain_definition": "The actual usable portion of a working capital limit calculated monthly based on verified paid stock, inventory, and eligible debtors after deducting margin.",
+    "category": "Financial Metrics"
+  },
+  {
+    "term": "Letter of Credit (LC)",
+    "plain_definition": "A formal financial document issued by a bank guaranteeing payment to a seller provided specific trade documentation is presented.",
+    "category": "General"
+  },
+  {
+    "term": "Bank Guarantee (BG)",
+    "plain_definition": "A promise by a lending bank to pay a beneficiary if the borrower fails to fulfill performance or financial obligations in a contract.",
+    "category": "General"
+  },
+  {
+    "term": "Balloon Payment",
+    "plain_definition": "A disproportionately large lump-sum payment due at the very end of a loan tenure after a period of smaller regular monthly installments.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Bullet Repayment",
+    "plain_definition": "A repayment structure where the entire principal balance is repaid in a single final lump sum at maturity, with only periodic interest paid in the interim.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Step-Up EMI",
+    "plain_definition": "A repayment structure where monthly installments start lower in the initial years and gradually increase as the borrower's earnings grow.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Step-Down EMI",
+    "plain_definition": "A repayment structure where monthly installments start higher and decrease over time, ideal for borrowers nearing retirement.",
+    "category": "Repayment"
+  },
+  {
+    "term": "One Time Settlement (OTS)",
+    "plain_definition": "A negotiated compromise where the lender agrees to accept a discounted lump-sum payment to close a stressed or non-performing loan account.",
+    "category": "Repayment"
+  },
+  {
+    "term": "Breakage Costs",
+    "plain_definition": "Expenses incurred by a bank when a borrower repays a fixed-rate loan before maturity, reflecting losses on matching wholesale funding arrangements.",
+    "category": "Fees & Penalties"
+  },
+  {
+    "term": "Asset Reconstruction Company (ARC)",
+    "plain_definition": "A specialized financial institution that buys bad loans from banks to recover dues or restructure the underlying business.",
+    "category": "Regulatory"
+  },
+  {
+    "term": "Stock Audit",
+    "plain_definition": "A periodic verification by an independent chartered accountant of the borrower's pledged inventory and book debts securing working capital loans.",
+    "category": "Covenants"
+  },
+  {
+    "term": "End-Use Monitoring",
+    "plain_definition": "Procedures used by banks (such as CA certificates or direct supplier payments) to ensure loan funds are used strictly for the sanctioned purpose.",
+    "category": "Covenants"
+  },
+  {
+    "term": "Loss Payee Clause",
+    "plain_definition": "An insurance endorsement designating the lending bank as the primary recipient of any insurance payouts if pledged property or machinery is damaged.",
+    "category": "Collateral & Security"
+  },
+  {
+    "term": "CIBIL / Credit Score",
+    "plain_definition": "A three-digit numeric summary (300 to 900) reflecting a borrower's credit history and repayment reliability based on past loan and card records.",
+    "category": "Financial Metrics"
+  },
+  {
+    "term": "Title Search Report (TSR)",
+    "plain_definition": "A legal opinion prepared by an advocate investigating property ownership records for 13 to 30 years to verify clear and marketable title.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Valuation Report",
+    "plain_definition": "An assessment by a government-approved valuer determining the fair market value and distress sale value of property or machinery offered as security.",
+    "category": "Legal Terms"
+  },
+  {
+    "term": "Documentation & Admin Charges",
+    "plain_definition": "Ancillary fees levied by lenders to draft agreements, inspect collateral, and register security charges on statutory portals like CERSAI.",
+    "category": "Fees & Penalties"
+  },
+  {
+    "term": "CERSAI (Central Registry of Securitisation Asset Reconstruction and Security Interest)",
+    "plain_definition": "The central electronic registry in India where all mortgages and security charges on tangible assets must be registered to prevent duplicate borrowing on the same property.",
+    "category": "Regulatory"
+  }
+]

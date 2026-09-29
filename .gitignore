@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+**/node_modules/
+venv/
+**/venv/
+venv2/
+**/venv2/
+.venv/
+**/.venv/
+venv*/
+**/venv*/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Builds
+dist/
+**/dist/
+build/
+**/build/
+.next/
+
+# Environment files & secrets (Keep safe!)
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+**/*.env
+!*.env.example
+!**/*.env.example
+*.pem
+*.key
+*.cert
+*firebase*.json
+serviceAccountKey*.json
+
+# Local SQLite databases & vector store
+*.sqlite
+*.sqlite3
+*.db
+backend/finsight.db
+**/finsight.db
+chroma_data/
+**/chroma_data/
+chroma_db_decision_forge/
+**/chroma_db_decision_forge/
+finsight-pro-complete/
+
+# Logs & temp files
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

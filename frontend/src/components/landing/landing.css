@@ -1,0 +1,210 @@
+/*
+ * Bizpulse landing page — design tokens and effects.
+ * Everything is scoped under `.lp`, so nothing here affects the rest of the app.
+ * Color tokens are RGB channels so Tailwind's `lp-*` colors can apply opacity.
+ */
+
+.lp {
+  --background: 250 250 253;
+  --surface: 255 255 255;
+  --card: 255 255 255;
+  --foreground: 16 24 47;
+  --muted: 244 245 250;
+  --muted-foreground: 78 88 115;
+  --subtle-foreground: 102 111 139;
+  --border: 228 231 241;
+  --primary: 225 29 72;
+  --secondary: 192 38 211;
+  --accent: 124 58 237;
+  --ink: 13 17 38;
+  --positive: 4 120 87;
+  --negative: 200 30 30;
+
+  --gradient-primary: linear-gradient(100deg, rgb(var(--primary)) 0%, rgb(var(--secondary)) 55%, rgb(var(--accent)) 100%);
+  --gradient-pink: linear-gradient(95deg, rgb(var(--primary)) 0%, rgb(var(--secondary)) 100%);
+  --gradient-violet: linear-gradient(95deg, rgb(var(--accent)) 0%, rgb(79 70 229) 100%);
+
+  --glass: rgb(255 255 255 / 0.72);
+  --glass-strong: rgb(255 255 255 / 0.86);
+  --glass-border: rgb(255 255 255 / 0.9);
+  --shadow-card: 0 1px 2px rgb(16 24 47 / 0.04), 0 10px 30px -14px rgb(16 24 47 / 0.14);
+  --shadow-float: 0 30px 70px -30px rgb(76 29 149 / 0.32), 0 10px 24px -12px rgb(16 24 47 / 0.14);
+  --glow-pink: 244 114 182;
+  --glow-purple: 167 139 250;
+  --glow-blue: 147 197 253;
+
+  color-scheme: light;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+}
+
+.lp[data-theme='dark'] {
+  --background: 8 11 24;
+  --surface: 13 18 36;
+  --card: 17 23 44;
+  --foreground: 236 238 247;
+  --muted: 24 31 58;
+  --muted-foreground: 172 179 204;
+  --subtle-foreground: 142 151 180;
+  --border: 38 46 78;
+  --primary: 251 76 110;
+  --secondary: 220 86 240;
+  --accent: 150 110 250;
+  --ink: 6 9 22;
+  --positive: 52 211 153;
+  --negative: 248 113 113;
+
+  --glass: rgb(17 23 44 / 0.7);
+  --glass-strong: rgb(17 23 44 / 0.86);
+  --glass-border: rgb(255 255 255 / 0.08);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -14px rgb(0 0 0 / 0.6);
+  --shadow-float: 0 30px 70px -30px rgb(0 0 0 / 0.8), 0 10px 24px -12px rgb(0 0 0 / 0.5);
+  --glow-pink: 190 24 93;
+  --glow-purple: 91 33 182;
+  --glow-blue: 30 64 175;
+
+  color-scheme: dark;
+}
+
+/* Sticky navbar is ~72px; keep anchored sections and focused elements clear of it. */
+.lp [id] {
+  scroll-margin-top: 88px;
+}
+
+/* One visible focus treatment for every interactive element on the page. */
+.lp :where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 3px;
+}
+
+/* ---- Gradient text ---- */
+.lp-gradient-text,
+.lp-gradient-text-pink,
+.lp-gradient-text-violet {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Keeps descenders from clipping when the gradient is applied to inline text. */
+  padding-bottom: 0.06em;
+}
+.lp-gradient-text { background-image: var(--gradient-primary); }
+.lp-gradient-text-pink { background-image: var(--gradient-pink); }
+.lp-gradient-text-violet { background-image: var(--gradient-violet); }
+
+:where(.lp-gradient-bg) { background-image: var(--gradient-primary); }
+
+/* ---- Surfaces ---- */
+:where(.lp-glass) {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+:where(.lp-glass-strong) {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+:where(.lp-shadow-card) { box-shadow: var(--shadow-card); }
+:where(.lp-shadow-float) { box-shadow: var(--shadow-float); }
+
+/* ---- Buttons ---- */
+.lp-btn-primary {
+  background-image: linear-gradient(100deg, rgb(var(--primary)) 0%, rgb(var(--secondary)) 50%, rgb(var(--accent)) 100%);
+  background-size: 180% 100%;
+  background-position: 0% 50%;
+  color: #fff;
+  box-shadow: 0 10px 24px -10px rgb(var(--primary) / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.18);
+  transition: background-position 500ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 300ms ease, transform 200ms ease;
+}
+.lp-btn-primary:hover {
+  background-position: 100% 50%;
+  box-shadow: 0 14px 30px -10px rgb(var(--secondary) / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.18);
+}
+.lp-btn-primary:active { transform: translateY(1px); }
+
+.lp-arrow {
+  display: inline-block;
+  transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.group:hover .lp-arrow,
+.group:focus-visible .lp-arrow {
+  transform: translateX(3px);
+}
+
+/* ---- Hero atmosphere ---- */
+:where(.lp-hero-atmosphere) {
+  background:
+    radial-gradient(38rem 30rem at 82% 30%, rgb(var(--glow-pink) / 0.22), transparent 70%),
+    radial-gradient(34rem 28rem at 64% 62%, rgb(var(--glow-purple) / 0.26), transparent 72%),
+    radial-gradient(40rem 26rem at 8% 0%, rgb(var(--glow-blue) / 0.18), transparent 70%),
+    radial-gradient(30rem 22rem at 30% 100%, rgb(var(--glow-pink) / 0.08), transparent 70%);
+}
+:where(.lp-grid) {
+  background-image:
+    linear-gradient(to right, rgb(var(--foreground) / 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--foreground) / 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+}
+
+/* Perspective lean for the hero dashboard, desktop only (mobile stays flat and legible). */
+@media (min-width: 1024px) {
+  .lp-tilt {
+    transform: perspective(2200px) rotateX(7deg) rotateY(-13deg) rotateZ(-2.5deg);
+    transform-origin: 30% 50%;
+  }
+}
+
+/* ---- Feature card hover wash ---- */
+:where(.lp-card-wash) {
+  background-image: radial-gradient(120% 90% at 0% 0%, rgb(var(--secondary) / 0.08), transparent 60%),
+    radial-gradient(120% 90% at 100% 100%, rgb(var(--accent) / 0.07), transparent 60%);
+}
+
+/* ---- Final CTA light sweep ---- */
+:where(.lp-cta-panel) {
+  background-image:
+    radial-gradient(60% 120% at 12% 0%, rgb(255 255 255 / 0.22), transparent 60%),
+    linear-gradient(115deg, rgb(225 29 72) 0%, rgb(192 38 211) 52%, rgb(109 40 217) 100%);
+}
+:where(.lp-sheen) {
+  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.18) 45%, transparent 70%);
+  transform: translateX(-60%);
+}
+
+/* ---- DecisionForge dark panel atmosphere ---- */
+:where(.lp-ink-atmosphere) {
+  background:
+    radial-gradient(40rem 26rem at 85% 10%, rgb(124 58 237 / 0.35), transparent 70%),
+    radial-gradient(30rem 22rem at 0% 100%, rgb(225 29 72 / 0.22), transparent 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-sheen { animation: lp-sheen 7s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+  .lp-pulse-dot { animation: lp-pulse 2.4s ease-in-out infinite; }
+}
+
+@keyframes lp-sheen {
+  0%, 20% { transform: translateX(-60%); }
+  60%, 100% { transform: translateX(60%); }
+}
+@keyframes lp-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--primary) / 0.45); }
+  50% { box-shadow: 0 0 0 6px rgb(var(--primary) / 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp *,
+  .lp *::before,
+  .lp *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

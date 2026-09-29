@@ -1,0 +1,182 @@
+[
+  {
+    "id": "RF-01",
+    "pattern_name": "Unilateral Interest Rate Revision",
+    "pattern_description": "Lender reserves sole discretion to hike interest rates, spreads, or margins at any time without requiring the borrower's prior consent.",
+    "keywords": ["sole discretion", "unilateral", "alter interest rate", "without prior notice", "at the discretion of lender", "repricing without consent", "vary the spread"],
+    "severity": "High",
+    "why_risky": "The bank can increase your monthly EMI or tenure at will without your permission, significantly increasing your total cost of borrowing.",
+    "mitigation_tip": "Demand linking to an external transparent benchmark (such as RBI Repo Rate/EBLR) with explicit 30-day prior written notice before changes."
+  },
+  {
+    "id": "RF-02",
+    "pattern_name": "Unconditional Personal Guarantee & Asset Seizure",
+    "pattern_description": "Requires business owners, promoters, or family members to pledge unlimited personal liability covering personal bank accounts, family homes, and non-business assets.",
+    "keywords": ["personal guarantee", "unconditional guarantee", "jointly and severally", "personal assets", "waive right to notice as guarantor", "personal liability", "guarantors unconditionally"],
+    "severity": "High",
+    "why_risky": "If your business encounters hardship, the lender can directly seize your personal residence, family savings, and personal bank accounts even before liquidating business assets.",
+    "mitigation_tip": "Cap the guarantee strictly to your proportional equity share or limit recovery solely to primary hypothecated commercial assets."
+  },
+  {
+    "id": "RF-03",
+    "pattern_name": "Strict Acceleration Clause (Immediate Demand on Minor Breach)",
+    "pattern_description": "Allows the lender to declare the entire loan balance immediately due and payable upon a single delayed payment or technical paperwork delay without an adequate grace period.",
+    "keywords": ["accelerate", "immediately due and payable", "without notice or demand", "event of default forthwith", "full principal outstanding due", "call the loan immediately"],
+    "severity": "High",
+    "why_risky": "A single minor administrative mistake or temporary 10-day delay could force your business into insolvency as the bank demands the full principal overnight.",
+    "mitigation_tip": "Insist on a mandatory 15-to-30-day cure period (grace period) following written notice before any acceleration remedy can be triggered."
+  },
+  {
+    "id": "RF-04",
+    "pattern_name": "Prohibitive Prepayment Penalty & Extended Lock-In",
+    "pattern_description": "Imposes exorbitant exit fees (e.g., 3.5%–6% + GST) or a rigid multi-year lock-in prohibiting refinancing or early debt clearance.",
+    "keywords": ["prepayment penalty", "foreclosure charges", "lock-in period", "prepayment prohibited", "early termination fee", "exit penalty", "foreclosure fee"],
+    "severity": "Medium",
+    "why_risky": "Traps you in an expensive high-interest loan and penalizes you when your business has surplus cash to become debt-free or refinance at better market rates.",
+    "mitigation_tip": "For individual borrowers and MSE floating loans, RBI rules prohibit foreclosure penalties; ensure zero penalty for prepayments made from business cash flows."
+  },
+  {
+    "id": "RF-05",
+    "pattern_name": "Sweeping Right of Set-Off Across All Accounts",
+    "pattern_description": "Allows the lender to unilaterally freeze or debit any account, fixed deposit, or affiliated company balance held anywhere within the banking institution.",
+    "keywords": ["right of set-off", "set off any monies", "debit without notice", "combine or consolidate accounts", "lien on all balances", "paramount lien"],
+    "severity": "High",
+    "why_risky": "The bank can unexpectedly freeze your company payroll account or personal savings without prior warning, paralyzing business operations.",
+    "mitigation_tip": "Exclude payroll, employee statutory dues, and trust accounts from any blanket set-off provision."
+  },
+  {
+    "id": "RF-06",
+    "pattern_name": "Cross-Default Trigger",
+    "pattern_description": "A clause stating that any dispute, delay, or technical breach under any unrelated third-party facility automatically triggers a default under this agreement.",
+    "keywords": ["cross default", "cross-default", "default under any other agreement", "indebtedness to any third party", "deemed to be in default under all facilities"],
+    "severity": "Medium",
+    "why_risky": "An isolated dispute over a minor vendor invoice or personal credit card can immediately trigger a catastrophic default on your primary commercial loan.",
+    "mitigation_tip": "Restrict cross-default triggers to material financial defaults above a specific monetary threshold (e.g. > ₹10,00,000) and require formal default declaration."
+  },
+  {
+    "id": "RF-07",
+    "pattern_name": "Mandatory One-Sided Arbitration & Faraway Jurisdiction",
+    "pattern_description": "Restricts dispute resolution to a sole arbitrator appointed solely by the lender, often in a distant jurisdiction, while stripping the borrower of local court remedies.",
+    "keywords": ["sole arbitrator appointed by lender", "exclusive jurisdiction", "waive right to court trial", "arbitration award final and binding without appeal", "seat of arbitration solely determined"],
+    "severity": "Medium",
+    "why_risky": "Severely handicaps your legal defense by requiring expensive travel and proceedings before a lender-selected arbitrator.",
+    "mitigation_tip": "Ensure mutual appointment of a neutral arbitrator and seat dispute resolution in your home business jurisdiction."
+  },
+  {
+    "id": "RF-08",
+    "pattern_name": "Blanket Power of Attorney (POA) & Unilateral Asset Sale",
+    "pattern_description": "Borrower irrevocably appoints the lender as attorney-in-fact to sign, transfer, assign, or sell any borrower property without judicial oversight.",
+    "keywords": ["irrevocable power of attorney", "attorney-in-fact", "sell transfer convey", "without borrower consent or knowledge", "power to execute conveyances"],
+    "severity": "High",
+    "why_risky": "Grants the lender extraordinary unchecked authority to execute binding sale or mortgage deeds on your company's valuable assets without court supervision.",
+    "mitigation_tip": "Limit power of attorney strictly to ministerial document perfection rather than direct commercial disposal."
+  },
+  {
+    "id": "RF-09",
+    "pattern_name": "Compounding Penal Charges on Default",
+    "pattern_description": "Levying excessive penal interest (e.g. 24% to 36% p.a.) and compounding penal interest onto principal monthly, creating an inescapable debt trap.",
+    "keywords": ["penal interest compounded monthly", "overdue charges capitalized", "penalty interest on overdue amounts", "compound penal rate", "capitalization of penal interest"],
+    "severity": "High",
+    "why_risky": "Penal compounding causes overdue balances to spiral exponentially. RBI guidelines explicitly prohibit capitalization of penal charges.",
+    "mitigation_tip": "Ensure penal charges are levied strictly on a simple, non-capitalized basis in compliance with RBI Fair Practice Code circulars."
+  },
+  {
+    "id": "RF-10",
+    "pattern_name": "Broad Unilateral Change of Terms / Negative Covenants",
+    "pattern_description": "Bank reserves the right to amend covenants, fee schedules, or operational rules at any time merely by updating their general website or notice board.",
+    "keywords": ["modify terms from time to time", "published on website", "binding upon notice", "amend without express agreement", "alter general conditions at will"],
+    "severity": "Medium",
+    "why_risky": "You could unknowingly violate new terms that were never directly communicated or explicitly agreed upon.",
+    "mitigation_tip": "Require that material amendments to terms and conditions must be formally executed in writing signed by both parties."
+  },
+  {
+    "id": "RF-11",
+    "pattern_name": "Balloon Payment / Refinancing Cliff Trap",
+    "pattern_description": "Features low initial monthly installments with an immense un-amortized lump-sum balance due on the final maturity date.",
+    "keywords": ["balloon payment", "bullet maturity", "un-amortized balance due at maturity", "final balloon installment"],
+    "severity": "High",
+    "why_risky": "If market liquidity tightens or your revenue dips when the balloon payment comes due, you could face sudden default and foreclosure if unable to refinance.",
+    "mitigation_tip": "Ensure the loan structure amortizes smoothly over the entire tenure, or secure pre-agreed refinancing options before signing."
+  },
+  {
+    "id": "RF-12",
+    "pattern_name": "Mandatory Post-Dated Cheques (PDC) Criminal Clause Exposure",
+    "pattern_description": "Requires submitting numerous undated security cheques allowing the bank to trigger Section 138 Negotiable Instruments Act criminal proceedings upon commercial default.",
+    "keywords": ["undated cheques", "security cheques", "section 138", "post-dated cheques", "criminal liability under NI act"],
+    "severity": "High",
+    "why_risky": "Commercial loan defaults can be converted into criminal proceedings with threat of arrest if the lender deposits undated security cheques without authorization.",
+    "mitigation_tip": "Refuse undated blank cheques; provide modern electronic e-NACH mandates where payments are handled through standard civil commercial channels."
+  },
+  {
+    "id": "RF-13",
+    "pattern_name": "Subjective Material Adverse Change (MAC) Trigger",
+    "pattern_description": "Gives the lender the arbitrary power to declare a default whenever they 'deem' in their sole judgment that your financial condition or business sector has deteriorated.",
+    "keywords": ["material adverse change", "in the opinion of the lender", "deemed unsatisfactory", "adverse change in market condition", "sole judgment of bank"],
+    "severity": "Medium",
+    "why_risky": "The bank can cancel your credit line or demand early repayment during general economic downturns even if you have never missed a single payment.",
+    "mitigation_tip": "Tie Material Adverse Change strictly to objective financial breaches (e.g. audited net worth reduction > 30%) rather than subjective bank opinion."
+  },
+  {
+    "id": "RF-14",
+    "pattern_name": "100% Mandatory Cash Sweep on Asset Sales",
+    "pattern_description": "Demands that all gross proceeds from any normal business equipment upgrade, property sale, or subsidiary divestment be seized for debt prepayment.",
+    "keywords": ["mandatory cash sweep", "proceeds of asset sale", "100% of disposal proceeds", "sweep of net cash proceeds"],
+    "severity": "Medium",
+    "why_risky": "Prevents your business from reinvesting capital into new, modern equipment or using asset sale proceeds to manage operational restructuring.",
+    "mitigation_tip": "Allow asset disposal reinvestment within a 6-to-12-month window for replacement productive equipment before any mandatory prepayment sweep applies."
+  },
+  {
+    "id": "RF-15",
+    "pattern_name": "Immediate Waiver of Statutory SARFAESI 60-Day Notice",
+    "pattern_description": "Clause attempting to make the borrower waive statutory protections or notice periods mandated under Indian security enforcement laws.",
+    "keywords": ["waive notice under SARFAESI", "without 60 days notice", "immediate repossession without statutory period", "waiver of statutory defense"],
+    "severity": "High",
+    "why_risky": "Strips your legal defense window under the SARFAESI Act, risking swift physical repossession of plant or property without proper legal review.",
+    "mitigation_tip": "Statutory notice rights under the SARFAESI Act cannot be legally waived; ensure agreements explicitly reflect mandatory 60-day Section 13(2) notices."
+  },
+  {
+    "id": "RF-16",
+    "pattern_name": "Forced Insurance Bundling & Single-Vendor Monopoly",
+    "pattern_description": "Mandates that borrower must purchase expensive property, life, or loan insurance exclusively through the lender's proprietary insurance partner at inflated premiums.",
+    "keywords": ["exclusively through bank's insurance partner", "mandatory insurance policy as condition precedent", "single insurance vendor", "insurance premium capitalized into loan"],
+    "severity": "Medium",
+    "why_risky": "Inflates the total cost of credit through uncompetitive insurance premiums and locks you into policies that may offer inferior coverage.",
+    "mitigation_tip": "Under RBI guidelines, borrowers have the legal right to procure required comprehensive insurance from any IRDAI-licensed insurer of their choice."
+  },
+  {
+    "id": "RF-17",
+    "pattern_name": "Involuntary Equity Conversion / Warrant Attachment",
+    "pattern_description": "Authorizes the lender upon default or covenant breach to unilaterally convert outstanding debt into equity shares at a heavy distress discount.",
+    "keywords": ["convert debt into equity", "distress valuation", "equity conversion right", "warrants attachment", "dilution of promoter shareholding"],
+    "severity": "High",
+    "why_risky": "You could lose majority control of your business to the lender or distress funds without adequate compensation.",
+    "mitigation_tip": "Insist that any debt-to-equity conversion must be mutually approved with valuations performed by an independent SEBI-registered valuer."
+  },
+  {
+    "id": "RF-18",
+    "pattern_name": "Negative Pledge Restricting Ordinary Working Capital",
+    "pattern_description": "Prohibits the borrower from obtaining normal unsecured trade credit, supplier vendor financing, or leasing equipment necessary for daily factory operations.",
+    "keywords": ["no further indebtedness of any kind", "negative pledge on all trade credit", "prior consent for all supplier terms", "prohibit operational credit lines"],
+    "severity": "Medium",
+    "why_risky": "Constrains day-to-day business agility by requiring cumbersome written bank consents before taking normal supplier 30-day payment terms.",
+    "mitigation_tip": "Carve out permitted indebtedness for customary trade credit and operational working capital under a defined threshold."
+  },
+  {
+    "id": "RF-19",
+    "pattern_name": "Sweeping Borrower Indemnity Without Negligence Carveout",
+    "pattern_description": "Requires the borrower to indemnify the bank against all losses, expenses, and damages including situations arising from the lender's own gross negligence or administrative errors.",
+    "keywords": ["indemnify and hold harmless", "against all claims and losses whatsoever", "without limitation to bank misconduct", "regardless of lender fault"],
+    "severity": "Medium",
+    "why_risky": "You could be forced to pay the bank's legal expenses and losses even when the dispute was caused by the bank's own accounting mistake.",
+    "mitigation_tip": "Add standard carveouts: 'except in cases of the Lender's proven gross negligence, fraud, or willful misconduct.'"
+  },
+  {
+    "id": "RF-20",
+    "pattern_name": "Forfeiture of Processing & Upfront Sanction Fees",
+    "pattern_description": "Lender charges massive upfront fees and states they are 100% non-refundable even if the bank fails to disburse funds due to its own internal reasons.",
+    "keywords": ["non-refundable processing fee", "forfeiture of upfront charges", "no refund upon non-disbursement", "retained by bank irrespective of disbursement"],
+    "severity": "Medium",
+    "why_risky": "You lose significant capital (1%–2% of facility amount) if the lender changes internal policy or delays disbursement indefinitely.",
+    "mitigation_tip": "Ensure processing fees are refundable (less reasonable administrative actuals) if the lender fails to disburse the loan through no fault of the borrower."
+  }
+]

@@ -1,0 +1,57 @@
+DBS BANK INDIA LIMITED
+HOUSING & MORTGAGE TERM LOAN AGREEMENT
+
+DOCUMENT IDENTIFIER: DBS/IN/HL-MORTGAGE/2024-55109
+DATE OF EXECUTION: November 05, 2024
+PLACE: Mumbai, Maharashtra
+
+BETWEEN:
+1. DBS BANK INDIA LIMITED, a banking company licensed under the Banking Regulation Act, 1949, having its Registered Office at Express Towers, Nariman Point, Mumbai - 400021 (the "Bank").
+2. AMIT KUMAR VERMA and SUNITA A. VERMA, Indian nationals residing at Flat 802, Regency Towers, Powai, Mumbai - 400076 (collectively the "Borrower").
+
+WHEREAS:
+The Borrower has requested the Bank for financial assistance in the nature of a Housing Term Loan for acquiring Residential Property situated at Unit 1404, Lake View Heights, Powai, Mumbai.
+
+OPERATIVE PROVISIONS:
+
+1. PRINCIPAL LOAN AMOUNT & DISBURSEMENT
+1.1 The Bank grants to the Borrower a term loan facility of ₹1,20,00,000/- (Indian Rupees One Crore Twenty Lakhs Only).
+1.2 Disbursement shall be made in stages directly to the property developer (Escrow Account) based on construction-linked completion certificates.
+1.3 Processing fee of 0.50% of the loan amount plus applicable GST is payable upfront and is non-refundable.
+
+2. INTEREST & EXTERNAL BENCHMARK RATE (EBLR)
+2.1 Interest shall be charged at the floating External Benchmark Lending Rate (EBLR), currently pegged to the RBI Repo Rate (6.50%) + Spread of 2.25%, resulting in an effective initial interest rate of 8.75% per annum computed on daily reducing balance.
+2.2 REPRICING FREQUENCY: The interest rate shall be automatically reset on the first day of the calendar quarter following any revision in the RBI Repo Rate.
+2.3 The Bank may reset the spread/margin every 3 years based on the Borrower's updated credit score and risk assessment.
+
+3. TENURE & EQUATED MONTHLY INSTALLMENTS (EMI)
+3.1 The facility is sanctioned for a total tenure of 240 months (20 years).
+3.2 The initial EMI is ₹1,06,048/- payable on the 10th of every calendar month through automated NACH mandate.
+3.3 Pre-EMI Interest shall be payable monthly during the construction period until final possession and disbursement.
+
+4. PREPAYMENT & FORECLOSURE TERMS (RBI COMPLIANCE)
+4.1 In accordance with Reserve Bank of India (RBI) master directions for individual floating-rate housing loans:
+  (a) Zero (0%) Prepayment Penalty or Foreclosure Charges shall apply to any partial or full prepayments made by individual borrowers from own sources or balance transfer.
+  (b) The Borrower may prepay any amount exceeding ₹25,000 at any time without notice.
+
+5. MORTGAGE, TITLE DEED DEPOSIT & NEGATIVE LIEN
+5.1 The Borrower shall create an Equitable Mortgage by depositing original title deeds, allotment letter, and occupancy certificate of Property Unit 1404, Lake View Heights, Powai with the Bank.
+5.2 The Borrower covenants not to let, lease, sell, assign, or create any negative lien or third-party charge on the mortgaged property throughout the currency of the loan.
+
+6. INSURANCE & ESCROW COVENANTS
+6.1 The Borrower shall maintain Comprehensive Property & Fire Insurance covering the mortgaged property with the Bank endorsed as the sole loss payee.
+6.2 In case of default in insurance premium renewal, the Bank may pay the premium and debit the same to the loan account with interest.
+
+7. EVENTS OF DEFAULT & BANK REMEDIES
+7.1 Default shall occur if the Borrower fails to pay any EMI within 30 days of the due date, suffers insolvency, or creates an unauthorized lien on the property.
+7.2 Upon default, the Bank may initiate proceedings under the Securitisation and Reconstruction of Financial Assets and Enforcement of Security Interest (SARFAESI) Act, 2002 to take physical possession and sell the secured property.
+7.3 LATE PAYMENT CHARGES: Late payment charges of ₹500 per default plus overdue penal interest of 1.5% per month (18% p.a.) shall be levied on overdue EMI payments.
+
+8. COOLING-OFF PERIOD & GRIEVANCE REDRESSAL
+8.1 A cooling-off period of 5 calendar days from loan agreement execution is available to the Borrower to exit the agreement by repaying principal without prepayment penalty.
+8.2 In case of unresolved grievances, the Borrower may reach the Principal Nodal Officer at dbsnodalofficer@dbs.com or the RBI Banking Ombudsman at cms.rbi.org.in.
+
+IN WITNESS WHEREOF the parties have executed this Agreement:
+Borrower 1: Amit Kumar Verma
+Borrower 2: Sunita A. Verma
+For DBS Bank India Ltd: Authorized Signatory

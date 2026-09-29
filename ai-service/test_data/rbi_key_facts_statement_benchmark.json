@@ -1,0 +1,63 @@
+{
+  "rbi_circular_reference": "RBI/2024-25/18 DOR.STR.REC.13/13.03.00/2024-25 (April 15, 2024)",
+  "standard_format_name": "Key Facts Statement (KFS) for Retail and MSME Term Loans",
+  "purpose": "Official benchmark/answer key for simplified loan terms disclosure",
+  "mandatory_kfs_fields": {
+    "1_loan_sanctioned_amount": {
+      "definition": "Net amount approved for the borrower",
+      "plain_explanation": "The exact total money the bank agreed to loan you."
+    },
+    "2_disbursement_schedule": {
+      "definition": "Tranche breakdown or lump-sum timeline",
+      "plain_explanation": "When and how the funds will hit your bank account."
+    },
+    "3_loan_tenure": {
+      "definition": "Period of the loan in months/years",
+      "plain_explanation": "Total number of months you have to pay back the loan."
+    },
+    "4_instalment_amount_and_type": {
+      "definition": "Monthly EMI breakdown (interest + principal)",
+      "plain_explanation": "Your fixed monthly payment amount."
+    },
+    "5_interest_rate_and_type": {
+      "definition": "Fixed vs. Floating (Benchmark + Spread)",
+      "plain_explanation": "Whether your rate is fixed or can change when central bank repo rates move."
+    },
+    "6_annual_percentage_rate_apr": {
+      "definition": "All-inclusive annual cost of credit (Interest + Processing + Insurance + Admin)",
+      "plain_explanation": "The real, all-in percentage cost of your loan per year."
+    },
+    "7_contingent_penal_charges": {
+      "definition": "Late fees and bounce charges (must be simple, non-capitalized)",
+      "plain_explanation": "Extra fees charged if you pay late. Note: RBI bans compounding interest on penalties."
+    },
+    "8_foreclosure_and_prepayment_charges": {
+      "definition": "Charges for paying early (0% for individual floating loans)",
+      "plain_explanation": "Fees for paying off the loan early. Zero penalty if you are an individual on a floating rate."
+    },
+    "9_cooling_off_look_up_period": {
+      "definition": "Window to cancel without penalty (typically 3-7 days)",
+      "plain_explanation": "Grace window to change your mind and exit the loan without penalty."
+    },
+    "10_grievance_redressal_details": {
+      "definition": "Nodal officer and Banking Ombudsman contact info",
+      "plain_explanation": "Where you can report unfair bank practices or file regulatory complaints."
+    }
+  },
+  "sample_kfs_benchmark_data": {
+    "lender_name": "Standard Regulated Entity (Bank / NBFC)",
+    "sanctioned_amount_inr": 7500000,
+    "tenure_months": 60,
+    "nominal_interest_rate_pct": 12.75,
+    "effective_apr_pct": 13.62,
+    "upfront_fees_total_inr": 75000,
+    "monthly_emi_inr": 169690,
+    "prepayment_penalty_pct": 3.5,
+    "cooling_off_period_days": 5,
+    "red_flag_warnings": [
+      "Unilateral rate change clause without prior consent",
+      "Personal guarantee exposing director's private residential assets",
+      "Immediate acceleration within 7 days upon technical default"
+    ]
+  }
+}

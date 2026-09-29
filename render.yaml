@@ -1,0 +1,37 @@
+services:
+  # 1. Backend API Gateway (NestJS)
+  - type: web
+    name: bizpulse-backend
+    env: node
+    plan: free
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: bizpulse-ai-service
+          property: host
+      - key: NODE_ENV
+        value: production
+
+  # 2. AI Engine & RAG Service (FastAPI + ChromaDB)
+  - type: web
+    name: bizpulse-ai-service
+    env: python
+    plan: free
+    buildCommand: cd ai-service && pip install -r requirements.txt
+    startCommand: cd ai-service && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CHROMA_PERSIST_DIR
+        value: /tmp/chroma_data
+      - key: MODEL_NAME
+        value: gpt-4o
