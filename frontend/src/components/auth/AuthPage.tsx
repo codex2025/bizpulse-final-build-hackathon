@@ -12,10 +12,10 @@ interface AuthPageProps {
 }
 
 const features = [
-  { icon: BarChart3, title: 'Smart Analytics', desc: 'Real-time cash flow insights & trend predictions' },
-  { icon: FileText, title: 'Contract AI', desc: 'Analyze contracts with Antigravity Intelligence' },
-  { icon: TrendingUp, title: 'Growth Tracking', desc: 'Historical data & profit forecasting' },
-  { icon: Shield, title: 'Bank-grade Security', desc: 'Firebase + JWT-secured, encrypted at rest' },
+  { icon: BarChart3, title: 'Commercial Analytics', desc: 'Real-time operational cashflow velocity & margin intelligence' },
+  { icon: FileText, title: 'Contract Intelligence', desc: 'Identify loan covenants, penalty risks & personal guarantees' },
+  { icon: TrendingUp, title: 'DecisionForge Engine', desc: 'Mathematical deal prioritization & win probability scoring' },
+  { icon: Shield, title: 'Enterprise Security', desc: 'Encrypted at rest, JWT authenticated session tokens' },
 ];
 
 export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
@@ -43,8 +43,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
       } else {
         navigate('/onboarding');
       }
-    } catch (err: any) {
-      setError(err.message || 'Google Sign-In failed. Please try again.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Google Sign-In failed. Please try again.';
+      setError(msg);
     } finally {
       setGoogleLoading(false);
     }
@@ -67,8 +68,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
         });
         navigate('/onboarding');
       }
-    } catch (err: any) {
-      setError(err.message || err.response?.data?.message || 'Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      let msg = 'Authentication error. Please verify your credentials.';
+      if (err instanceof Error) msg = err.message;
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -78,99 +81,100 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     <div className="min-h-screen flex overflow-hidden bg-slate-50">
       {/* Left panel - branding */}
       <motion.div
-        initial={{ opacity: 0, x: -40 }}
+        initial={{ opacity: 0, x: -30 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.7, ease: 'easeOut' }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
         className="hidden lg:flex flex-col justify-between w-1/2 p-16 relative overflow-hidden border-r border-slate-200 bg-white"
       >
-        {/* Decorative orbs */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 bg-brand-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-80 h-80 bg-violet-500/5 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/3 w-64 h-64 bg-indigo-500/5 rounded-full blur-2xl" />
+        {/* Subtle decorative glow */}
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-cobalt-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-brand-500 to-violet-600 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/30">
+          <div className="w-10 h-10 bg-cobalt-600 rounded-xl flex items-center justify-center shadow-lg shadow-cobalt-600/20">
             <Zap size={20} className="text-white" />
           </div>
-          <span className="text-2xl font-black gradient-text tracking-tight">Bizpulse</span>
+          <span className="text-2xl font-black text-ink-900 tracking-tight">Bizpulse</span>
         </div>
 
         {/* Hero text */}
-        <div className="relative z-10 space-y-8">
+        <div className="relative z-10 space-y-8 max-w-lg">
           <div>
             <motion.h1
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.6 }}
-              className="text-5xl font-black text-slate-900 leading-tight mb-4"
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="text-4xl lg:text-5xl font-black text-ink-900 leading-tight mb-4 tracking-tight"
             >
               Financial intelligence,<br />
-              <span className="gradient-text">customized for you.</span>
+              <span className="text-cobalt-600">purpose-built for business.</span>
             </motion.h1>
             <motion.p
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
-              className="text-slate-500 text-lg font-medium leading-relaxed"
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="text-slate-500 text-base font-medium leading-relaxed"
             >
-              Enterprise SME billing, freelancer milestone tracking, employee salary budgets, and personal daily expense management — all in one AI-powered hub.
+              Enterprise cashflow telemetry, legal contract intelligence, automated decision progression, and GST tax invoicing in a unified operating architecture.
             </motion.p>
           </div>
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.6 }}
-            className="grid grid-cols-2 gap-4"
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="grid grid-cols-2 gap-3.5"
           >
             {features.map(({ icon: Icon, title, desc }, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.55 + i * 0.08 }}
-                className="p-4 rounded-2xl bg-slate-50/50 border border-slate-100 hover:border-brand-500/30 hover:bg-white transition-all shadow-xs hover:shadow-md"
+                transition={{ delay: 0.45 + i * 0.06 }}
+                className="p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-cobalt-300 hover:bg-white transition-all shadow-2xs hover:shadow-xs"
               >
-                <Icon size={20} className="text-brand-600 mb-2" />
-                <p className="text-sm font-bold text-slate-900 mb-1">{title}</p>
-                <p className="text-xs text-slate-500 font-medium">{desc}</p>
+                <Icon size={18} className="text-cobalt-600 mb-2" />
+                <p className="text-xs font-bold text-ink-900 mb-0.5">{title}</p>
+                <p className="text-[11px] text-slate-500 font-medium leading-normal">{desc}</p>
               </motion.div>
             ))}
           </motion.div>
         </div>
 
-        {/* Powered by */}
-        <div className="relative z-10 flex items-center gap-2 text-xs text-slate-400">
-          <Zap size={12} className="text-brand-600" />
-          <span>Powered by <span className="text-brand-700 font-bold uppercase tracking-tight">Antigravity Intelligence</span></span>
+        {/* System footer */}
+        <div className="relative z-10 flex items-center gap-2 text-xs text-slate-400 font-medium">
+          <Zap size={13} className="text-cobalt-600" />
+          <span>Bizpulse Financial Operating Engine • v2.4 Production</span>
         </div>
       </motion.div>
 
       {/* Right panel - auth form */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12 overflow-y-auto">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-          className="w-full max-w-sm"
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="w-full max-w-sm space-y-6"
         >
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-6 lg:hidden">
-            <div className="w-8 h-8 bg-gradient-to-br from-brand-500 to-violet-600 rounded-lg flex items-center justify-center">
+          <div className="flex items-center gap-2 mb-2 lg:hidden">
+            <div className="w-8 h-8 bg-cobalt-600 rounded-lg flex items-center justify-center">
               <Zap size={16} className="text-white" />
             </div>
-            <span className="text-xl font-black gradient-text">Bizpulse</span>
+            <span className="text-xl font-black text-ink-900">Bizpulse</span>
           </div>
 
-          <h1 className="text-3xl font-black text-slate-900 mb-1.5">
-            {mode === 'login' ? 'Welcome back 👋' : 'Create your account'}
-          </h1>
-          <p className="text-slate-500 font-medium text-xs mb-6">
-            {mode === 'login'
-              ? 'Sign in to access your financial intelligence portal'
-              : 'Sign up to configure your personalized financial workspace.'}
-          </p>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-ink-900 mb-1.5 tracking-tight">
+              {mode === 'login' ? 'Welcome back 👋' : 'Create your account'}
+            </h1>
+            <p className="text-slate-500 font-medium text-xs">
+              {mode === 'login'
+                ? 'Sign in to access your financial intelligence portal'
+                : 'Sign up to configure your personalized enterprise workspace.'}
+            </p>
+          </div>
 
           <AnimatePresence>
             {error && (
@@ -178,28 +182,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 text-red-500 text-xs font-semibold flex items-center gap-2"
+                className="bg-vermilion-50 border border-vermilion-200 rounded-xl p-3 text-vermilion-700 text-xs font-semibold flex items-center gap-2"
               >
-                <span className="w-4 h-4 rounded-full bg-red-500/30 flex items-center justify-center text-[10px] font-black">!</span>
-                {error}
+                <span className="w-4 h-4 rounded-full bg-vermilion-200 text-vermilion-800 flex items-center justify-center text-[10px] font-black">!</span>
+                <span>{error}</span>
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Google Sign-in Button */}
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
+          <button
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading || loading}
-            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 shadow-xs transition-all cursor-pointer disabled:opacity-50 mb-4"
+            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
             {googleLoading ? (
               <motion.span
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-                className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full block"
+                className="w-4 h-4 border-2 border-cobalt-600 border-t-transparent rounded-full block"
               />
             ) : (
               <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -222,12 +224,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
               </svg>
             )}
             <span>{mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}</span>
-          </motion.button>
+          </button>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-4">
+          <div className="flex items-center gap-3">
             <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">or with email</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">or continue with email</span>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
 
@@ -250,7 +252,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
               <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="email"
-                placeholder="Email address"
+                placeholder="Work email address"
                 required
                 className="input-field pl-9 text-xs font-semibold"
                 value={form.email}
@@ -262,7 +264,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
               <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type={showPass ? 'text' : 'password'}
-                placeholder="Password"
+                placeholder="Account password"
                 required
                 className="input-field pl-9 pr-10 text-xs font-semibold"
                 value={form.password}
@@ -278,22 +280,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
             </div>
 
             {mode === 'login' && (
-              <div className="bg-slate-100/70 border border-slate-200 rounded-xl p-3 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
-                  <Zap size={12} className="text-brand-600" />
+              <div className="bg-slate-100/80 border border-slate-200 rounded-xl p-3 flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-lg bg-cobalt-50 border border-cobalt-100 flex items-center justify-center flex-shrink-0 text-cobalt-600">
+                  <Zap size={11} />
                 </div>
-                <p className="text-xs text-slate-600 font-medium">
-                  Try demo: <span className="text-brand-700 font-bold">demo@bizpulse.com</span> / <span className="text-brand-700 font-bold">demo123</span>
+                <p className="text-[11px] text-slate-600 font-medium">
+                  Demo account: <strong className="text-ink-900">demo@bizpulse.com</strong> / <strong className="text-ink-900">demo123</strong>
                 </p>
               </div>
             )}
 
-            <motion.button
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
+            <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full py-3 text-sm font-extrabold rounded-xl mt-2 relative overflow-hidden cursor-pointer"
+              className="btn-primary w-full py-2.5 text-xs font-extrabold rounded-xl cursor-pointer"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -302,17 +302,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                     transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
                     className="w-4 h-4 border-2 border-white border-t-transparent rounded-full block"
                   />
-                  {mode === 'login' ? 'Signing in...' : 'Creating account...'}
+                  {mode === 'login' ? 'Signing in...' : 'Registering...'}
                 </span>
-              ) : mode === 'login' ? 'Sign In →' : 'Continue to Mode Selection →'}
-            </motion.button>
+              ) : mode === 'login' ? 'Sign In →' : 'Continue to Workspace Mode →'}
+            </button>
           </form>
 
-          <p className="text-center text-xs text-slate-500 font-medium mt-5">
+          <p className="text-center text-xs text-slate-500 font-medium">
             {mode === 'login' ? (
-              <>Don't have an account? <Link to="/register" className="text-brand-600 hover:text-brand-700 font-bold transition-colors">Sign up free</Link></>
+              <>Don't have an account? <Link to="/register" className="text-cobalt-600 hover:text-cobalt-700 font-bold">Sign up free</Link></>
             ) : (
-              <>Already have an account? <Link to="/login" className="text-brand-600 hover:text-brand-700 font-bold transition-colors">Sign in</Link></>
+              <>Already have an account? <Link to="/login" className="text-cobalt-600 hover:text-cobalt-700 font-bold">Sign in</Link></>
             )}
           </p>
         </motion.div>
