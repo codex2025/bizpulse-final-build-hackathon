@@ -6,6 +6,7 @@ import { DecisionRun } from './entities/decision-run.entity';
 import { DecisionApproval } from './entities/approval.entity';
 import { DecisionAuditLog } from './entities/audit-log.entity';
 import { DecisionPolicyConfig } from './entities/policy-config.entity';
+import { DecisionQueryLog } from './entities/query-log.entity';
 import { Client } from '../clients/entities/client.entity';
 
 @Module({
@@ -15,6 +16,7 @@ import { Client } from '../clients/entities/client.entity';
       DecisionApproval,
       DecisionAuditLog,
       DecisionPolicyConfig,
+      DecisionQueryLog,
       Client,
     ]),
   ],

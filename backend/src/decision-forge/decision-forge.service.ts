@@ -2,11 +2,12 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { DecisionRun } from './entities/decision-run.entity';
-import { DecisionApproval } from './entities/approval.entity';
+import { DecisionApproval, ApprovalStatus } from './entities/approval.entity';
 import { DecisionAuditLog } from './entities/audit-log.entity';
 import { DecisionPolicyConfig } from './entities/policy-config.entity';
+import { DecisionQueryLog } from './entities/query-log.entity';
 import { Client } from '../clients/entities/client.entity';
 
 const DEFAULT_POLICY = {
@@ -18,6 +19,36 @@ const DEFAULT_POLICY = {
   highPriorityThreshold: 75.0,
   mediumPriorityThreshold: 55.0,
 };
+
+/** Approval state machine. APPROVED and REJECTED are terminal; MODIFIED may still be decided. */
+const TRANSITIONS: Record<string, ApprovalStatus[]> = {
+  DRAFT: ['REVIEW', 'APPROVED', 'REJECTED', 'MODIFIED'],
+  PENDING: ['REVIEW', 'APPROVED', 'REJECTED', 'MODIFIED'],
+  REVIEW: ['APPROVED', 'REJECTED', 'MODIFIED'],
+  MODIFIED: ['APPROVED', 'REJECTED', 'MODIFIED'],
+  APPROVED: [],
+  REJECTED: [],
+};
+const FINAL_STATES: ApprovalStatus[] = ['APPROVED', 'REJECTED'];
+
+export function canTransition(from: string, to: string): boolean {
+  return (TRANSITIONS[from] || []).includes(to as ApprovalStatus);
+}
+
+const MAX_NOTES = 2000;
+const MAX_ACTION = 1000;
+const MAX_QUESTION = 500;
+
+function cleanText(value: any, max: number, field: string): string {
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') {
+    throw new HttpException(`${field} must be text.`, HttpStatus.BAD_REQUEST);
+  }
+  if (value.length > max) {
+    throw new HttpException(`${field} is too long (limit ${max} characters).`, HttpStatus.BAD_REQUEST);
+  }
+  return value.trim();
+}
 
 @Injectable()
 export class DecisionForgeService {
@@ -34,85 +65,154 @@ export class DecisionForgeService {
     private readonly auditRepo: Repository<DecisionAuditLog>,
     @InjectRepository(DecisionPolicyConfig)
     private readonly policyRepo: Repository<DecisionPolicyConfig>,
+    @InjectRepository(DecisionQueryLog)
+    private readonly queryRepo: Repository<DecisionQueryLog>,
     @InjectRepository(Client)
     private readonly clientRepo: Repository<Client>,
   ) {
     this.aiUrl = this.config.get('AI_SERVICE_URL', 'http://localhost:8000');
   }
 
-  async getDataset() {
+  /**
+   * HTTP client for the ai-service, bound to ONE workspace. The workspace id is the authenticated
+   * user's id, so every dataset, RAG index and fetch state on the ai-service side is per user.
+   */
+  protected ai(userId: string): AxiosInstance {
+    return axios.create({
+      baseURL: `${this.aiUrl}/decision-forge`,
+      timeout: 30000,
+      headers: { 'X-Workspace-Id': userId, ...this.serviceHeaders() },
+    });
+  }
+
+  /** Shared secret proving the caller is this gateway (see ai-service security.py). Optional locally. */
+  private serviceHeaders(): Record<string, string> {
+    const token = this.config.get<string>('AI_SERVICE_TOKEN', '');
+    return token ? { 'X-Internal-Token': token } : {};
+  }
+
+  private static readonly QUERY_LIMIT = 30;
+  private static readonly QUERY_WINDOW_MS = 60_000;
+  private queryHits = new Map<string, number[]>();
+
+  /** Per-user sliding-window limit on questions (each one can run a full decision pass). */
+  private checkQueryRate(userId: string): void {
+    const now = Date.now();
+    const recent = (this.queryHits.get(userId) || []).filter((t) => now - t < DecisionForgeService.QUERY_WINDOW_MS);
+    if (recent.length >= DecisionForgeService.QUERY_LIMIT) {
+      throw new HttpException('Too many questions. Please wait a moment and try again.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    recent.push(now);
+    this.queryHits.set(userId, recent);
+  }
+
+  private aiError(err: any, fallback: string): HttpException {
+    const status = err?.response?.status;
+    const detail = err?.response?.data?.detail;
+    if (status && status >= 400 && status < 500 && typeof detail === 'string') {
+      return new HttpException(detail, status);
+    }
+    if (!err?.response) {
+      return new HttpException('The decision service is temporarily unavailable.', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    return new HttpException(typeof detail === 'string' ? detail : fallback, HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
+  async getDataset(userId: string) {
     try {
-      const res = await axios.get(`${this.aiUrl}/decision-forge/dataset`);
-      return res.data;
+      return (await this.ai(userId).get('/dataset')).data;
     } catch (err: any) {
       this.logger.error(`Error getting dataset: ${err.message}`);
-      throw new HttpException('AI service dataset error', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw this.aiError(err, 'AI service dataset error');
     }
   }
 
-  async resetDemoData(userId: string, email: string) {
+  async getQuality(userId: string) {
     try {
-      const res = await axios.post(`${this.aiUrl}/decision-forge/reset-demo`);
+      return (await this.ai(userId).get('/quality')).data;
+    } catch (err: any) {
+      throw this.aiError(err, 'Data quality report unavailable');
+    }
+  }
 
+  async getDatasets() {
+    try {
+      return (await axios.get(`${this.aiUrl}/decision-forge/datasets`, { timeout: 10000, headers: this.serviceHeaders() })).data;
+    } catch (err: any) {
+      throw this.aiError(err, 'Dataset list unavailable');
+    }
+  }
+
+  /**
+   * Reloads a deterministic dataset into the caller's workspace. With `clearHistory` it also deletes
+   * the caller's decision runs, approvals, query logs and saved policy versions (back to the default
+   * policy) so a demo starts from a known state. The
+   * audit log is never deleted: the reset itself is recorded in it.
+   */
+  async resetDemoData(userId: string, email: string, dataset?: string, clearHistory = false) {
+    const key = dataset || 'real';
+    try {
+      const res = await this.ai(userId).post('/reset-demo', { dataset: key });
+      if (clearHistory) {
+        await this.approvalRepo.delete({ userId });
+        await this.queryRepo.delete({ userId });
+        await this.runRepo.delete({ userId });
+        await this.policyRepo.delete({ userId }); // getPolicy() recreates the default policy (v1) on next use
+      }
       await this.auditRepo.save({
-        eventType: 'DEMO_DATASET_LOADED',
+        eventType: clearHistory ? 'DEMO_RESET' : 'DEMO_DATASET_LOADED',
         actorId: userId,
         actorEmail: email,
-        payload: { message: 'Reset to verified B2B Industrial Machinery dataset' },
+        payload: { dataset: key, snapshotId: res.data.snapshot_id, count: res.data.count, historyCleared: clearHistory },
       });
-
       return res.data;
     } catch (err: any) {
-      throw new HttpException('Failed to reset demo dataset', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw this.aiError(err, 'Failed to reset demo dataset');
     }
   }
 
   async ingestFile(file: Express.Multer.File, userId: string, email: string) {
+    if (!file) {
+      throw new HttpException('No file uploaded.', HttpStatus.BAD_REQUEST);
+    }
     const FormData = require('form-data');
     const form = new FormData();
     form.append('file', file.buffer, file.originalname);
 
     try {
-      const res = await axios.post(`${this.aiUrl}/decision-forge/ingest/file`, form, {
-        headers: form.getHeaders(),
-      });
+      const res = await this.ai(userId).post('/ingest/file', form, { headers: { ...form.getHeaders(), 'X-Workspace-Id': userId } });
 
       await this.auditRepo.save({
         eventType: 'DATASET_UPLOADED',
         actorId: userId,
         actorEmail: email,
-        payload: {
-          filename: file.originalname,
-          rows: res.data.total_rows,
-          qualityScore: res.data.quality_report?.health_score,
-        },
+        payload: { filename: file.originalname, rows: res.data.total_rows, validation: res.data.validation_report },
       });
 
       return res.data;
     } catch (err: any) {
-      this.logger.error(`Ingest file error: ${err.message}`);
-      throw new HttpException(err.response?.data?.detail || 'Failed to ingest file', HttpStatus.BAD_REQUEST);
+      this.logger.error(`Ingest error: ${err.message}`);
+      throw this.aiError(err, 'Failed to parse uploaded file');
     }
   }
 
   async applyMapping(records: any[], userId: string, email: string) {
+    if (!Array.isArray(records) || records.length === 0) {
+      throw new HttpException('No records provided to activate.', HttpStatus.BAD_REQUEST);
+    }
     try {
-      const res = await axios.post(`${this.aiUrl}/decision-forge/ingest/apply-mapping`, { records });
+      const res = await this.ai(userId).post('/ingest/apply-mapping', { records });
 
       await this.auditRepo.save({
         eventType: 'DATASET_ACTIVATED',
         actorId: userId,
         actorEmail: email,
-        payload: {
-          recordsCount: res.data.records_count,
-          qualityScore: res.data.quality_score,
-        },
+        payload: { recordsCount: records.length, qualityScore: res.data.quality_score, snapshotId: res.data.snapshot_id },
       });
 
       return res.data;
     } catch (err: any) {
-      this.logger.error(`Apply mapping error: ${err.message}`);
-      throw new HttpException(err.response?.data?.detail || 'Failed to activate dataset', HttpStatus.BAD_REQUEST);
+      throw this.aiError(err, 'Failed to activate mapped dataset');
     }
   }
 
@@ -140,6 +240,10 @@ export class DecisionForgeService {
       highPriorityThreshold: Number(body.highPriorityThreshold ?? DEFAULT_POLICY.highPriorityThreshold),
       mediumPriorityThreshold: Number(body.mediumPriorityThreshold ?? DEFAULT_POLICY.mediumPriorityThreshold),
     };
+
+    if (Object.values(weights).some((v) => !Number.isFinite(v) || v < 0)) {
+      throw new HttpException('Policy values must be non-negative numbers.', HttpStatus.BAD_REQUEST);
+    }
 
     const total =
       weights.dealValueWeight +
@@ -178,6 +282,24 @@ export class DecisionForgeService {
     return saved;
   }
 
+  private async persistRun(userId: string, data: any, recommendations: any[]) {
+    return this.runRepo.save({
+      decisionRunId: data.decision_run_id,
+      userId,
+      policyVersion: data.policy_version,
+      recordsAnalyzed: data.records_analyzed,
+      pipelineTotalValue: data.pipeline_total_value,
+      weightedPipelineValue: data.weighted_pipeline_value,
+      highPriorityCount: data.high_priority_count,
+      staleWarningCount: data.stale_warning_count,
+      recommendations,
+      policySnapshot: data.policy || null,
+      snapshotId: data.snapshot_id || null,
+      datasetKey: data.dataset_key || null,
+      dataSnapshot: data.data_snapshot || null,
+    });
+  }
+
   async runDecisionEngine(userId: string, email: string, policyOverride?: any) {
     try {
       const activePolicy = await this.getPolicy(userId);
@@ -195,21 +317,10 @@ export class DecisionForgeService {
             policy_version: `v${p.version}`,
           };
 
-      const res = await axios.post(`${this.aiUrl}/decision-forge/decide/run`, body);
+      const res = await this.ai(userId).post('/decide/run', body);
       const data = res.data;
 
-      // Save run to SQLite
-      const run = await this.runRepo.save({
-        decisionRunId: data.decision_run_id,
-        userId,
-        policyVersion: data.policy_version,
-        recordsAnalyzed: data.records_analyzed,
-        pipelineTotalValue: data.pipeline_total_value,
-        weightedPipelineValue: data.weighted_pipeline_value,
-        highPriorityCount: data.high_priority_count,
-        staleWarningCount: data.stale_warning_count,
-        recommendations: data.recommendations,
-      });
+      await this.persistRun(userId, data, data.recommendations);
 
       await this.auditRepo.save({
         eventType: 'DECISION_GENERATED',
@@ -221,19 +332,66 @@ export class DecisionForgeService {
           highPriorityCount: data.high_priority_count,
           pipelineTotal: data.pipeline_total_value,
           dataSnapshot: data.data_snapshot,
+          snapshotId: data.snapshot_id,
+          policyVersion: data.policy_version,
         },
       });
 
       return data;
     } catch (err: any) {
       this.logger.error(`Run decision error: ${err.message}`);
-      throw new HttpException(err.response?.data?.detail || 'Failed to run decision engine', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw this.aiError(err, 'Failed to run decision engine');
+    }
+  }
+
+  /** Natural-language question -> plan -> analytics -> RAG -> answer. The whole trail is stored for replay. */
+  async queryDecision(question: any, userId: string, email: string, preset?: string) {
+    const q = cleanText(question, MAX_QUESTION, 'Question');
+    if (!q) {
+      throw new HttpException('A question is required.', HttpStatus.BAD_REQUEST);
+    }
+    this.checkQueryRate(userId);
+    try {
+      const res = await this.ai(userId).post('/decisions/query', { question: q, preset });
+      const data = res.data;
+
+      let runId: string | null = data.decision_run_id || null;
+      if (runId && data.run_summary) {
+        await this.persistRun(userId, { ...data.run_summary, decision_run_id: runId, snapshot_id: data.snapshot_id,
+          dataset_key: data.dataset_key, data_snapshot: data.data_snapshot }, data.recommendations || []);
+      }
+      const log = await this.queryRepo.save({
+        userId,
+        decisionRunId: runId || undefined,
+        question: q,
+        plan: data.plan,
+        answer: data.answer,
+        analytics: data.analytics,
+        rag: { status: data.rag?.status, message: data.rag?.message, evidence: (data.rag?.evidence || []).slice(0, 20) },
+        trace: data.trace,
+        policyVersion: data.policy_version || undefined,
+        snapshotId: data.snapshot_id,
+        datasetKey: data.dataset_key,
+        confidence: data.confidence,
+      });
+      await this.auditRepo.save({
+        eventType: 'QUERY_RUN',
+        decisionRunId: runId || undefined,
+        actorId: userId,
+        actorEmail: email,
+        payload: { intent: data.intent, planner: data.plan?.planner, tools: data.plan?.analytics_tools, confidence: data.confidence },
+      });
+      return { ...data, query_log_id: log.id };
+    } catch (err: any) {
+      if (err instanceof HttpException) throw err;
+      this.logger.error(`Query error: ${err.message}`);
+      throw this.aiError(err, 'Failed to answer the question');
     }
   }
 
   async fetchExternalContext(opportunityId: string, userId: string, email: string) {
     try {
-      const res = await axios.post(`${this.aiUrl}/decision-forge/opportunities/${opportunityId}/fetch-context`);
+      const res = await this.ai(userId).post(`/opportunities/${encodeURIComponent(opportunityId)}/fetch-context`);
 
       await this.auditRepo.save({
         eventType: 'EXTERNAL_CONTEXT_FETCHED',
@@ -246,13 +404,21 @@ export class DecisionForgeService {
       return res.data;
     } catch (err: any) {
       this.logger.error(`Fetch external context error: ${err.message}`);
-      throw new HttpException(err.response?.data?.detail || 'Failed to fetch external context', HttpStatus.INTERNAL_SERVER_ERROR);
+      // External context is optional: report it as unavailable instead of failing the decision.
+      if (!err?.response || err.response.status >= 500) {
+        return {
+          status: 'unavailable',
+          message: 'External context unavailable. Decision calculated from internal business data.',
+          signal: null,
+        };
+      }
+      throw this.aiError(err, 'Failed to fetch external context');
     }
   }
 
   async simulateTwin(inputs: any, userId: string) {
     try {
-      const res = await axios.post(`${this.aiUrl}/decision-forge/twin/simulate`, inputs);
+      const res = await this.ai(userId).post('/twin/simulate', inputs);
 
       await this.auditRepo.save({
         eventType: 'SIMULATION_RUN',
@@ -261,71 +427,145 @@ export class DecisionForgeService {
           inputs,
           deltaRevenuePercent: res.data.delta_revenue_percent,
           utilization: res.data.rep_capacity_utilization_percent,
+          simulationId: res.data.simulation_id,
         },
       });
 
       return res.data;
     } catch (err: any) {
-      throw new HttpException('Simulation failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw this.aiError(err, 'Simulation failed');
     }
+  }
+
+  // ---- human approval -----------------------------------------------------------------
+
+  /** The recommendation must exist in a run owned by THIS user; anything else looks like "not found". */
+  private async requireOwnedRecommendation(userId: string, recId: string, decisionRunId?: string) {
+    const runId = decisionRunId || /^REC-(DR-[A-Z0-9]+)-/.exec(recId || '')?.[1];
+    const run = runId ? await this.runRepo.findOne({ where: { decisionRunId: runId, userId } }) : null;
+    const rec = run?.recommendations?.find((r: any) => r.recommendation_id === recId);
+    if (!run || !rec) {
+      throw new HttpException('Recommendation not found.', HttpStatus.NOT_FOUND);
+    }
+    return { run, rec };
+  }
+
+  private async getOrCreateApproval(userId: string, recId: string, run: DecisionRun, rec: any) {
+    const existing = await this.approvalRepo.findOne({ where: { recommendationId: recId, userId } });
+    if (existing) return existing;
+    return this.approvalRepo.save({
+      recommendationId: recId,
+      decisionRunId: run.decisionRunId,
+      opportunityId: rec.opportunity_id,
+      companyName: rec.company_name,
+      dealValue: rec.deal_value,
+      status: 'DRAFT',
+      approvedAction: '',
+      reviewerNotes: '',
+      userId,
+      policyVersion: run.policyVersion,
+      snapshotId: run.snapshotId || undefined,
+      priorityScore: rec.priority_score,
+      confidence: rec.confidence,
+      // Frozen copy of exactly what the reviewer is shown.
+      evidenceSnapshot: {
+        priority_score: rec.priority_score,
+        decision_class: rec.decision_class,
+        factors: rec.factors,
+        evidence_pack: rec.evidence_pack,
+        warnings: rec.warnings,
+        suggested_action: rec.suggested_action,
+        data_snapshot: run.dataSnapshot,
+      },
+      statusHistory: [],
+    });
+  }
+
+  private async transition(approval: DecisionApproval, to: ApprovalStatus, userId: string, patch: Partial<DecisionApproval> = {}) {
+    if (!canTransition(approval.status, to)) {
+      throw new HttpException(
+        `This recommendation is already ${approval.status} and cannot move to ${to}.`,
+        HttpStatus.CONFLICT,
+      );
+    }
+    const history = [...(approval.statusHistory || []), { from: approval.status, to, at: new Date().toISOString(), by: userId }];
+    await this.approvalRepo.update({ id: approval.id }, { ...patch, status: to, statusHistory: history });
+    return this.approvalRepo.findOne({ where: { id: approval.id } });
+  }
+
+  async startReview(recId: string, body: any, userId: string, email: string) {
+    const { run, rec } = await this.requireOwnedRecommendation(userId, recId, body?.decisionRunId);
+    const approval = await this.getOrCreateApproval(userId, recId, run, rec);
+    const updated = approval.status === 'REVIEW' ? approval : await this.transition(approval, 'REVIEW', userId);
+    await this.auditRepo.save({
+      eventType: 'REVIEW_STARTED', decisionRunId: run.decisionRunId, opportunityId: rec.opportunity_id,
+      companyName: rec.company_name, actorId: userId, actorEmail: email, payload: { recommendationId: recId },
+    });
+    return updated;
   }
 
   async reviewAction(
     recId: string,
     action: 'APPROVED' | 'MODIFIED' | 'REJECTED',
-    body: {
-      opportunityId: string;
-      companyName: string;
-      dealValue: number;
-      decisionRunId?: string;
-      approvedAction?: string;
-      reviewerNotes?: string;
-    },
+    body: { decisionRunId?: string; approvedAction?: string; reviewerNotes?: string } & Record<string, any>,
     userId: string,
     email: string,
   ) {
-    const approval = await this.approvalRepo.save({
-      recommendationId: recId,
-      decisionRunId: body.decisionRunId || undefined,
-      opportunityId: body.opportunityId,
-      companyName: body.companyName,
-      dealValue: body.dealValue,
-      status: action,
-      approvedAction: body.approvedAction || '',
-      reviewerNotes: body.reviewerNotes || '',
-      userId,
+    // Only the recommendation id and the reviewer's own words come from the request. Company,
+    // deal value and opportunity are read from the stored run -- a client cannot rewrite them.
+    const approvedAction = cleanText(body?.approvedAction, MAX_ACTION, 'Action');
+    const reviewerNotes = cleanText(body?.reviewerNotes, MAX_NOTES, 'Comment');
+    if (action === 'MODIFIED' && !approvedAction) {
+      throw new HttpException('Describe the modified action before saving.', HttpStatus.BAD_REQUEST);
+    }
+
+    const { run, rec } = await this.requireOwnedRecommendation(userId, recId, body?.decisionRunId);
+    const approval = await this.getOrCreateApproval(userId, recId, run, rec);
+    const updated = await this.transition(approval, action, userId, {
+      approvedAction: approvedAction || rec.suggested_action || '',
+      reviewerNotes,
     });
 
     await this.auditRepo.save({
       eventType: `ACTION_${action}`,
-      decisionRunId: body.decisionRunId,
-      opportunityId: body.opportunityId,
-      companyName: body.companyName,
+      decisionRunId: run.decisionRunId,
+      opportunityId: rec.opportunity_id,
+      companyName: rec.company_name,
       actorId: userId,
       actorEmail: email,
       payload: {
         recommendationId: recId,
-        approvedAction: body.approvedAction,
-        reviewerNotes: body.reviewerNotes,
-        dealValue: body.dealValue,
+        approvedAction: updated?.approvedAction,
+        reviewerNotes,
+        dealValue: rec.deal_value,
+        policyVersion: run.policyVersion,
+        snapshotId: run.snapshotId,
+        priorityScore: rec.priority_score,
+        from: approval.status,
+        to: action,
       },
     });
 
-    return approval;
+    return updated;
   }
 
   async convertToClient(recId: string, body: any, userId: string, email: string) {
-    // 1. Create client in Bizpulse Client Directory
-    let client = await this.clientRepo.findOne({
-      where: { name: body.companyName, user_id: userId },
-    });
+    const approval = await this.approvalRepo.findOne({ where: { recommendationId: recId, userId } });
+    if (!approval) {
+      throw new HttpException('Recommendation not found.', HttpStatus.NOT_FOUND);
+    }
+    if (approval.status !== 'APPROVED' && approval.status !== 'MODIFIED') {
+      throw new HttpException('Only an approved (or modified) recommendation can be converted to a client.', HttpStatus.CONFLICT);
+    }
+    const companyName = approval.companyName;
 
+    let client = await this.clientRepo.findOne({ where: { name: companyName, user_id: userId } });
     if (!client) {
       client = await this.clientRepo.save({
-        name: body.companyName,
-        email: body.contactEmail || '',
-        phone: body.contactPhone || '',
-        address: body.location || '',
+        name: companyName,
+        email: cleanText(body?.contactEmail, 200, 'Email'),
+        phone: cleanText(body?.contactPhone, 50, 'Phone'),
+        address: cleanText(body?.location, 300, 'Location'),
         // GST/KYC details are not fabricated -- they're unknown until the business
         // supplies them, and the placeholder makes that explicit in the UI.
         gst_number: 'PENDING VERIFICATION',
@@ -333,66 +573,144 @@ export class DecisionForgeService {
       });
     }
 
-    // Update approval record
-    await this.approvalRepo.update({ recommendationId: recId }, {
-      convertedClientId: client.id,
-    });
+    await this.approvalRepo.update({ id: approval.id }, { convertedClientId: client.id });
 
     await this.auditRepo.save({
       eventType: 'CLIENT_CONVERTED',
-      opportunityId: body.opportunityId,
-      companyName: body.companyName,
+      opportunityId: approval.opportunityId,
+      companyName,
       actorId: userId,
       actorEmail: email,
-      payload: {
-        clientId: client.id,
-        clientName: client.name,
-        dealValue: body.dealValue,
-      },
+      payload: { clientId: client.id, clientName: client.name, dealValue: approval.dealValue },
     });
 
     return {
       status: 'success',
       clientId: client.id,
       clientName: client.name,
-      dealValue: body.dealValue,
+      dealValue: approval.dealValue,
       message: `Successfully created client ${client.name} in Bizpulse!`,
     };
   }
 
   async getAuditLogs(userId: string) {
-    return this.auditRepo.find({
-      where: { actorId: userId },
-      order: { timestamp: 'DESC' },
-      take: 50,
-    });
+    return this.auditRepo.find({ where: { actorId: userId }, order: { timestamp: 'DESC' }, take: 50 });
   }
 
   async getApprovals(userId: string) {
-    return this.approvalRepo.find({
-      where: { userId },
-      order: { updatedAt: 'DESC' },
-    });
+    return this.approvalRepo.find({ where: { userId }, order: { updatedAt: 'DESC' } });
   }
 
-  async replayDecision(runId: string) {
-    const run = await this.runRepo.findOne({ where: { decisionRunId: runId } });
+  // ---- decisions, evidence, replay ------------------------------------------------------
+
+  async listDecisions(userId: string) {
+    const runs = await this.runRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, take: 20 });
+    return runs.map((r) => ({
+      decisionRunId: r.decisionRunId,
+      policyVersion: r.policyVersion,
+      datasetKey: r.datasetKey,
+      snapshotId: r.snapshotId,
+      recordsAnalyzed: r.recordsAnalyzed,
+      highPriorityCount: r.highPriorityCount,
+      staleWarningCount: r.staleWarningCount,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  private async requireOwnedRun(runId: string, userId: string) {
+    const run = await this.runRepo.findOne({ where: { decisionRunId: runId, userId } });
     if (!run) {
       throw new HttpException('Decision run not found', HttpStatus.NOT_FOUND);
     }
-    const auditEvents = await this.auditRepo.find({
-      where: { decisionRunId: runId },
-      order: { timestamp: 'ASC' },
-    });
-    const approvals = await this.approvalRepo.find({
-      where: { decisionRunId: runId },
-      order: { updatedAt: 'ASC' },
-    });
+    return run;
+  }
+
+  async getEvidence(runId: string, userId: string, opportunityId?: string) {
+    const run = await this.requireOwnedRun(runId, userId);
+    const recs = (run.recommendations || []).filter((r: any) => !opportunityId || r.opportunity_id === opportunityId);
+    return {
+      decisionRunId: run.decisionRunId,
+      snapshotId: run.snapshotId,
+      policyVersion: run.policyVersion,
+      dataSnapshot: run.dataSnapshot,
+      evidence: recs.map((r: any) => ({
+        recommendationId: r.recommendation_id,
+        opportunityId: r.opportunity_id,
+        companyName: r.company_name,
+        priorityScore: r.priority_score,
+        factors: r.factors,
+        evidencePack: r.evidence_pack,
+        warnings: r.warnings,
+        confidence: r.confidence,
+      })),
+    };
+  }
+
+  /** Ordered, inspectable trail: question -> plan -> data snapshot -> analytics -> RAG -> evidence -> policy -> score -> recommendation -> approval. */
+  async replayDecision(runId: string, userId: string) {
+    const run = await this.requireOwnedRun(runId, userId);
+    const auditEvents = await this.auditRepo.find({ where: { decisionRunId: runId, actorId: userId }, order: { timestamp: 'ASC' } });
+    const approvals = await this.approvalRepo.find({ where: { decisionRunId: runId, userId }, order: { updatedAt: 'ASC' } });
+    const queries = await this.queryRepo.find({ where: { decisionRunId: runId, userId }, order: { createdAt: 'ASC' } });
+
+    const q = queries[0];
+    const top = (run.recommendations || []).slice(0, 3);
+    const replay = [
+      { step: 'question', detail: q ? { question: q.question } : { question: null, note: 'Run started from the Decision Center, not a typed question.' } },
+      { step: 'query_plan', detail: q?.plan ?? null },
+      { step: 'data_snapshot', detail: { snapshotId: run.snapshotId, datasetKey: run.datasetKey, dataSnapshot: run.dataSnapshot, recordsAnalyzed: run.recordsAnalyzed } },
+      { step: 'analytics', detail: q?.analytics ?? { pipelineTotal: run.pipelineTotalValue, weightedExpectedValue: run.weightedPipelineValue } },
+      { step: 'rag_results', detail: q?.rag ?? { notes: top.map((r: any) => ({ opportunityId: r.opportunity_id, notes: r.evidence_pack?.rag_notes })) } },
+      { step: 'evidence', detail: top.map((r: any) => ({ opportunityId: r.opportunity_id, evidencePack: r.evidence_pack })) },
+      { step: 'policy', detail: { policyVersion: run.policyVersion, policy: run.policySnapshot } },
+      { step: 'score', detail: top.map((r: any) => ({ opportunityId: r.opportunity_id, priorityScore: r.priority_score, factors: r.factors })) },
+      { step: 'recommendation', detail: top.map((r: any) => ({ opportunityId: r.opportunity_id, decisionClass: r.decision_class, action: r.suggested_action, confidence: r.confidence })) },
+      { step: 'approval', detail: approvals.map((a) => ({ opportunityId: a.opportunityId, status: a.status, notes: a.reviewerNotes, history: a.statusHistory })) },
+    ];
+
+    return { run, auditEvents, approvals, queries, replay };
+  }
+
+  // ---- dashboard summary ----------------------------------------------------------------
+
+  async getSummary(userId: string, email: string) {
+    let run = await this.runRepo.findOne({ where: { userId }, order: { createdAt: 'DESC' } });
+    // Use the newest run that contains every recommendation (query runs keep only the top 10).
+    const runs = await this.runRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, take: 10 });
+    run = runs.find((r) => (r.recommendations || []).length >= (r.recordsAnalyzed || 0) && r.recordsAnalyzed > 0) || null;
+    if (!run) {
+      try {
+        await this.runDecisionEngine(userId, email);
+        run = await this.runRepo.findOne({ where: { userId }, order: { createdAt: 'DESC' } });
+      } catch {
+        return { hasRun: false, message: 'Decision service unavailable.' };
+      }
+    }
+    if (!run) return { hasRun: false };
+
+    const approvals = await this.approvalRepo.find({ where: { userId, decisionRunId: run.decisionRunId } });
+    const finalIds = new Set(approvals.filter((a) => FINAL_STATES.includes(a.status)).map((a) => a.recommendationId));
+    const recs: any[] = run.recommendations || [];
+    const open = recs.filter((r) => !finalIds.has(r.recommendation_id));
+    const immediate = open.filter((r) => r.decision_class === 'IMMEDIATE_ACTION');
+    const stale = open.filter((r) => r.stale_data_warning);
+    const review = open.filter((r) => r.review_required);
+    const attention = new Set([...immediate, ...stale, ...review].map((r) => r.recommendation_id));
+    const awaiting = approvals.filter((a) => ['DRAFT', 'REVIEW', 'MODIFIED', 'PENDING'].includes(a.status)).length;
 
     return {
-      run,
-      auditEvents,
-      approvals,
+      hasRun: true,
+      decisionRunId: run.decisionRunId,
+      datasetKey: run.datasetKey,
+      policyVersion: run.policyVersion,
+      immediateActions: immediate.length,
+      staleOpportunities: stale.length,
+      reviewRequired: review.length,
+      awaitingApproval: awaiting,
+      requiresAttention: attention.size,
+      pipelineTotal: run.pipelineTotalValue,
+      weightedExpectedValue: run.weightedPipelineValue,
+      generatedAt: run.createdAt,
     };
   }
 }

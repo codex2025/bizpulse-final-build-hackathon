@@ -32,6 +32,20 @@ export class DecisionRun {
   @Column({ type: 'simple-json', nullable: true })
   recommendations: any[];
 
+  /** The exact policy body used (weights, thresholds, penalties) so the run can be replayed. */
+  @Column({ name: 'policy_snapshot', type: 'simple-json', nullable: true })
+  policySnapshot: any;
+
+  /** Hash of the input records the run was computed from. */
+  @Column({ name: 'snapshot_id', nullable: true })
+  snapshotId: string;
+
+  @Column({ name: 'dataset_key', nullable: true })
+  datasetKey: string;
+
+  @Column({ name: 'data_snapshot', nullable: true })
+  dataSnapshot: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

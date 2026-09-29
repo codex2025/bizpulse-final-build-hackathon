@@ -15,8 +15,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('reports a healthy gateway', () => {
+      expect(appController.getHello()).toMatchObject({ status: 'healthy', name: 'Bizpulse Fintech Gateway API' });
     });
   });
 });
