@@ -9,6 +9,14 @@ export interface DecisionFactor {
   description: string;
 }
 
+export interface ProvenanceEntry {
+  claim: string;
+  publisher: string;
+  url: string;
+  published_date: string;
+  retrieved_date?: string;
+}
+
 export interface RecommendationItem {
   recommendation_id: string;
   decision_run_id: string;
@@ -27,10 +35,17 @@ export interface RecommendationItem {
   evidence_pack: {
     structured_data: Record<string, any>;
     rag_notes: Array<{ snippet: string; company_name: string }>;
+    /** Facts traceable to a cited URL (real-dataset records only). */
+    sourced_facts?: Record<string, string | number>;
+    /** Per-field reasoning for each analyst estimate, keyed by field name. */
+    modeled_basis?: Record<string, string>;
+    /** 'sourced' | 'estimated' for the real dataset; 'record' for legacy flat data. */
+    field_origin?: Record<string, 'sourced' | 'estimated' | 'record'>;
+    provenance?: ProvenanceEntry[];
     external_signal?: {
       title: string;
       source: string;
-      url: string;
+      url?: string | null;
       published_at?: string;
       retrieved_at: string;
       freshness_status: string;

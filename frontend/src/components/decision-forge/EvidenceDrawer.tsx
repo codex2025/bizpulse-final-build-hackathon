@@ -11,6 +11,28 @@ interface EvidenceDrawerProps {
   fetchingContextId: string | null;
 }
 
+const SOURCED_LABELS: Record<string, string> = {
+  investment_label: 'Announced investment',
+  facility_type: 'Facility',
+  facility_size_sqft: 'Size (sq ft)',
+  announced_jobs: 'Announced jobs',
+  operational_target: 'Timeline',
+  scope_detail: 'Scope',
+  additional_context: 'Context',
+};
+
+const SourcedBadge = () => (
+  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+    SOURCED
+  </span>
+);
+
+const EstimatedBadge = () => (
+  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-50 text-amber-700 border border-amber-300">
+    ESTIMATED
+  </span>
+);
+
 export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
   recommendation,
   onClose,
@@ -24,6 +46,12 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
 
   const { evidence_pack, factors } = recommendation;
   const ext = evidence_pack.external_signal;
+  const hasOrigin = !!evidence_pack.field_origin && Object.values(evidence_pack.field_origin).includes('estimated');
+  const provenance = evidence_pack.provenance || [];
+  const sourcedEntries = Object.entries(evidence_pack.sourced_facts || {}).filter(
+    ([k]) => k !== 'announced_investment_usd'
+  );
+  const basisEntries = Object.entries(evidence_pack.modeled_basis || {});
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/40 backdrop-blur-sm flex justify-end animate-fadeIn">
@@ -100,6 +128,99 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {activeTab === 'structured' && (
             <div className="space-y-4">
+              {hasOrigin && (
+                <>
+                  <div className="rounded-xl p-4 border border-emerald-200 bg-emerald-50/40">
+                    <div className="flex items-center gap-2 mb-3">
+                      <SourcedBadge />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Public facts &mdash; traceable to a cited source
+                      </h4>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-400 block">Location:</span>
+                        <span className="font-semibold text-slate-800">{evidence_pack.structured_data.location}</span>
+                      </div>
+                      {sourcedEntries.map(([k, v]) => (
+                        <div key={k} className={typeof v === 'string' && v.length > 40 ? 'col-span-2' : ''}>
+                          <span className="text-slate-400 block">{SOURCED_LABELS[k] || k}:</span>
+                          <span className="font-semibold text-slate-800">
+                            {typeof v === 'number' ? v.toLocaleString() : v}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl p-4 border border-amber-300 bg-amber-50/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <EstimatedBadge />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Analyst estimates &mdash; not sourced facts
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-amber-800 mb-3">
+                      No private CRM data for this company is public. These values are our own model and
+                      synthetic CRM state, not the company&apos;s real figures.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-400 block">Deal value (est.):</span>
+                        <span className="font-semibold text-slate-800 text-sm">{evidence_pack.structured_data.deal_value}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">Win probability (est.):</span>
+                        <span className="font-semibold text-slate-800 text-sm">{Math.round(recommendation.win_probability * 100)}%</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">Pipeline stage (synthetic):</span>
+                        <span className="font-semibold text-slate-800">{evidence_pack.structured_data.stage}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">Account owner (synthetic):</span>
+                        <span className="font-semibold text-slate-800">{evidence_pack.structured_data.owner}</span>
+                      </div>
+                    </div>
+                    {basisEntries.length > 0 && (
+                      <ul className="mt-3 space-y-1.5 text-[11px] text-slate-600 border-t border-amber-200 pt-3">
+                        {basisEntries.map(([k, v]) => (
+                          <li key={k}>
+                            <strong className="text-slate-700">Basis for {k.replace(/_/g, ' ')}: </strong>
+                            {v}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl p-4 border border-slate-200 bg-white">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Citations</h4>
+                    {provenance.length > 0 ? (
+                      <ul className="space-y-3">
+                        {provenance.map((p, i) => (
+                          <li key={i} className="text-xs">
+                            <p className="text-slate-700 leading-snug">{p.claim}</p>
+                            <a
+                              href={p.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-rose-600 hover:text-rose-700 inline-flex items-center gap-1 font-medium mt-1"
+                            >
+                              {p.publisher} <ExternalLink className="w-3 h-3" />
+                            </a>
+                            <span className="text-slate-400"> &middot; published {p.published_date}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-slate-400">No citation is on file for this account.</p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {!hasOrigin && (
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
                   Canonical Database Fields (Single Source of Truth)
@@ -123,6 +244,7 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
                   </div>
                 </div>
               </div>
+              )}
 
               <div>
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
@@ -190,7 +312,7 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
                       Retrieved {new Date(ext.retrieved_at).toLocaleString()}
-                      {ext.published_at && ` · Published ${new Date(ext.published_at).toLocaleDateString()}`}
+                      {ext.published_at && ` · Published ${ext.published_at}`}
                     </span>
                   </div>
 
@@ -204,15 +326,19 @@ export const EvidenceDrawer: React.FC<EvidenceDrawerProps> = ({
                   </p>
 
                   <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 text-slate-500">
-                    <span>Source: {ext.source}</span>
-                    <a
-                      href={ext.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-rose-600 hover:text-rose-700 flex items-center gap-1 font-medium"
-                    >
-                      Verify Source <ExternalLink className="w-3 h-3" />
-                    </a>
+                    <span>Source: {ext.source}{ext.published_at ? ` · ${ext.published_at}` : ''}</span>
+                    {ext.url ? (
+                      <a
+                        href={ext.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-rose-600 hover:text-rose-700 flex items-center gap-1 font-medium"
+                      >
+                        Verify Source <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">No public link on file</span>
+                    )}
                   </div>
                 </div>
               ) : recommendation.external_context_available ? (

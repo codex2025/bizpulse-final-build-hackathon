@@ -20,7 +20,7 @@
     "external_signal": {
       "title": "Titan Heavy Hydraulics Secures $42M Defense Component Contract, Plans Ohio Facility Expansion",
       "source": "Midwest Manufacturing Today",
-      "url": "https://midwestmfg.example.com/news/titan-expansion-2026",
+      "url": null,
       "retrieved_at": "2026-09-26T08:15:00Z",
       "freshness": "Fresh (< 24h)",
       "impact": "High expansion budget drastically increases likelihood of multi-unit purchase."
@@ -47,7 +47,7 @@
     "external_signal": {
       "title": "Auto OEM Tier-1 Suppliers Face Bottlenecks in Precision Metal Parts",
       "source": "Automotive News Wire",
-      "url": "https://autonews.example.com/tier1-supply-chain-crunch",
+      "url": null,
       "retrieved_at": "2026-09-25T19:40:00Z",
       "freshness": "Fresh (< 48h)",
       "impact": "High urgency to secure reliable machining supplier creates strong negotiation leverage."
@@ -74,7 +74,7 @@
     "external_signal": {
       "title": "Texas Grid Operator ERCOT Announces Incentives for Industrial Cogeneration Turbines",
       "source": "Energy & Power Journal",
-      "url": "https://energyjournal.example.com/ercot-industrial-incentives-2026",
+      "url": null,
       "retrieved_at": "2026-09-26T06:30:00Z",
       "freshness": "Fresh (< 24h)",
       "impact": "State tax rebate offsets up to 18% of equipment costs, accelerating buying timeline."
@@ -101,7 +101,7 @@
     "external_signal": {
       "title": "Industrial Energy Rates in Wisconsin Drop 14% as Gas Storage Peaks",
       "source": "Great Lakes Energy Gazette",
-      "url": "https://glegazette.example.com/wisconsin-industrial-gas-drop",
+      "url": null,
       "retrieved_at": "2026-09-24T12:00:00Z",
       "freshness": "Recent (48h)",
       "impact": "Key obstacle (energy cost volatility) removed; opportune moment to re-engage."
@@ -128,7 +128,7 @@
     "external_signal": {
       "title": "Canadian Infrastructure Ministry Releases $1.8B Northern Transport Corridor Tenders",
       "source": "Canadian Builder Review",
-      "url": "https://builderreview.example.com/northern-corridor-tenders",
+      "url": null,
       "retrieved_at": "2026-09-25T14:10:00Z",
       "freshness": "Fresh (< 24h)",
       "impact": "Large public infrastructure tenders create surge demand for fleet telemetry."
@@ -155,7 +155,7 @@
     "external_signal": {
       "title": "Vanguard Robotics Secures $30M Series B to Accelerate Automated Fulfillment Systems",
       "source": "TechCrunch Robotics",
-      "url": "https://techcrunch.example.com/vanguard-robotics-series-b",
+      "url": null,
       "retrieved_at": "2026-09-26T07:45:00Z",
       "freshness": "Breaking (< 6h)",
       "impact": "Series B capitalization ensures zero credit/payment default risk; immediate close target."
@@ -182,7 +182,7 @@
     "external_signal": {
       "title": "US Department of Agriculture Expands Grain Silo Safety Grant Program",
       "source": "AgriBusiness Weekly",
-      "url": "https://agribusiness.example.com/usda-grain-silo-grants",
+      "url": null,
       "retrieved_at": "2026-09-24T18:00:00Z",
       "freshness": "Recent (48h)",
       "impact": "USDA grants cover up to 50% of monitoring equipment for certified agritech facilities."
@@ -209,7 +209,7 @@
     "external_signal": {
       "title": "EPA Tightens Mississippi River Tugboat Emission Standards with Strict Dec 31 Enforcement",
       "source": "Maritime Executive",
-      "url": "https://maritime-executive.example.com/epa-tugboat-standards-2026",
+      "url": null,
       "retrieved_at": "2026-09-25T11:20:00Z",
       "freshness": "Fresh (< 24h)",
       "impact": "Regulatory deadline enforces immediate buying urgency within the next 45 days."

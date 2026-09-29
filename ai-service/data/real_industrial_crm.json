@@ -1,0 +1,512 @@
+{
+  "dataset_meta": {
+    "dataset_name": "real_industrial_crm",
+    "version": "1.0",
+    "snapshot_date": "2026-09-29T00:00:00Z",
+    "persona": "Enterprise sales team at an industrial automation equipment vendor (controls, conveyance, material handling, machine vision). Target accounts are real companies that have publicly announced new plants or major facility expansions, because a newly announced facility is a live capital-equipment buying window.",
+    "task": "Rank which announced-facility accounts the team should contact first, with every ranking factor traceable to a cited public source, and a human approving the final outreach action.",
+    "data_honesty_statement": "Fields under `sourced` are verbatim-traceable to a real, public, dated URL listed in `provenance`. Fields under `modeled` are OUR OWN analyst estimates and synthetic CRM state — no private CRM data for these companies is public, and we do not claim otherwise. The UI must render these two groups differently. Contacts are ROLE PLACEHOLDERS, never real named individuals, and no email addresses at real company domains are fabricated.",
+    "modeled_field_methodology": {
+      "deal_value": "Analyst estimate of the addressable automation-equipment package for the announced facility, sized from facility type, announced headcount and build scope. Each record carries its own one-line basis. Not a quoted or CRM figure.",
+      "win_probability": "Analyst estimate from announced-build stage: pre-construction/early announcement scores lower, near-commissioning scores higher, because equipment specification happens close to fit-out.",
+      "engagement_score": "Synthetic CRM engagement state for demo purposes only. Represents what a rep's logged-activity score would look like; not derived from any real interaction.",
+      "last_contact_date": "Synthetic CRM timestamp for demo purposes only, anchored to the dataset snapshot_date so recency scoring is deterministic and reproducible.",
+      "sales_notes": "Synthetic rep notes for RAG demonstration. Each note is written ONLY from facts present in the cited sources — no invented budgets, commitments, competitor bids, or quotes from named individuals."
+    }
+  },
+  "opportunities": [
+    {
+      "opportunity_id": "OPP-R01",
+      "company_name": "Amazon",
+      "contact_name": "Robotics Facility Engineering Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "E-commerce Fulfillment & Robotics Manufacturing",
+      "location": "Greenwood, Indiana, USA",
+      "sourced": {
+        "announced_investment_usd": 100000000,
+        "investment_label": "$100+ million",
+        "facility_type": "Robotics manufacturing facility",
+        "facility_size_sqft": 585000,
+        "announced_jobs": 300,
+        "operational_target": "2028",
+        "scope_detail": "Produces robots and equipment for Amazon fulfillment centers; includes fabrication, welding, powder coating and assembly.",
+        "additional_context": "Amazon separately announced a multi-billion-dollar robotics manufacturing facility in Austin, Texas with up to 500 jobs, and a robotics manufacturing announcement in Massachusetts."
+      },
+      "modeled": {
+        "deal_value": 780000,
+        "deal_value_basis": "Fabrication, welding, powder-coating and assembly lines across 585,000 sq ft imply multiple conveyance and machine-vision cells; sized as a multi-cell package.",
+        "win_probability": 0.72,
+        "win_probability_basis": "Operational target 2028 means fit-out specification is active now, but Amazon builds significant automation in-house, capping win likelihood.",
+        "engagement_score": 88,
+        "last_contact_date": "2026-09-26T09:00:00Z",
+        "stage": "Technical Validation",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account is standing up a 585,000 sq ft robotics manufacturing site in Greenwood, Indiana with fabrication, welding, powder coating and assembly in scope.",
+          "Publicly stated operational target is 2028, which places equipment specification inside the current buying window.",
+          "Same account has parallel robotics manufacturing builds announced in Austin, Texas and in Massachusetts, suggesting a repeatable multi-site opportunity."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$100+ million, 585,000 sq ft robotics manufacturing facility in Greenwood, Indiana; 300 jobs; operations begin by 2028.",
+          "publisher": "Manufacturing Dive",
+          "url": "https://www.manufacturingdive.com/news/amazon-us-steel-pirelli-eli-lilly-investments-layoffs-september-2026/831373/",
+          "published_date": "2026-09",
+          "retrieved_date": "2026-09-29"
+        },
+        {
+          "claim": "Amazon robotics manufacturing announcement, Massachusetts.",
+          "publisher": "Manufacturing Dive — Openings & Expansions",
+          "url": "https://www.manufacturingdive.com/topic/openings-expansions/",
+          "published_date": "2026-09-25",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R02",
+      "company_name": "Eli Lilly and Company",
+      "contact_name": "API Plant Automation Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "Pharmaceutical Manufacturing",
+      "location": "Houston, Texas, USA",
+      "sourced": {
+        "announced_investment_usd": 6500000000,
+        "investment_label": "$6.5 billion",
+        "facility_type": "Active pharmaceutical ingredient (API) production facility",
+        "announced_jobs": 600,
+        "scope_detail": "Produces orforglipron, an oral GLP-1 drug. Includes $12.5 million funding for a San Jacinto College training program.",
+        "additional_context": "One of the largest single-site pharmaceutical manufacturing investments announced in the period."
+      },
+      "modeled": {
+        "deal_value": 865000,
+        "deal_value_basis": "API production lines require high-spec process control, clean-room-compatible conveyance and serialization vision systems; sized at the upper end of our single-site package range.",
+        "win_probability": 0.68,
+        "win_probability_basis": "Very large capex and 600+ headcount signal a long qualification cycle with validated-supplier requirements typical of pharma.",
+        "engagement_score": 79,
+        "last_contact_date": "2026-09-24T14:00:00Z",
+        "stage": "Proposal Review",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $6.5 billion API production facility in Houston, Texas producing orforglipron, an oral GLP-1 drug.",
+          "Announced headcount of 600+ with a dedicated $12.5 million San Jacinto College workforce training program, indicating a fully staffed multi-line site.",
+          "Pharmaceutical API lines carry validated-supplier and serialization requirements that lengthen qualification but raise contract value."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$6.5 billion API production facility in Houston, Texas; 600+ jobs; produces orforglipron; includes $12.5 million for San Jacinto College training program.",
+          "publisher": "Manufacturing Dive",
+          "url": "https://www.manufacturingdive.com/news/amazon-us-steel-pirelli-eli-lilly-investments-layoffs-september-2026/831373/",
+          "published_date": "2026-09",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R03",
+      "company_name": "Pirelli",
+      "contact_name": "Plant Modernization Manager (role placeholder)",
+      "contact_email": null,
+      "industry": "Tire & Rubber Manufacturing",
+      "location": "Rome, Georgia, USA",
+      "sourced": {
+        "announced_investment_usd": 1200000000,
+        "investment_label": "$1.2 billion",
+        "facility_type": "Tire manufacturing expansion",
+        "announced_jobs": 1000,
+        "operational_target": "Full operations by 2033; major hiring in 2029",
+        "scope_detail": "Expansion of tire manufacturing capacity at the Rome, Georgia site."
+      },
+      "modeled": {
+        "deal_value": 610000,
+        "deal_value_basis": "Tire manufacturing expansion implies curing-press handling and material conveyance scope; sized mid-range given phased build.",
+        "win_probability": 0.44,
+        "win_probability_basis": "Full operations target of 2033 and major hiring not until 2029 place equipment specification well outside the near-term buying window.",
+        "engagement_score": 58,
+        "last_contact_date": "2026-08-11T10:30:00Z",
+        "stage": "Qualified Lead",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $1.2 billion tire manufacturing expansion in Rome, Georgia with 1,000 announced jobs.",
+          "Publicly stated timeline puts full operations at 2033 with major hiring in 2029, so the equipment specification window is years out.",
+          "Long-horizon account: worth relationship-building now, but not a near-term close."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$1.2 billion tire manufacturing expansion in Rome, Georgia; 1,000 jobs; full operations by 2033, major hiring in 2029.",
+          "publisher": "Manufacturing Dive",
+          "url": "https://www.manufacturingdive.com/news/amazon-us-steel-pirelli-eli-lilly-investments-layoffs-september-2026/831373/",
+          "published_date": "2026-09",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R04",
+      "company_name": "United States Steel Corporation",
+      "contact_name": "Tubular Operations Engineering Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "Steel & Heavy Industry",
+      "location": "Fairfield, Alabama, USA",
+      "sourced": {
+        "announced_investment_usd": 475000000,
+        "investment_label": "$475 million",
+        "facility_type": "Quench and tempering facility for tubular operations",
+        "announced_jobs": 250,
+        "operational_target": "Construction through 2029",
+        "scope_detail": "New quench and tempering line supporting tubular operations at Fairfield.",
+        "additional_context": "Parent group Nippon Steel separately announced a 900 million euro ($1.02 billion) electric arc furnace and air separation unit at U.S. Steel Kosice, Slovakia, with arc furnace operations from 2030 and a 1.6 million metric ton per year capacity."
+      },
+      "modeled": {
+        "deal_value": 540000,
+        "deal_value_basis": "Quench and tempering lines need high-temperature material handling, quench-tank conveyance and inline dimensional inspection; sized as a single-line package.",
+        "win_probability": 0.74,
+        "win_probability_basis": "Construction running through 2029 with a defined single-line scope means process equipment is being specified in the current cycle.",
+        "engagement_score": 84,
+        "last_contact_date": "2026-09-25T11:15:00Z",
+        "stage": "Proposal Review",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $475 million quench and tempering facility for tubular operations in Fairfield, Alabama with 250 announced jobs.",
+          "Construction runs through 2029 on a defined single-line scope, which is a tighter and more specifiable package than a greenfield multi-line site.",
+          "Parent group Nippon Steel is concurrently investing 900 million euros in an electric arc furnace and air separation unit at U.S. Steel Kosice in Slovakia, indicating group-level capital appetite."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$475 million quench and tempering facility for tubular operations in Fairfield, Alabama; 250 jobs; construction through 2029.",
+          "publisher": "Manufacturing Dive",
+          "url": "https://www.manufacturingdive.com/news/amazon-us-steel-pirelli-eli-lilly-investments-layoffs-september-2026/831373/",
+          "published_date": "2026-09",
+          "retrieved_date": "2026-09-29"
+        },
+        {
+          "claim": "Nippon Steel 900 million euro ($1.02 billion) electric arc furnace and air separation unit at U.S. Steel Kosice, Slovakia; arc furnace operations 2030, air separation unit 2029; 1.6 million metric tons per year.",
+          "publisher": "Manufacturing Dive",
+          "url": "https://www.manufacturingdive.com/news/amazon-us-steel-pirelli-eli-lilly-investments-layoffs-september-2026/831373/",
+          "published_date": "2026-09",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R05",
+      "company_name": "FANUC America",
+      "contact_name": "Facility Build-Out Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "Robotics & Factory Automation",
+      "location": "Michigan, USA",
+      "sourced": {
+        "announced_investment_usd": 90000000,
+        "investment_label": "$90 million",
+        "facility_type": "Production-ready robot manufacturing facility",
+        "facility_size_sqft": 840000,
+        "announced_jobs": 225,
+        "operational_target": "Targeted completion late 2027",
+        "scope_detail": "New 840,000 sq ft facility creating production-ready capacity for robot manufacturing in the US. Supports demand for automation solutions including physical AI and digital-twin technologies.",
+        "additional_context": "Part of a broader $300 million investment since 2019 that has created over 700 US jobs and expanded footprint to 3 million sq ft. Executive quote from Mike Cicco, President and CEO, FANUC America: the investment builds on FANUC America's Michigan manufacturing footprint, which has included producing robots for paint application domestically for more than four decades."
+      },
+      "modeled": {
+        "deal_value": 425000,
+        "deal_value_basis": "Supplier-side opportunity: an 840,000 sq ft build needs internal material handling and plant conveyance even though the account manufactures robots itself. Sized conservatively as a support-systems package.",
+        "win_probability": 0.51,
+        "win_probability_basis": "Account is itself an automation manufacturer and will insource most cell-level automation, limiting scope to ancillary plant systems.",
+        "engagement_score": 71,
+        "last_contact_date": "2026-09-19T15:00:00Z",
+        "stage": "Technical Validation",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $90 million, 840,000 sq ft production-ready robot manufacturing facility in Michigan with 225 new positions and targeted completion in late 2027.",
+          "This sits within a broader $300 million investment since 2019 that has grown the account's footprint to 3 million sq ft and created over 700 US jobs.",
+          "Account manufactures robots itself, so the realistic scope is ancillary plant material handling rather than cell-level automation."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$90 million investment, 840,000 sq ft Michigan facility, 225 new positions, targeted completion late 2027, part of broader $300 million investment since 2019 totaling 3 million sq ft and 700+ US jobs. Quote attributed to Mike Cicco, President and CEO, FANUC America.",
+          "publisher": "FANUC America (company press release)",
+          "url": "https://www.fanucamerica.com/press-releases/fanuc-america-announces-90-million-investment-to-create-production-ready-capacity-for-robot-manufacturing-in-the-us",
+          "published_date": "2026-03-24",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R06",
+      "company_name": "Chobani",
+      "contact_name": "Process Line Engineering Manager (role placeholder)",
+      "contact_email": null,
+      "industry": "Food & Beverage Manufacturing",
+      "location": "Pennsylvania, USA",
+      "sourced": {
+        "announced_investment_usd": 1200000000,
+        "investment_label": "$1.2 billion",
+        "facility_type": "Yogurt production facility",
+        "announced_jobs": 900,
+        "scope_detail": "New yogurt production facility in Pennsylvania."
+      },
+      "modeled": {
+        "deal_value": 695000,
+        "deal_value_basis": "High-throughput food processing lines require filling-line conveyance, CIP-compatible handling and inline inspection; sized as a multi-line package.",
+        "win_probability": 0.77,
+        "win_probability_basis": "Greenfield food plants specify process and packaging equipment early and move faster than heavy industry or pharma.",
+        "engagement_score": 86,
+        "last_contact_date": "2026-09-27T09:30:00Z",
+        "stage": "Contract Negotiation",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $1.2 billion yogurt production facility in Pennsylvania with 900+ announced jobs.",
+          "Greenfield food and beverage sites specify filling, conveyance and inline inspection equipment early in the build, which fits our lead time.",
+          "Announced headcount of 900+ points to a multi-line site rather than a single production line."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$1.2 billion yogurt production facility in Pennsylvania; 900+ jobs.",
+          "publisher": "Manufacturing Dive — Openings & Expansions",
+          "url": "https://www.manufacturingdive.com/topic/openings-expansions/",
+          "published_date": "2026-09-01",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R07",
+      "company_name": "Ford Motor Company",
+      "contact_name": "Paint Shop Project Engineer (role placeholder)",
+      "contact_email": null,
+      "industry": "Automotive Manufacturing",
+      "location": "Kentucky, USA",
+      "sourced": {
+        "announced_investment_usd": 1000000000,
+        "investment_label": "$1 billion",
+        "facility_type": "Paint shop for assembly plant",
+        "scope_detail": "New paint shop at a Kentucky assembly plant."
+      },
+      "modeled": {
+        "deal_value": 720000,
+        "deal_value_basis": "Automotive paint shops are conveyance- and robotics-dense with strict environmental controls; sized at the upper-middle of our range.",
+        "win_probability": 0.7,
+        "win_probability_basis": "A defined single-system scope (paint shop) specifies equipment on a tighter, more predictable cycle than a full plant build.",
+        "engagement_score": 81,
+        "last_contact_date": "2026-09-23T13:45:00Z",
+        "stage": "Proposal Review",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $1 billion paint shop for its Kentucky assembly plant.",
+          "Paint shop scope is conveyance- and robotics-dense with strict environmental control requirements, which matches our product line directly.",
+          "Single-system scope tends to specify equipment on a tighter cycle than a full greenfield plant."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$1 billion paint shop for assembly plant, Kentucky.",
+          "publisher": "Manufacturing Dive — Openings & Expansions",
+          "url": "https://www.manufacturingdive.com/topic/openings-expansions/",
+          "published_date": "2026-09-11",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R08",
+      "company_name": "GE Appliances",
+      "contact_name": "Assembly Line Automation Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "Appliance Manufacturing",
+      "location": "Louisville, Kentucky, USA",
+      "sourced": {
+        "announced_investment_usd": 1000000000,
+        "investment_label": "$1 billion",
+        "facility_type": "Appliance manufacturing",
+        "scope_detail": "Appliance manufacturing investment at Louisville, Kentucky."
+      },
+      "modeled": {
+        "deal_value": 505000,
+        "deal_value_basis": "Appliance assembly is conveyance- and vision-inspection-heavy but uses lighter-duty equipment than heavy industry; sized mid-range.",
+        "win_probability": 0.66,
+        "win_probability_basis": "Brownfield investment at an existing site typically phases equipment replacement rather than buying a full line at once.",
+        "engagement_score": 75,
+        "last_contact_date": "2026-09-18T10:00:00Z",
+        "stage": "Technical Validation",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $1 billion appliance manufacturing investment in Louisville, Kentucky.",
+          "Appliance assembly lines are conveyance- and vision-inspection-heavy, matching our mid-duty product range.",
+          "Brownfield site investment usually phases equipment replacement, so expect a staged rather than single-shot purchase."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$1 billion appliance manufacturing investment, Louisville, Kentucky.",
+          "publisher": "Manufacturing Dive — Openings & Expansions",
+          "url": "https://www.manufacturingdive.com/topic/openings-expansions/",
+          "published_date": "2026-09-03",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R09",
+      "company_name": "Toyotetsu Mid America",
+      "contact_name": "Modernization Project Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "Automotive Components",
+      "location": "Owensboro, Kentucky, USA",
+      "sourced": {
+        "announced_investment_usd": 41000000,
+        "investment_label": "$41 million",
+        "facility_type": "Operations expansion and modernization",
+        "announced_jobs": 640,
+        "jobs_note": "640 jobs retained (not new)",
+        "operational_target": "Completion in 2028",
+        "scope_detail": "Expansion and modernization of existing operations."
+      },
+      "modeled": {
+        "deal_value": 185000,
+        "deal_value_basis": "Modernization of an existing line at a $41 million total project size supports a single-cell retrofit package, not a full line.",
+        "win_probability": 0.62,
+        "win_probability_basis": "Modernization projects have clear scope and shorter cycles, but the small total project size limits equipment spend.",
+        "engagement_score": 64,
+        "last_contact_date": "2026-08-24T14:20:00Z",
+        "stage": "Qualified Lead",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $41 million operations expansion and modernization in Owensboro, Kentucky with completion targeted for 2028.",
+          "The 640 figure is jobs retained rather than new hires, indicating a modernization of existing capacity rather than added lines.",
+          "Total project size supports a single-cell retrofit package rather than a full line purchase."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$41 million operations expansion and modernization, Owensboro, Kentucky; 640 jobs retained; completion in 2028.",
+          "publisher": "Manufacturing Dive",
+          "url": "https://www.manufacturingdive.com/news/amazon-us-steel-pirelli-eli-lilly-investments-layoffs-september-2026/831373/",
+          "published_date": "2026-09",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R10",
+      "company_name": "Hansae Mobility Co.",
+      "contact_name": "Final Assembly Engineering Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "Automotive Components & Mobility",
+      "location": "Chesterfield Township, Michigan, USA",
+      "sourced": {
+        "announced_investment_usd": 93000000,
+        "investment_label": "$93+ million",
+        "facility_type": "Final assembly and machining consolidation facility",
+        "facility_size_sqft": 400000,
+        "announced_jobs": 102,
+        "scope_detail": "Consolidates final assembly and machining into a single 400,000 sq ft facility. State grants totaling $1.33 million approved.",
+        "additional_context": "Consolidation of previously separate operations into one site."
+      },
+      "modeled": {
+        "deal_value": 295000,
+        "deal_value_basis": "Consolidating final assembly and machining into one 400,000 sq ft site requires new inter-process conveyance; sized as a mid-small integration package.",
+        "win_probability": 0.69,
+        "win_probability_basis": "Consolidation projects must re-link previously separate processes, which forces new material handling procurement on a defined timeline.",
+        "engagement_score": 73,
+        "last_contact_date": "2026-09-22T11:40:00Z",
+        "stage": "Proposal Review",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $93+ million, 400,000 sq ft facility in Chesterfield Township, Michigan consolidating final assembly and machining, with 102 announced jobs.",
+          "State grants totaling $1.33 million were approved for the project, indicating the build is past initial approval gates.",
+          "Consolidating previously separate assembly and machining operations forces new inter-process conveyance procurement."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$93+ million, 400,000 sq ft facility in Chesterfield Township, Michigan; 102 jobs; consolidates final assembly and machining; state grants totaling $1.33 million approved.",
+          "publisher": "Manufacturing Dive",
+          "url": "https://www.manufacturingdive.com/news/amazon-us-steel-pirelli-eli-lilly-investments-layoffs-september-2026/831373/",
+          "published_date": "2026-09",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R11",
+      "company_name": "Hanwha Defense",
+      "contact_name": "Propellant Plant Process Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "Defense Manufacturing",
+      "location": "Pine Bluff, Arkansas, USA",
+      "sourced": {
+        "announced_investment_usd": 2200000000,
+        "investment_label": "$2.2 billion",
+        "facility_type": "Propellant and ammunition manufacturing",
+        "scope_detail": "Propellant and ammunition manufacturing facility in Pine Bluff, Arkansas."
+      },
+      "modeled": {
+        "deal_value": 640000,
+        "deal_value_basis": "Energetic-materials handling requires explosion-rated conveyance and remote-handling automation, a high-spec and high-margin package.",
+        "win_probability": 0.55,
+        "win_probability_basis": "Defense sites require security clearance and certification of suppliers, lengthening qualification despite strong capital commitment.",
+        "engagement_score": 67,
+        "last_contact_date": "2026-09-15T08:50:00Z",
+        "stage": "Qualified Lead",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $2.2 billion propellant and ammunition manufacturing facility in Pine Bluff, Arkansas.",
+          "Energetic-materials handling requires explosion-rated conveyance and remote handling, which is a high-specification segment of our range.",
+          "Defense-sector supplier certification and clearance requirements will lengthen the qualification cycle."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$2.2 billion propellant/ammunition manufacturing facility, Pine Bluff, Arkansas.",
+          "publisher": "Manufacturing Dive — Openings & Expansions",
+          "url": "https://www.manufacturingdive.com/topic/openings-expansions/",
+          "published_date": "2026-09-22",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    },
+    {
+      "opportunity_id": "OPP-R12",
+      "company_name": "LEGO Group",
+      "contact_name": "Molding Operations Lead (role placeholder)",
+      "contact_email": null,
+      "industry": "Consumer Products Manufacturing",
+      "location": "Monterrey, Mexico",
+      "sourced": {
+        "announced_investment_usd": 400000000,
+        "investment_label": "$400 million",
+        "facility_type": "Manufacturing expansion",
+        "announced_jobs": 1300,
+        "scope_detail": "Manufacturing expansion at Monterrey, Mexico."
+      },
+      "modeled": {
+        "deal_value": 455000,
+        "deal_value_basis": "High-volume injection molding expansion needs part-handling automation and inline vision QC; sized mid-range for a phased expansion.",
+        "win_probability": 0.58,
+        "win_probability_basis": "Cross-border project adds import, service-coverage and support-footprint considerations to supplier selection.",
+        "engagement_score": 69,
+        "last_contact_date": "2026-09-16T12:10:00Z",
+        "stage": "Qualified Lead",
+        "owner": "Sales Team",
+        "sales_notes": [
+          "Account announced a $400 million manufacturing expansion in Monterrey, Mexico with 1,300 announced jobs.",
+          "High-volume molding expansion implies part-handling automation and inline vision quality control scope.",
+          "Cross-border delivery requires confirming our service and support footprint in northern Mexico before proposing."
+        ]
+      },
+      "provenance": [
+        {
+          "claim": "$400 million manufacturing expansion, Monterrey, Mexico; 1,300 jobs.",
+          "publisher": "Manufacturing Dive — Openings & Expansions",
+          "url": "https://www.manufacturingdive.com/topic/openings-expansions/",
+          "published_date": "2026-09-24",
+          "retrieved_date": "2026-09-29"
+        }
+      ]
+    }
+  ]
+}

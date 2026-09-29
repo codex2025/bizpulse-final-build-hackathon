@@ -18,7 +18,9 @@ from app.decision_forge.schemas import (
     SimulationInput,
     SimulationResponse
 )
-from app.decision_forge.schema_mapper import SchemaMapper
+from app.decision_forge.schema_mapper import SchemaMapper, load_dataset
+from app.decision_forge.external_gateway import build_signal_from_record
+from app.decision_forge.qa import answer_question, SUGGESTED_QUESTIONS
 from app.decision_forge.quality_engine import DataQualityEngine
 from app.decision_forge.decision_engine import DeterministicDecisionEngine
 from app.decision_forge.decision_twin import DecisionTwinSimulator
@@ -33,6 +35,7 @@ rag_service = NotesRagService()
 
 # In-memory store for active session dataset (fallback if no external DB provided)
 ACTIVE_OPPORTUNITIES: List[Dict[str, Any]] = []
+DATASET_META: Optional[Dict[str, Any]] = None
 # The last decision run's ranked recommendations, keyed by decision_run_id, so a single
 # recommendation can be looked up (e.g. to fetch external context for it) after the run.
 LAST_RUN_ID: Optional[str] = None
@@ -64,25 +67,38 @@ def compute_reference_time(opportunities: List[Dict[str, Any]]) -> datetime:
     return latest or datetime.now(timezone.utc)
 
 
+def _activate(raw: Any) -> None:
+    """Loads either dataset shape (auto-detected via `dataset_meta`) as the active set.
+    Signals are built from each record's own provenance -- never invented."""
+    global ACTIVE_OPPORTUNITIES, DATASET_META
+    loaded = load_dataset(raw)
+    DATASET_META = loaded["meta"]
+    ACTIVE_OPPORTUNITIES = loaded["opportunities"]
+    for opp in ACTIVE_OPPORTUNITIES:
+        if not opp.get("external_signal"):
+            signal = build_signal_from_record(opp)
+            if signal:
+                opp["external_signal"] = signal
+    rag_service.index_opportunities(ACTIVE_OPPORTUNITIES)
+
+
 def load_default_demo_dataset():
-    global ACTIVE_OPPORTUNITIES, LAST_RUN_ID
+    """Prefers the real, cited dataset; falls back to the legacy flat demo dataset."""
+    global LAST_RUN_ID
     ai_service_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    # Bundled inside ai-service/data so it ships with the ai-service deployment on
-    # its own (Vercel/Render deploy just this directory, not the repo root's data/).
-    # Fall back to the repo-root copy for anyone running from a full local checkout
-    # before that copy existed.
-    candidates = [
-        os.path.join(ai_service_root, "data", "demo_industrial_crm.json"),
-        os.path.join(ai_service_root, "..", "data", "demo_industrial_crm.json"),
-    ]
-    data_path = next((p for p in candidates if os.path.exists(p)), candidates[0])
-    if os.path.exists(data_path):
+    # Bundled inside ai-service/data so it ships with the ai-service deployment on its own.
+    data_path = None
+    for name in ("real_industrial_crm.json", "demo_industrial_crm.json"):
+        candidate = os.path.join(ai_service_root, "data", name)
+        if os.path.exists(candidate):
+            data_path = candidate
+            break
+    if data_path:
         try:
             with open(data_path, "r", encoding="utf-8") as f:
-                ACTIVE_OPPORTUNITIES = json.load(f)
-                rag_service.index_opportunities(ACTIVE_OPPORTUNITIES)
+                _activate(json.load(f))
         except Exception as e:
-            print(f"[DecisionForge] Error loading demo dataset: {e}")
+            print(f"[DecisionForge] Error loading dataset: {e}")
     decision_engine.ext_gateway.reset()
     LAST_RUN_ID = None
 
@@ -149,13 +165,12 @@ async def ingest_file(file: UploadFile = File(...)):
 @router.post("/ingest/apply-mapping")
 async def apply_mapping(payload: Dict[str, Any] = Body(...)):
     """Activates a reviewed set of normalized records as the live dataset for decision-making."""
-    global ACTIVE_OPPORTUNITIES, LAST_RUN_ID
+    global LAST_RUN_ID
     records = payload.get("records", [])
     if not records:
         raise HTTPException(status_code=400, detail="No records provided to activate.")
 
-    ACTIVE_OPPORTUNITIES = records
-    rag_service.index_opportunities(records)
+    _activate(records)
     decision_engine.ext_gateway.reset()
     LAST_RUN_ID = None
     quality = quality_engine.evaluate(records, reference_time=compute_reference_time(records))
@@ -178,20 +193,15 @@ async def get_current_dataset():
         "opportunities": ACTIVE_OPPORTUNITIES,
         "count": len(ACTIVE_OPPORTUNITIES),
         "quality_report": quality,
-        "data_snapshot": reference_time.isoformat()
+        "data_snapshot": reference_time.isoformat(),
+        "dataset_meta": DATASET_META
     }
 
-@router.post("/decide/run", response_model=DecisionRunResponse)
-async def run_decision_engine(policy: Optional[PolicyWeights] = None):
-    """
-    Executes the deterministic decision engine against active CRM opportunities.
-    Computes priority scores, factor breakdowns, evidence packs, and recommended actions.
-    """
+def _run(pol: PolicyWeights) -> DecisionRunResponse:
     global LAST_RUN_ID
     if not ACTIVE_OPPORTUNITIES:
         load_default_demo_dataset()
 
-    pol = policy or PolicyWeights()
     reference_time = compute_reference_time(ACTIVE_OPPORTUNITIES)
     run_id = f"DR-{uuid.uuid4().hex[:6].upper()}"
     LAST_RUN_ID = run_id
@@ -227,6 +237,30 @@ async def run_decision_engine(policy: Optional[PolicyWeights] = None):
         recommendations=recommendations,
         generated_at=datetime.now(timezone.utc).isoformat()
     )
+
+
+@router.post("/decide/run", response_model=DecisionRunResponse)
+async def run_decision_engine(policy: Optional[PolicyWeights] = None):
+    """
+    Executes the deterministic decision engine against active CRM opportunities.
+    Computes priority scores, factor breakdowns, evidence packs, and recommended actions.
+    """
+    return _run(policy or PolicyWeights())
+
+
+@router.get("/ask/suggestions")
+async def ask_suggestions():
+    return {"questions": SUGGESTED_QUESTIONS}
+
+
+@router.post("/ask")
+async def ask_pipeline(payload: Dict[str, Any] = Body(...)):
+    """Answers a natural-language pipeline question from a fresh decision run over the
+    active dataset. Answers are computed, never canned."""
+    question = str(payload.get("question", "")).strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="A question is required.")
+    return answer_question(question, _run(PolicyWeights()).recommendations)
 
 @router.post("/opportunities/{opportunity_id}/fetch-context")
 async def fetch_external_context(opportunity_id: str):

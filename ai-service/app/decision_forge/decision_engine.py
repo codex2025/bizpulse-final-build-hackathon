@@ -123,7 +123,7 @@ class DeterministicDecisionEngine:
                 score=round(deal_score, 1),
                 weight=policy.deal_value_weight,
                 weighted_contribution=round(deal_score * policy.deal_value_weight, 1),
-                description=f"Represents a ${deal_val:,.0f} revenue potential against team target."
+                description=f"Represents a ${deal_val:,.0f} revenue potential against team target." + (" Analyst estimate, not a sourced or quoted figure." if opp.get("data_origin") == "nested" else "")
             ),
             DecisionFactor(
                 name="Win Likelihood",
@@ -169,16 +169,37 @@ class DeterministicDecisionEngine:
             {"snippet": n, "company_name": company_name} for n in opp.get("sales_notes", [])[:2]
         ]
 
+        provenance = list(opp.get("provenance") or [])
+        modeled_basis = opp.get("modeled_basis") or {}
+        is_nested = opp.get("data_origin") == "nested"
+        field_origin = {
+            "opportunity_id": "sourced" if is_nested else "record",
+            "location": "sourced" if is_nested else "record",
+            "deal_value": "estimated" if is_nested else "record",
+            "stage": "estimated" if is_nested else "record",
+            "win_probability": "estimated" if is_nested else "record",
+            "engagement_score": "estimated" if is_nested else "record",
+            "last_contact_date": "estimated" if is_nested else "record",
+            "owner": "estimated" if is_nested else "record",
+        }
+
         evidence_pack = {
             "structured_data": {
                 "opportunity_id": opp.get("opportunity_id"),
                 "deal_value": f"${deal_val:,.0f}",
                 "stage": opp.get("stage"),
                 "owner": opp.get("owner", "Sales Team"),
-                "location": opp.get("location", "US")
+                "location": opp.get("location") or "US"
             },
             "rag_notes": notes_used,
-            "external_signal": external_signal
+            "external_signal": external_signal,
+            # Sourced facts (each traceable to an entry in `provenance`) vs. our own
+            # estimates: every structured field is tagged so nothing estimated can be
+            # read as a sourced fact.
+            "sourced_facts": opp.get("sourced") or {},
+            "modeled_basis": modeled_basis,
+            "field_origin": field_origin,
+            "provenance": provenance,
         }
 
         # Outreach draft grounded only in facts already present in the evidence pack --
@@ -207,9 +228,9 @@ class DeterministicDecisionEngine:
             decision_run_id=decision_run_id,
             opportunity_id=opp.get("opportunity_id", "0"),
             company_name=company_name,
-            contact_name=opp.get("contact_name", "N/A"),
+            contact_name=opp.get("contact_name") or "N/A",
             contact_email=opp.get("contact_email"),
-            industry=opp.get("industry", "Industrial"),
+            industry=opp.get("industry") or "Industrial",
             deal_value=deal_val,
             stage=opp.get("stage", "Active"),
             win_probability=win_prob,

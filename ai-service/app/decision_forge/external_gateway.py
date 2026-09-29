@@ -13,59 +13,49 @@ a real "before vs after" score change (plan section 22 demo script, 1:10-1:45).
 from typing import Dict, Any, Optional, Set
 from datetime import datetime, timezone
 
-# Validated snapshot cache for hackathon reliability & offline safety.
-# published_at is fixed (as if captured when this snapshot was validated); retrieved_at
-# is stamped for real, the moment a user in this session actually requests it.
-CACHED_SIGNALS = {
-    "Titan Heavy Hydraulics": {
-        "title": "Titan Heavy Hydraulics Secures $42M Defense Component Contract, Plans Ohio Facility Expansion",
-        "source": "Midwest Manufacturing Today",
-        "url": "https://midwestmfg.example.com/news/titan-expansion-2026",
-        "published_at": "2026-09-26T08:15:00Z",
-        "impact_summary": "High expansion budget drastically increases likelihood of multi-unit equipment purchase.",
-        "relevance_score": 0.95
-    },
-    "Apex Precision Tooling": {
-        "title": "Auto OEM Tier-1 Suppliers Face Bottlenecks in Precision Metal Parts",
-        "source": "Automotive News Wire",
-        "url": "https://autonews.example.com/tier1-supply-chain-crunch",
-        "published_at": "2026-09-25T19:40:00Z",
-        "impact_summary": "Urgency to secure reliable machining supplier creates strong negotiation leverage.",
-        "relevance_score": 0.88
-    },
-    "Sterling Turbine Solutions": {
-        "title": "Texas Grid Operator ERCOT Announces Incentives for Industrial Cogeneration Turbines",
-        "source": "Energy & Power Journal",
-        "url": "https://energyjournal.example.com/ercot-industrial-incentives-2026",
-        "published_at": "2026-09-26T06:30:00Z",
-        "impact_summary": "State tax rebate offsets up to 18% of equipment costs, accelerating buying timeline.",
-        "relevance_score": 0.82
-    },
-    "Vanguard Robotics & Automation": {
-        "title": "Vanguard Robotics Secures $30M Series B to Accelerate Automated Fulfillment Systems",
-        "source": "TechCrunch Robotics",
-        "url": "https://techcrunch.example.com/vanguard-robotics-series-b",
-        "published_at": "2026-09-26T07:45:00Z",
-        "impact_summary": "Series B capitalization ensures zero credit/payment default risk; immediate close target.",
-        "relevance_score": 0.96
-    },
-    "Midwest Foundry Works": {
-        "title": "Industrial Energy Rates in Wisconsin Drop 14% as Gas Storage Peaks",
-        "source": "Great Lakes Energy Gazette",
-        "url": "https://glegazette.example.com/wisconsin-industrial-gas-drop",
-        "published_at": "2026-09-24T12:00:00Z",
-        "impact_summary": "Key barrier (energy cost volatility) removed; opportune moment to re-engage.",
-        "relevance_score": 0.75
-    },
-    "Delta Marine Propulsion": {
-        "title": "EPA Tightens Mississippi River Tugboat Emission Standards with Strict Dec 31 Enforcement",
-        "source": "Maritime Executive",
-        "url": "https://maritime-executive.example.com/epa-tugboat-standards-2026",
-        "published_at": "2026-09-25T11:20:00Z",
-        "impact_summary": "Regulatory deadline enforces immediate buying urgency within the next 45 days.",
-        "relevance_score": 0.89
+# Validated snapshot cache. There is deliberately no hand-written entry here any more:
+# every signal is built from a record's own cited `provenance` (real publisher, real URL,
+# real published date) by build_signal_from_record(), so nothing in the cache can be
+# fictional. Kept as a module-level dict so the lookup path below is unchanged.
+CACHED_SIGNALS: Dict[str, Dict[str, Any]] = {}
+
+
+def _impact_summary(sourced: Dict[str, Any]) -> str:
+    """Impact statement composed ONLY from fields under `sourced`; never invents a fact."""
+    parts = []
+    if sourced.get("investment_label"):
+        parts.append(f"{sourced['investment_label']} announced")
+    if sourced.get("facility_type"):
+        parts.append(str(sourced["facility_type"]))
+    if sourced.get("announced_jobs"):
+        parts.append(f"{sourced['announced_jobs']:,} announced jobs")
+    if sourced.get("operational_target"):
+        parts.append(f"operational target: {sourced['operational_target']}")
+    if not parts:
+        return "Publicly cited facility announcement; see source for details."
+    return "Publicly announced: " + "; ".join(parts) + ". A new facility is a live capital-equipment buying window."
+
+
+def build_signal_from_record(opp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Builds an external signal from the record's first provenance entry. Returns None
+    (no signal) when the record has no usable citation -- we never fabricate one.
+
+    relevance_score is a MODELED value (0.70 base, +0.05 per additional independent
+    citation, capped at 0.80); it is labelled as such via `relevance_basis`."""
+    prov = [p for p in (opp.get("provenance") or []) if p.get("url")]
+    if not prov:
+        return None
+    primary = prov[0]
+    return {
+        "title": primary.get("claim", ""),
+        "source": primary.get("publisher", ""),
+        "url": primary["url"],
+        "published_at": primary.get("published_date"),
+        "impact_summary": _impact_summary(opp.get("sourced") or {}),
+        "relevance_score": round(min(0.80, 0.70 + 0.05 * (len(prov) - 1)), 2),
+        "relevance_basis": "Modeled: 0.70 base + 0.05 per additional citation (cap 0.80); not a sourced fact.",
     }
-}
+
 
 class ExternalContextGateway:
     def __init__(self):
@@ -125,10 +115,11 @@ class ExternalContextGateway:
             res = {
                 "title": embedded.get("title", f"External signal for {company_name}"),
                 "source": embedded.get("source", "Seed dataset"),
-                "url": embedded.get("url", "#"),
+                "url": embedded.get("url") or None,
                 "published_at": embedded.get("published_at"),
                 "impact_summary": embedded.get("impact_summary") or embedded.get("impact", "No impact summary provided."),
                 "relevance_score": embedded.get("relevance_score", 0.8),
+                "relevance_basis": embedded.get("relevance_basis"),
             }
         else:
             return None

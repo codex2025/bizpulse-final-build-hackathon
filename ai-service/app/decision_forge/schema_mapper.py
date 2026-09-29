@@ -83,3 +83,55 @@ class SchemaMapper:
                 else:
                     normalized[canonical_field] = str(val).strip() if val is not None else ""
         return normalized
+
+
+# ---------------------------------------------------------------------------
+# Dataset loading: nested (sourced / modeled / provenance) and legacy flat formats
+# ---------------------------------------------------------------------------
+MODELED_SCALAR_FIELDS = ["deal_value", "win_probability", "engagement_score", "last_contact_date", "stage", "owner"]
+
+
+def is_nested_dataset(raw: Any) -> bool:
+    """The nested format is a dict carrying `dataset_meta`; the legacy format is a flat list."""
+    return isinstance(raw, dict) and "dataset_meta" in raw
+
+
+def flatten_nested_record(rec: Dict[str, Any]) -> Dict[str, Any]:
+    """Flatten `modeled.*` into the canonical fields the engine reads, while carrying
+    `sourced`, `provenance` and the per-field `_basis` strings through untouched so they
+    can reach the evidence pack. Tolerates missing/empty blocks (graceful degradation)."""
+    modeled = rec.get("modeled") or {}
+    flat: Dict[str, Any] = {
+        "opportunity_id": rec.get("opportunity_id", ""),
+        "company_name": rec.get("company_name", ""),
+        "contact_name": rec.get("contact_name") or "N/A",
+        "contact_email": rec.get("contact_email"),
+        "industry": rec.get("industry"),
+        "location": rec.get("location"),
+        "sales_notes": list(modeled.get("sales_notes") or []),
+        "sourced": dict(rec.get("sourced") or {}),
+        "provenance": list(rec.get("provenance") or []),
+        "modeled_basis": {k[: -len("_basis")]: v for k, v in modeled.items() if k.endswith("_basis")},
+        "modeled_fields": [k for k in modeled if not k.endswith("_basis")],
+        "data_origin": "nested",
+    }
+    # Absent optional text fields are omitted (not None) so engine defaults apply.
+    for field in ("industry", "location"):
+        if flat.get(field) is None:
+            flat.pop(field, None)
+    for field in MODELED_SCALAR_FIELDS:
+        if field in modeled and modeled[field] is not None:
+            flat[field] = modeled[field]
+    return flat
+
+
+def load_dataset(raw: Any) -> Dict[str, Any]:
+    """Normalise either supported dataset shape into
+    {"meta": dict | None, "opportunities": [flat opportunity dicts]}."""
+    if is_nested_dataset(raw):
+        return {
+            "meta": raw.get("dataset_meta"),
+            "opportunities": [flatten_nested_record(r) for r in raw.get("opportunities", [])],
+        }
+    records = raw.get("opportunities", []) if isinstance(raw, dict) else list(raw or [])
+    return {"meta": None, "opportunities": records}
