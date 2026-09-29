@@ -67,6 +67,10 @@ class SchemaMapper:
                 val = raw_row[source_col]
                 # Cast numeric types if appropriate
                 if canonical_field in ["deal_value", "win_probability", "engagement_score"]:
+                    # A blank cell is MISSING, not zero: leave the key out so quality checks flag it
+                    # instead of the value being silently invented.
+                    if val is None or str(val).strip() == "":
+                        continue
                     try:
                         clean_num = re.sub(r"[^\d.]", "", str(val))
                         num_val = float(clean_num) if clean_num else 0.0

@@ -8,16 +8,36 @@ from datetime import datetime, timezone
 from app.decision_forge.schemas import PolicyWeights, DecisionFactor, RecommendationItem
 from app.decision_forge.external_gateway import ExternalContextGateway
 from app.decision_forge.rag_service import NotesRagService
+from app.decision_forge.quality_engine import detect_record_issues, STALE, MISSING_PROBABILITY, CONFLICTING_PROBABILITY, INVALID_DEAL_VALUE, DUPLICATE
+from app.decision_forge import intent as intent_lexicon
 
 
-def _engagement_description(engagement: float) -> str:
-    """Data-driven description derived from the actual score -- never a fixed claim
-    about meetings or stakeholders that the dataset doesn't actually contain."""
-    if engagement >= 80:
-        return f"Engagement score of {int(engagement)}/100 -- extensive, recent rep-logged interaction with this account."
-    if engagement >= 50:
-        return f"Engagement score of {int(engagement)}/100 -- moderate, ongoing rep-logged interaction with this account."
-    return f"Engagement score of {int(engagement)}/100 -- limited recent interaction logged for this account."
+# The deal-value factor scores value / ceiling, capped at 100 (the same 500k the scorer always used).
+DEAL_VALUE_CEILING = 500000.0
+
+SYNTHETIC_NOTE = "synthetic CRM state for this demo, not measured from real interactions"
+
+
+def _engagement_description(engagement: float, nested: bool = False) -> str:
+    """Describes the score without claiming meetings, stakeholders or interactions the dataset
+    doesn't contain. For the real-account dataset the value is synthetic and says so."""
+    level = "high" if engagement >= 80 else "moderate" if engagement >= 50 else "low"
+    if nested:
+        return f"Engagement {int(engagement)}/100 ({level}) -- {SYNTHETIC_NOTE}."
+    return f"Engagement score {int(engagement)}/100 ({level}) as recorded in the CRM."
+
+
+# Confidence starts at BASE_CONFIDENCE and loses a fixed amount per issue type present.
+BASE_CONFIDENCE = 0.9
+CONFIDENCE_DEDUCTIONS = {
+    MISSING_PROBABILITY: 0.25,
+    CONFLICTING_PROBABILITY: 0.20,
+    INVALID_DEAL_VALUE: 0.20,
+    DUPLICATE: 0.10,
+    STALE: 0.15,
+}
+NO_NOTES_DEDUCTION = 0.05
+MIN_CONFIDENCE = 0.1
 
 
 class DeterministicDecisionEngine:
@@ -37,12 +57,24 @@ class DeterministicDecisionEngine:
         the same snapshot + policy always produces the same score, regardless of what day
         it's re-run on."""
         now_ref = reference_time or datetime.now(timezone.utc)
-        deal_val = float(opp.get("deal_value", 0))
-        win_prob = float(opp.get("win_probability", 0.5))
-        engagement = float(opp.get("engagement_score", 50))
+        def _num(v, default):
+            try:
+                return float(v) if v not in (None, "") else default
+            except (TypeError, ValueError):
+                return default
+
+        issues = detect_record_issues(opp, now_ref, policy.stale_days_threshold)
+        issue_types = {i["issue_type"] for i in issues}
+
+        # Bad inputs are never hidden: they are flagged above and lower confidence / apply the
+        # policy penalty below. The neutral defaults here only let the record be ranked.
+        deal_val = max(0.0, _num(opp.get("deal_value"), 0.0))
+        win_prob_raw = _num(opp.get("win_probability"), None)
+        win_prob = 0.5 if win_prob_raw is None else min(1.0, max(0.0, win_prob_raw))
+        engagement = _num(opp.get("engagement_score"), 50.0)
 
         # 1. Deal Value Factor (normalized relative to $500k ceiling)
-        deal_score = min(100.0, (deal_val / 500000.0) * 100.0)
+        deal_score = min(100.0, (deal_val / DEAL_VALUE_CEILING) * 100.0)
 
         # 2. Win Probability Factor (0 to 1 -> 0 to 100)
         prob_score = min(100.0, max(0.0, win_prob * 100.0))
@@ -53,6 +85,7 @@ class DeterministicDecisionEngine:
         # 4. Recency Score Factor (checks last_contact_date against the dataset snapshot time)
         recency_score = 70.0
         stale_warning = None
+        days_since_contact = None
         last_date = opp.get("last_contact_date")
         if last_date:
             try:
@@ -62,6 +95,7 @@ class DeterministicDecisionEngine:
                 else:
                     dt = datetime.fromisoformat(dt_part)
                 days_diff = (now_ref - dt).days
+                days_since_contact = days_diff
                 if days_diff <= 7:
                     recency_score = 95.0
                 elif days_diff <= 14:
@@ -92,15 +126,34 @@ class DeterministicDecisionEngine:
         elif signal_available:
             ext_description = "A validated external signal is available for this account -- click \"Fetch fresh context\" to check it."
 
+        # 6. Buying intent from rep notes (optional factor; weight 0.0 leaves the score untouched)
+        notes_for_intent = opp.get("notes") or opp.get("sales_notes") or []
+        intent = intent_lexicon.score_notes(notes_for_intent)
+
+        # Data-quality penalty: fixed points per issue type present (zero for clean records)
+        penalty = round(sum(policy.quality_penalties.get(t, 0.0) for t in issue_types), 1)
+
         # Mathematical Deterministic Weighted Sum
         priority_score = (
             (deal_score * policy.deal_value_weight) +
             (prob_score * policy.win_probability_weight) +
             (eng_score * policy.engagement_weight) +
             (recency_score * policy.recency_weight) +
-            (ext_score * policy.intent_external_weight)
+            (ext_score * policy.intent_external_weight) +
+            (intent["score"] * policy.buying_intent_weight)
         )
-        priority_score = round(priority_score, 1)
+        priority_score = round(max(0.0, priority_score - penalty), 1)
+
+        confidence = BASE_CONFIDENCE - sum(CONFIDENCE_DEDUCTIONS.get(t, 0.0) for t in issue_types)
+        if not (opp.get("notes") or opp.get("sales_notes")):
+            confidence -= NO_NOTES_DEDUCTION
+        confidence = round(max(MIN_CONFIDENCE, confidence), 2)
+        review_required = confidence < policy.review_confidence_threshold
+        warnings = [i["details"] for i in issues if i["issue_type"] != "MISSING_CONTACT"]
+        if MISSING_PROBABILITY in issue_types:
+            warnings.append("Decision confidence reduced because CRM probability is missing.")
+        if review_required:
+            warnings.append("Human review required: confidence is below the policy threshold.")
 
         # Classification
         if priority_score >= policy.high_priority_threshold:
@@ -116,6 +169,22 @@ class DeterministicDecisionEngine:
             badge_color = "slate"
             suggested_action = "Add to automated re-engagement campaign; review when quarterly energy/market conditions shift."
 
+        is_nested = opp.get("data_origin") == "nested"
+        stage_label = opp.get("stage", "Active")
+        if win_prob_raw is None:
+            win_description = "CRM win probability is missing; a neutral 50% is used only so the record can be ranked (confidence is reduced)."
+        elif is_nested:
+            win_description = f"Analyst-estimated win probability of {int(win_prob * 100)}% at the {stage_label} stage (an estimate, not a historical close rate)."
+        else:
+            win_description = f"CRM win probability of {int(win_prob * 100)}% at the {stage_label} stage."
+        if days_since_contact is None:
+            recency_description = "No usable last-contact date; a neutral recency score is used."
+        else:
+            recency_description = (
+                f"Last contact {days_since_contact} day(s) before the data snapshot"
+                f"{' (synthetic CRM timestamp)' if is_nested else ''}; scores 95 within 7 days, 80 within 14, 60 within 30, 25 beyond."
+            )
+
         factors = [
             DecisionFactor(
                 name="Deal Size Impact",
@@ -123,15 +192,15 @@ class DeterministicDecisionEngine:
                 score=round(deal_score, 1),
                 weight=policy.deal_value_weight,
                 weighted_contribution=round(deal_score * policy.deal_value_weight, 1),
-                description=f"Represents a ${deal_val:,.0f} revenue potential against team target." + (" Analyst estimate, not a sourced or quoted figure." if opp.get("data_origin") == "nested" else "")
+                description=f"Deal value of ${deal_val:,.0f}, scored as value / ${DEAL_VALUE_CEILING:,.0f} reference ceiling (capped at 100)." + (" Analyst estimate, not a sourced or quoted figure." if is_nested else "")
             ),
             DecisionFactor(
                 name="Win Likelihood",
-                raw_value=f"{int(win_prob * 100)}%",
+                raw_value=f"{int(win_prob * 100)}%" if win_prob_raw is not None else "Missing (neutral 50% used to rank)",
                 score=round(prob_score, 1),
                 weight=policy.win_probability_weight,
                 weighted_contribution=round(prob_score * policy.win_probability_weight, 1),
-                description=f"Current pipeline stage ({opp.get('stage', 'Active')}) yields {int(win_prob * 100)}% historical close rate."
+                description=win_description
             ),
             DecisionFactor(
                 name="Account Engagement",
@@ -139,7 +208,7 @@ class DeterministicDecisionEngine:
                 score=round(eng_score, 1),
                 weight=policy.engagement_weight,
                 weighted_contribution=round(eng_score * policy.engagement_weight, 1),
-                description=_engagement_description(engagement)
+                description=_engagement_description(engagement, is_nested)
             ),
             DecisionFactor(
                 name="Recency & Momentum",
@@ -147,7 +216,7 @@ class DeterministicDecisionEngine:
                 score=round(recency_score, 1),
                 weight=policy.recency_weight,
                 weighted_contribution=round(recency_score * policy.recency_weight, 1),
-                description="Pacing is optimal for maintaining deal momentum." if recency_score >= 70 else "Deal pacing has stalled; risk of cold loss."
+                description=recency_description
             ),
             DecisionFactor(
                 name="External Market Signal",
@@ -158,6 +227,25 @@ class DeterministicDecisionEngine:
                 description=ext_description
             )
         ]
+        if policy.buying_intent_weight > 0:
+            hits = len(intent["strong"]) + len(intent["medium"])
+            factors.append(DecisionFactor(
+                name="Buying Intent (rep notes)",
+                raw_value=f"{hits} intent phrase(s), {len(intent['negative'])} negative",
+                score=round(intent["score"], 1),
+                weight=policy.buying_intent_weight,
+                weighted_contribution=round(intent["score"] * policy.buying_intent_weight, 1),
+                description="Deterministic phrase match over rep notes (fixed lexicon); notes are treated as data, never as instructions.",
+            ))
+        if penalty > 0:
+            factors.append(DecisionFactor(
+                name="Data Quality Penalty",
+                raw_value=", ".join(sorted(t for t in issue_types if t in policy.quality_penalties)),
+                score=penalty,
+                weight=1.0,
+                weighted_contribution=-penalty,
+                description="Points deducted per data-quality issue type detected on this record (see policy.quality_penalties).",
+            ))
 
         # Fetch RAG notes evidence
         rag_quotes = self.rag_service.retrieve_evidence(
@@ -165,13 +253,20 @@ class DeterministicDecisionEngine:
             opportunity_id=opp.get("opportunity_id"),
             top_k=2
         )
+        # If retrieval is unavailable/empty, fall back to the record's own notes -- still with a
+        # full source reference (evidence is never returned without one).
+        opp_id_for_ref = opp.get("opportunity_id", "")
         notes_used = rag_quotes if rag_quotes else [
-            {"snippet": n, "company_name": company_name} for n in opp.get("sales_notes", [])[:2]
+            {
+                "doc_id": f"{opp_id_for_ref}_note_{i}", "record_id": opp_id_for_ref, "opportunity_id": opp_id_for_ref,
+                "source_type": "sales_note", "created_at": None, "company_name": company_name,
+                "text": str(n), "snippet": str(n), "relevance": None,
+            }
+            for i, n in enumerate((opp.get("sales_notes") or [])[:2])
         ]
 
         provenance = list(opp.get("provenance") or [])
         modeled_basis = opp.get("modeled_basis") or {}
-        is_nested = opp.get("data_origin") == "nested"
         field_origin = {
             "opportunity_id": "sourced" if is_nested else "record",
             "location": "sourced" if is_nested else "record",
@@ -193,6 +288,15 @@ class DeterministicDecisionEngine:
             },
             "rag_notes": notes_used,
             "external_signal": external_signal,
+            "data_quality": {"issues": issues, "penalty_points": penalty, "confidence": confidence},
+            "buying_intent": {k: intent[k] for k in ("score", "strong", "medium", "negative", "definition")},
+            "labels": {
+                "structured_data": "FACT" if field_origin.get("deal_value") != "estimated" else "PREDICTION",
+                "factor_scores": "ANALYSIS",
+                "priority_score": "DECISION",
+                "external_signal": "EXTERNAL",
+                "buying_intent": "ANALYSIS",
+            },
             # Sourced facts (each traceable to an entry in `provenance`) vs. our own
             # estimates: every structured field is tagged so nothing estimated can be
             # read as a sourced fact.
@@ -244,4 +348,8 @@ class DeterministicDecisionEngine:
             stale_data_warning=stale_warning,
             external_context_available=signal_available,
             external_context_fetched=was_fetched,
+            confidence=confidence,
+            review_required=review_required,
+            warnings=warnings,
+            data_quality_issues=issues,
         )

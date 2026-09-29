@@ -1,251 +1,214 @@
 """
 FastAPI Router for DecisionForge AI.
-Handles CSV/XLSX Ingestion, Schema Mapping, Quality Scanning,
-Deterministic Priority Decision Runs, Decision Twin Simulations, and Evidence Retrieval.
+
+Every endpoint operates on ONE workspace, taken from the `X-Workspace-Id` header (the gateway
+sets it to the authenticated user's id). Datasets, RAG index, external-context fetch state and
+decision runs are per workspace -- there is no process-wide dataset.
 """
-import io
 import csv
-import json
+import io
 import uuid
-import os
-from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Body
-from app.decision_forge.schemas import (
-    CanonicalOpportunity,
-    PolicyWeights,
-    DecisionRunResponse,
-    SimulationInput,
-    SimulationResponse
-)
-from app.decision_forge.schema_mapper import SchemaMapper, load_dataset
-from app.decision_forge.external_gateway import build_signal_from_record
-from app.decision_forge.qa import answer_question, SUGGESTED_QUESTIONS
-from app.decision_forge.quality_engine import DataQualityEngine
-from app.decision_forge.decision_engine import DeterministicDecisionEngine
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Body, Depends, File, Header, HTTPException, UploadFile
+
+from app.decision_forge import analytics
 from app.decision_forge.decision_twin import DecisionTwinSimulator
-from app.decision_forge.rag_service import NotesRagService
+from app.decision_forge.planner import default_llm
+from app.decision_forge.policies import PRESETS, factor_weight_sum, get_preset
+from app.decision_forge.qa import SUGGESTED_QUESTIONS
+from app.decision_forge.query_pipeline import run_query
+from app.decision_forge.schema_mapper import SchemaMapper
+from app.decision_forge.security import verify_internal_token
+from app.decision_forge.schemas import (
+    DecisionRunResponse,
+    PolicyWeights,
+    SimulationInput,
+    SimulationResponse,
+)
+from app.decision_forge.workspace import (
+    InvalidWorkspaceId,
+    WorkspaceState,
+    compute_reference_time,  # noqa: F401  (re-exported for callers/tests)
+    registry,
+)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(verify_internal_token)])
 mapper = SchemaMapper()
-quality_engine = DataQualityEngine()
-decision_engine = DeterministicDecisionEngine()
 simulator = DecisionTwinSimulator()
-rag_service = NotesRagService()
 
-# In-memory store for active session dataset (fallback if no external DB provided)
-ACTIVE_OPPORTUNITIES: List[Dict[str, Any]] = []
-DATASET_META: Optional[Dict[str, Any]] = None
-# The last decision run's ranked recommendations, keyed by decision_run_id, so a single
-# recommendation can be looked up (e.g. to fetch external context for it) after the run.
-LAST_RUN_ID: Optional[str] = None
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024
+MAX_ROWS = 5000
+MAX_COLUMNS = 60
+ALLOWED_UPLOAD_EXTENSIONS = (".csv",)
 
 
-def compute_reference_time(opportunities: List[Dict[str, Any]]) -> datetime:
-    """The dataset's own snapshot time: the most recent last_contact_date in the active
-    dataset, falling back to wall-clock only when the data carries no usable dates.
-    Anchoring recency/staleness math to this instead of datetime.now() means re-running
-    the same snapshot always reproduces the same scores (plan AC-002 / AC-010), rather
-    than drifting as real-world days pass.
-    """
-    latest: Optional[datetime] = None
-    for opp in opportunities:
-        raw = opp.get("last_contact_date")
-        if not raw:
-            continue
-        try:
-            dt_part = raw.replace("Z", "+00:00")
-            dt = (
-                datetime.strptime(dt_part, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                if len(dt_part) == 10
-                else datetime.fromisoformat(dt_part)
-            )
-        except Exception:
-            continue
-        if latest is None or dt > latest:
-            latest = dt
-    return latest or datetime.now(timezone.utc)
+def _ws(x_workspace_id: Optional[str]) -> WorkspaceState:
+    try:
+        return registry.get(x_workspace_id)
+    except InvalidWorkspaceId as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-def _activate(raw: Any) -> None:
-    """Loads either dataset shape (auto-detected via `dataset_meta`) as the active set.
-    Signals are built from each record's own provenance -- never invented."""
-    global ACTIVE_OPPORTUNITIES, DATASET_META
-    loaded = load_dataset(raw)
-    DATASET_META = loaded["meta"]
-    ACTIVE_OPPORTUNITIES = loaded["opportunities"]
-    for opp in ACTIVE_OPPORTUNITIES:
-        if not opp.get("external_signal"):
-            signal = build_signal_from_record(opp)
-            if signal:
-                opp["external_signal"] = signal
-    rag_service.index_opportunities(ACTIVE_OPPORTUNITIES)
+def _summary_view(ws: WorkspaceState) -> Dict[str, Any]:
+    return {"dataset_key": ws.dataset_key, "count": len(ws.opportunities), "snapshot_id": ws.snapshot_id}
 
-
-def load_default_demo_dataset():
-    """Prefers the real, cited dataset; falls back to the legacy flat demo dataset."""
-    global LAST_RUN_ID
-    ai_service_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    # Bundled inside ai-service/data so it ships with the ai-service deployment on its own.
-    data_path = None
-    for name in ("real_industrial_crm.json", "demo_industrial_crm.json"):
-        candidate = os.path.join(ai_service_root, "data", name)
-        if os.path.exists(candidate):
-            data_path = candidate
-            break
-    if data_path:
-        try:
-            with open(data_path, "r", encoding="utf-8") as f:
-                _activate(json.load(f))
-        except Exception as e:
-            print(f"[DecisionForge] Error loading dataset: {e}")
-    decision_engine.ext_gateway.reset()
-    LAST_RUN_ID = None
-
-# Pre-load on startup
-load_default_demo_dataset()
 
 @router.post("/reset-demo")
-async def reset_demo_data():
-    """Resets the dataset to the clean, verified industrial sales benchmark, and clears
-    any "fetched" external-context state so a fresh demo run starts from a known state
-    (plan AC-010)."""
-    load_default_demo_dataset()
+async def reset_demo_data(payload: Optional[Dict[str, Any]] = Body(default=None),
+                          x_workspace_id: Optional[str] = Header(default=None)):
+    """Resets THIS workspace to a deterministic dataset ('real' by default, or 'synthetic'),
+    clearing its fetched-context state and RAG index. Other workspaces are untouched."""
+    ws = _ws(x_workspace_id)
+    key = (payload or {}).get("dataset", "real")
+    if key not in ("real", "synthetic", "legacy"):
+        raise HTTPException(status_code=400, detail=f"Unknown dataset '{key}'. Choose one of: real, synthetic, legacy.")
+    ws.load(key)
     return {
         "status": "success",
-        "message": f"Loaded {len(ACTIVE_OPPORTUNITIES)} industrial B2B sales opportunities into DecisionForge memory.",
-        "count": len(ACTIVE_OPPORTUNITIES)
+        "message": f"Loaded {len(ws.opportunities)} opportunities ({key} dataset) into your DecisionForge workspace.",
+        **_summary_view(ws),
     }
 
-@router.post("/ingest/file")
-async def ingest_file(file: UploadFile = File(...)):
-    """Accepts CSV or tabular file, detects columns, returns suggested mappings and data quality.
-    This does NOT activate the dataset -- call /ingest/apply-mapping with the reviewed
-    records to make them the active dataset (plan FR-004: user reviews/edits before use)."""
-    content = await file.read()
-    filename = file.filename or "data.csv"
 
+@router.get("/datasets")
+async def list_datasets():
+    return {"datasets": [
+        {"key": "real", "label": "Real accounts (cited public announcements)", "synthetic": False},
+        {"key": "synthetic", "label": "Synthetic B2B sales (scale + evaluation)", "synthetic": True},
+        {"key": "legacy", "label": "Legacy fictional demo", "synthetic": True},
+    ]}
+
+
+async def _read_upload(file: UploadFile) -> str:
+    filename = (file.filename or "").lower()
+    if not filename.endswith(ALLOWED_UPLOAD_EXTENSIONS):
+        raise HTTPException(status_code=400, detail="Unsupported file type. Upload a .csv file.")
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large (limit {MAX_UPLOAD_BYTES // (1024 * 1024)} MB).")
+    if b"\x00" in content:
+        raise HTTPException(status_code=400, detail="File does not look like a text CSV (binary content detected).")
     try:
-        text = content.decode("utf-8", errors="replace")
-        reader = csv.DictReader(io.StringIO(text))
-        rows = list(reader)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse CSV file: {str(e)}")
+        return content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File is not valid UTF-8 text. Re-export the CSV as UTF-8.")
 
+
+@router.post("/ingest/file")
+async def ingest_file(file: UploadFile = File(...), x_workspace_id: Optional[str] = Header(default=None)):
+    """Validates a CSV, detects columns, proposes mappings and reports data quality.
+    This does NOT activate the dataset -- call /ingest/apply-mapping with the reviewed records
+    (the user reviews/edits before anything is used)."""
+    ws = _ws(x_workspace_id)
+    text = await _read_upload(file)
+    try:
+        rows = list(csv.DictReader(io.StringIO(text)))
+    except csv.Error as e:
+        raise HTTPException(status_code=400, detail=f"Malformed CSV: {e}")
     if not rows:
         raise HTTPException(status_code=400, detail="CSV file appears to be empty.")
+    if len(rows) > MAX_ROWS:
+        raise HTTPException(status_code=413, detail=f"Too many rows ({len(rows)}); limit is {MAX_ROWS}.")
+    columns = [c for c in rows[0].keys() if c is not None]
+    if len(columns) > MAX_COLUMNS:
+        raise HTTPException(status_code=400, detail=f"Too many columns ({len(columns)}); limit is {MAX_COLUMNS}.")
 
-    columns = list(rows[0].keys())
     mapping_result = mapper.map_columns(columns)
-
-    # Normalize rows
-    normalized_records = [
-        mapper.normalize_record(r, mapping_result["mapped_columns"])
-        for r in rows
-    ]
-
-    # Assign opportunity IDs to any record missing one so it can be activated downstream
-    for idx, rec in enumerate(normalized_records):
+    normalized = [mapper.normalize_record(r, mapping_result["mapped_columns"]) for r in rows]
+    invalid_rows = 0
+    for rec in normalized:
+        if not rec.get("company_name"):
+            invalid_rows += 1
         if not rec.get("opportunity_id"):
             rec["opportunity_id"] = f"UPL-{uuid.uuid4().hex[:6].upper()}"
         rec.setdefault("sales_notes", [])
 
-    quality_report = quality_engine.evaluate(normalized_records)
-
+    quality = ws.quality.evaluate(normalized, reference_time=compute_reference_time(normalized))
     return {
-        "filename": filename,
+        "filename": file.filename,
         "total_rows": len(rows),
         "detected_columns": columns,
         "mapping_proposal": mapping_result,
-        "normalized_records": normalized_records,
-        "sample_preview": normalized_records[:3],
-        "quality_report": quality_report
+        "normalized_records": normalized,
+        "sample_preview": normalized[:3],
+        "quality_report": quality,
+        "validation_report": {
+            "records_parsed": len(normalized),
+            "invalid_records": invalid_rows,
+            "duplicates": quality.get("duplicate_count", 0),
+            "missing_probability": quality.get("missing_probability_count", 0),
+            "missing_or_invalid_value": quality.get("missing_value_count", 0),
+            "stale_records": quality.get("stale_record_count", 0),
+            "warnings": (["Rows with no company name cannot be scored reliably."] if invalid_rows else []),
+        },
     }
+
 
 @router.post("/ingest/apply-mapping")
-async def apply_mapping(payload: Dict[str, Any] = Body(...)):
-    """Activates a reviewed set of normalized records as the live dataset for decision-making."""
-    global LAST_RUN_ID
+async def apply_mapping(payload: Dict[str, Any] = Body(...), x_workspace_id: Optional[str] = Header(default=None)):
+    """Activates a reviewed set of normalized records as THIS workspace's dataset."""
+    ws = _ws(x_workspace_id)
     records = payload.get("records", [])
-    if not records:
+    if not isinstance(records, list) or not records:
         raise HTTPException(status_code=400, detail="No records provided to activate.")
+    if len(records) > MAX_ROWS:
+        raise HTTPException(status_code=413, detail=f"Too many records ({len(records)}); limit is {MAX_ROWS}.")
+    if not all(isinstance(r, dict) for r in records):
+        raise HTTPException(status_code=400, detail="Every record must be an object.")
+    ws.apply_records(records)
+    quality = ws.quality_report()
+    return {"status": "activated", "records_count": len(ws.opportunities), "quality_score": quality["health_score"],
+            "snapshot_id": ws.snapshot_id}
 
-    _activate(records)
-    decision_engine.ext_gateway.reset()
-    LAST_RUN_ID = None
-    quality = quality_engine.evaluate(records, reference_time=compute_reference_time(records))
-
-    return {
-        "status": "activated",
-        "records_count": len(records),
-        "quality_score": quality["health_score"]
-    }
 
 @router.get("/dataset")
-async def get_current_dataset():
-    """Returns the currently active opportunity dataset and data quality scorecard"""
-    if not ACTIVE_OPPORTUNITIES:
-        load_default_demo_dataset()
-
-    reference_time = compute_reference_time(ACTIVE_OPPORTUNITIES)
-    quality = quality_engine.evaluate(ACTIVE_OPPORTUNITIES, reference_time=reference_time)
+async def get_current_dataset(x_workspace_id: Optional[str] = Header(default=None)):
+    """The workspace's dataset and data-quality scorecard (structured note bodies omitted for size)."""
+    ws = _ws(x_workspace_id)
+    lean = [{k: v for k, v in o.items() if k != "notes"} for o in ws.opportunities]
     return {
-        "opportunities": ACTIVE_OPPORTUNITIES,
-        "count": len(ACTIVE_OPPORTUNITIES),
-        "quality_report": quality,
-        "data_snapshot": reference_time.isoformat(),
-        "dataset_meta": DATASET_META
+        "opportunities": lean,
+        "count": len(lean),
+        "quality_report": ws.quality_report(),
+        "data_snapshot": ws.reference_time.isoformat(),
+        "dataset_meta": ws.meta,
+        "dataset_key": ws.dataset_key,
+        "snapshot_id": ws.snapshot_id,
     }
 
-def _run(pol: PolicyWeights) -> DecisionRunResponse:
-    global LAST_RUN_ID
-    if not ACTIVE_OPPORTUNITIES:
-        load_default_demo_dataset()
 
-    reference_time = compute_reference_time(ACTIVE_OPPORTUNITIES)
-    run_id = f"DR-{uuid.uuid4().hex[:6].upper()}"
-    LAST_RUN_ID = run_id
+@router.get("/quality")
+async def get_quality(x_workspace_id: Optional[str] = Header(default=None), limit: int = 200):
+    ws = _ws(x_workspace_id)
+    report = ws.quality_report()
+    issues = report.get("issues", [])
+    return {**{k: v for k, v in report.items() if k != "issues"}, "issues": issues[: max(1, min(limit, 1000))],
+            "issues_total": len(issues), "dataset_key": ws.dataset_key, "snapshot_id": ws.snapshot_id}
 
-    recommendations = []
-    stale_count = 0
-    high_prio_count = 0
 
-    for opp in ACTIVE_OPPORTUNITIES:
-        rec = decision_engine.evaluate_opportunity(opp, pol, reference_time=reference_time, decision_run_id=run_id)
-        if rec.stale_data_warning:
-            stale_count += 1
-        if rec.decision_class == "IMMEDIATE_ACTION":
-            high_prio_count += 1
-        recommendations.append(rec)
+@router.get("/policies")
+async def list_policies():
+    return {"presets": [{"name": n, "factor_weight_sum": factor_weight_sum(p), **p.model_dump()} for n, p in PRESETS.items()]}
 
-    # Sort descending by priority score
-    recommendations.sort(key=lambda x: x.priority_score, reverse=True)
 
-    total_val = sum(float(o.get("deal_value", 0)) for o in ACTIVE_OPPORTUNITIES)
-    weighted_val = sum(float(o.get("deal_value", 0)) * float(o.get("win_probability", 0.5)) for o in ACTIVE_OPPORTUNITIES)
-
-    return DecisionRunResponse(
-        decision_run_id=run_id,
-        policy_version=pol.policy_version,
-        data_snapshot=reference_time.isoformat(),
-        records_analyzed=len(ACTIVE_OPPORTUNITIES),
-        recommendations_count=len(recommendations),
-        pipeline_total_value=total_val,
-        weighted_pipeline_value=round(weighted_val, 2),
-        high_priority_count=high_prio_count,
-        stale_warning_count=stale_count,
-        recommendations=recommendations,
-        generated_at=datetime.now(timezone.utc).isoformat()
-    )
+def _resolve_policy(policy: Optional[PolicyWeights], preset: Optional[str]) -> PolicyWeights:
+    if policy is not None:
+        return policy
+    if preset:
+        try:
+            return get_preset(preset)
+        except KeyError:
+            raise HTTPException(status_code=400, detail=f"Unknown policy preset '{preset}'.")
+    return PolicyWeights()
 
 
 @router.post("/decide/run", response_model=DecisionRunResponse)
-async def run_decision_engine(policy: Optional[PolicyWeights] = None):
-    """
-    Executes the deterministic decision engine against active CRM opportunities.
-    Computes priority scores, factor breakdowns, evidence packs, and recommended actions.
-    """
-    return _run(policy or PolicyWeights())
+async def run_decision_engine(policy: Optional[PolicyWeights] = None, preset: Optional[str] = None,
+                              x_workspace_id: Optional[str] = Header(default=None)):
+    """Deterministic decision run over THIS workspace's opportunities."""
+    ws = _ws(x_workspace_id)
+    return ws.run(_resolve_policy(policy, preset))
 
 
 @router.get("/ask/suggestions")
@@ -253,49 +216,89 @@ async def ask_suggestions():
     return {"questions": SUGGESTED_QUESTIONS}
 
 
-@router.post("/ask")
-async def ask_pipeline(payload: Dict[str, Any] = Body(...)):
-    """Answers a natural-language pipeline question from a fresh decision run over the
-    active dataset. Answers are computed, never canned."""
-    question = str(payload.get("question", "")).strip()
-    if not question:
+def _question(payload: Dict[str, Any]) -> str:
+    q = payload.get("question")
+    if not isinstance(q, str) or not q.strip():
         raise HTTPException(status_code=400, detail="A question is required.")
-    return answer_question(question, _run(PolicyWeights()).recommendations)
+    if len(q) > 500:
+        raise HTTPException(status_code=400, detail="Question is too long (limit 500 characters).")
+    return q.strip()
+
+
+@router.post("/decisions/query")
+async def decisions_query(payload: Dict[str, Any] = Body(...), preset: Optional[str] = None,
+                          x_workspace_id: Optional[str] = Header(default=None)):
+    """Plan -> analytics -> RAG -> decision -> answer. Only the tools the plan needs are run."""
+    ws = _ws(x_workspace_id)
+    policy = _resolve_policy(None, preset or payload.get("preset"))
+    return run_query(ws, _question(payload), llm=default_llm(), policy=policy)
+
+
+@router.post("/ask")
+async def ask_pipeline(payload: Dict[str, Any] = Body(...), x_workspace_id: Optional[str] = Header(default=None)):
+    """Backwards-compatible alias of /decisions/query."""
+    ws = _ws(x_workspace_id)
+    return run_query(ws, _question(payload), llm=default_llm())
+
+
+@router.get("/analytics/{tool}")
+async def run_analytics_tool(tool: str, x_workspace_id: Optional[str] = Header(default=None),
+                             opportunity_id: Optional[str] = None, customer_id: Optional[str] = None,
+                             company_name: Optional[str] = None, threshold_days: int = 30):
+    """Typed, deterministic, read-only analytics tools (see analytics.TOOLS)."""
+    ws = _ws(x_workspace_id)
+    if tool not in analytics.TOOLS:
+        raise HTTPException(status_code=404, detail=f"Unknown analytics tool '{tool}'.")
+    ref, ds, opps = ws.reference_time, ws.dataset_key, ws.opportunities
+    if tool == "get_pipeline_summary":
+        return analytics.get_pipeline_summary(opps, ref, ds)
+    if tool == "get_region_summary":
+        return analytics.get_region_summary(opps, ref, ds)
+    if tool == "get_expected_value":
+        return analytics.get_expected_value(opps, ref, opportunity_id, ds)
+    if tool == "get_stale_opportunities":
+        return analytics.get_stale_opportunities(opps, ref, threshold_days, ds)
+    if tool == "get_activity_metrics":
+        return analytics.get_activity_metrics(opps, ws.activities, ref, dataset_key=ds)
+    if tool == "get_sales_rep_capacity":
+        return analytics.get_sales_rep_capacity(opps, ws.reps, ref, dataset_key=ds)
+    if tool == "get_customer_metrics":
+        if not (customer_id or company_name):
+            raise HTTPException(status_code=400, detail="customer_id or company_name is required.")
+        return analytics.get_customer_metrics(opps, ref, customer_id, company_name, ds)
+    if not opportunity_id:
+        raise HTTPException(status_code=400, detail="opportunity_id is required.")
+    return analytics.get_opportunity_metrics(opps, ref, opportunity_id, ds)
+
 
 @router.post("/opportunities/{opportunity_id}/fetch-context")
-async def fetch_external_context(opportunity_id: str):
-    """Explicitly retrieves fresh external context for one opportunity (plan FR-015/UC-004).
-    External evidence is query-driven, never merged in silently: until this endpoint is
-    called for a company, its decision score uses a neutral baseline for that factor."""
-    opp = next((o for o in ACTIVE_OPPORTUNITIES if o.get("opportunity_id") == opportunity_id), None)
+async def fetch_external_context(opportunity_id: str, x_workspace_id: Optional[str] = Header(default=None)):
+    """Explicitly retrieves the cited external signal for one opportunity. External evidence is
+    query-driven and never merged in silently: until this is called for a company its decision
+    uses a neutral baseline for that factor. If nothing can be retrieved the decision simply
+    continues on internal data."""
+    ws = _ws(x_workspace_id)
+    opp = next((o for o in ws.opportunities if o.get("opportunity_id") == opportunity_id), None)
     if not opp:
         raise HTTPException(status_code=404, detail="Opportunity not found in the active dataset.")
 
     company_name = opp.get("company_name", "")
-    embedded_signal = opp.get("external_signal")
-    if not decision_engine.ext_gateway.has_signal(company_name, embedded=embedded_signal):
+    embedded = opp.get("external_signal")
+    gw = ws.engine.ext_gateway
+    if not gw.has_signal(company_name, embedded=embedded):
         return {
             "status": "no_signal",
-            "message": f"No validated external signal available for {company_name}.",
-            "signal": None
+            "message": "External context unavailable. Decision calculated from internal business data.",
+            "signal": None,
         }
+    gw.mark_fetched(company_name)
+    signal = gw.get_signal_for_company(company_name, only_if_fetched=True, embedded=embedded)
+    return {"status": "fetched", "message": f"External context retrieved for {company_name}.", "signal": signal}
 
-    decision_engine.ext_gateway.mark_fetched(company_name)
-    signal = decision_engine.ext_gateway.get_signal_for_company(company_name, only_if_fetched=True, embedded=embedded_signal)
-    return {
-        "status": "fetched",
-        "message": f"Fresh external context retrieved for {company_name}.",
-        "signal": signal
-    }
 
 @router.post("/twin/simulate", response_model=SimulationResponse)
-async def simulate_decision_twin(inputs: SimulationInput):
-    """
-    Decision Twin Scenario Simulator.
-    Calculates expected pipeline velocity, rep workload %, and conversion lifts under alternative strategy parameters.
-    """
-    if not ACTIVE_OPPORTUNITIES:
-        load_default_demo_dataset()
-
-    sim_res = simulator.simulate(ACTIVE_OPPORTUNITIES, inputs)
-    return sim_res
+async def simulate_decision_twin(inputs: SimulationInput, x_workspace_id: Optional[str] = Header(default=None)):
+    """Decision Twin: scenario math on a COPY of the workspace snapshot; source records are never mutated."""
+    ws = _ws(x_workspace_id)
+    snapshot = [dict(o) for o in ws.opportunities]
+    return simulator.simulate(snapshot, inputs)

@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", protected_namespaces=())
 
     openai_api_key: str = ""
+    decision_planner_model: str = "gpt-4o-mini"
     model_name: str = "gpt-4o"
     max_tokens: int = 2000
     database_url: str = ""

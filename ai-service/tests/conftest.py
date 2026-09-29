@@ -34,8 +34,10 @@ def opportunities(raw_dataset):
 
 
 @pytest.fixture()
-def engine():
-    return DeterministicDecisionEngine()
+def engine(opportunities):
+    eng = DeterministicDecisionEngine()
+    eng.rag_service.index_opportunities(opportunities)  # exercise the real retrieval path
+    return eng
 
 
 @pytest.fixture()

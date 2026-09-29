@@ -1,151 +1,221 @@
 """
 Decision Twin Scenario Simulator.
-Empowers decision-makers to test "What-If" strategic hypotheses before approving actions.
-Simulates alternative outreach volumes, rep capacities, and deal thresholds against historical conversion curves.
-"""
-from typing import List, Dict, Any
-from app.decision_forge.schemas import SimulationInput, SimulationResponse, ScenarioComparison
 
-# Baseline assumptions the scenario is compared against (matches SimulationInput defaults).
-BASELINE_CONTACTS_PER_DAY = 15
-BASELINE_SALES_REPS = 3
+Lets a decision-maker test "what-if" strategies before acting. The workflow is:
+  BASELINE -> COPY SCENARIO -> CHANGE PARAMETERS -> RECALCULATE -> COMPARE.
+
+The baseline and the scenario are two parameter sets run through the SAME model on a COPY of the
+workspace snapshot (source records are never modified), so the comparison is like for like. The
+baseline defaults to the current strategy in the tab's opening levers (4 reps, 20 contacts/day,
+$50,000 minimum deal, 3-day response, priority cutoff 60) and can be overridden.
+
+Transparent arithmetic, per parameter set:
+
+  scope             valid opportunities with deal_value >= minimum and twin priority proxy >= cutoff
+  capacity          reps x contacts/day x working days           (touchpoints per month)
+  reachable deals   floor(capacity / touchpoints per deal)
+  coverage          the highest-expected-value in-scope deals, up to the reachable count
+  expected value    sum(deal_value x adjusted probability) over covered deals
+  workload          in-scope deals x touchpoints per deal / capacity
+  missed            every valid opportunity NOT covered (filtered out or beyond capacity)
+  delta             scenario metric - baseline metric
+
+Records with a missing/invalid probability or deal value are excluded from every figure and counted.
+
+The response-time and focus multipliers are ASSUMPTIONS, not measurements. They are returned in
+`assumptions`, and `scenario_expected_value_no_assumptions` shows the covered value without them
+so the reader can see how much of the estimate rests on them. Output is a "scenario estimate",
+never a forecast or a guaranteed result.
+"""
+import hashlib
+from typing import List, Dict, Any
+from app.decision_forge import analytics
+from app.decision_forge.schemas import (
+    ScenarioComparison,
+    ScenarioParams,
+    SimulationInput,
+    SimulationResponse,
+)
+
 WORKING_DAYS_PER_MONTH = 20
 TOUCHPOINTS_PER_DEAL = 4
 
+# Scenario assumptions (stated in every response).
+FAST_RESPONSE_DAYS, FAST_RESPONSE_FACTOR = 3, 1.18
+STANDARD_RESPONSE_DAYS, STANDARD_RESPONSE_FACTOR = 7, 1.05
+SLOW_RESPONSE_DAYS, SLOW_RESPONSE_FACTOR = 14, 0.85
+FOCUS_MIN_DEAL, FOCUS_FACTOR = 100000, 1.08
+PROBABILITY_CAP = 0.95
+OVERLOAD_UTILIZATION = 115.0
+UNDERUSE_UTILIZATION = 45.0
+
 
 def _composite_priority_proxy(o: Dict[str, Any]) -> float:
-    """A lightweight, twin-local stand-in for the full deterministic priority score.
-    The Decision Twin intentionally does NOT read the configured policy weights (that
-    would blur "simulate a strategy" with "change the scoring policy" -- see Decision
-    Policy instead); it uses a simple deal-size/win-probability blend purely to let the
-    "Scenario Priority Cutoff" lever filter opportunities in a visible, explainable way.
-    """
-    deal_val = float(o.get("deal_value", 0))
-    win_prob = float(o.get("win_probability", 0.5))
+    """A twin-local stand-in for the full priority score. The Twin intentionally does NOT read the
+    configured policy weights (that would blur "simulate a strategy" with "change the scoring
+    policy"); a simple deal-size/win-probability blend lets the priority-cutoff lever filter
+    opportunities in a visible, explainable way."""
+    deal_val = float(o.get("deal_value") or 0)
+    win_prob = float(o.get("win_probability") if o.get("win_probability") is not None else 0.5)
     deal_score = min(100.0, (deal_val / 500000.0) * 100.0)
     prob_score = min(100.0, max(0.0, win_prob * 100.0))
     return (deal_score * 0.5) + (prob_score * 0.5)
 
 
+def _speed_factor(days: int) -> float:
+    if days <= FAST_RESPONSE_DAYS:
+        return FAST_RESPONSE_FACTOR
+    if days <= STANDARD_RESPONSE_DAYS:
+        return STANDARD_RESPONSE_FACTOR
+    if days > SLOW_RESPONSE_DAYS:
+        return SLOW_RESPONSE_FACTOR
+    return 1.0
+
+
+def _evaluate(valid: List[Dict[str, Any]], ev: Dict[int, float], p: ScenarioParams) -> Dict[str, Any]:
+    """Runs the model for one parameter set."""
+    in_scope = [
+        o for o in valid
+        if float(o.get("deal_value") or 0) >= p.min_deal_value and _composite_priority_proxy(o) >= p.priority_threshold
+    ]
+    capacity = p.sales_reps_count * p.contacts_per_day * WORKING_DAYS_PER_MONTH
+    reachable = capacity // TOUCHPOINTS_PER_DEAL
+    ranked = sorted(in_scope, key=lambda o: (-ev[id(o)], str(o.get("opportunity_id", ""))))
+    covered = ranked[:reachable]
+    covered_ids = {id(o) for o in covered}
+    missed = [o for o in valid if id(o) not in covered_ids]
+
+    speed = _speed_factor(p.followup_window_days)
+    focus = FOCUS_FACTOR if p.min_deal_value >= FOCUS_MIN_DEAL else 1.0
+
+    def adjusted(o: Dict[str, Any]) -> float:
+        return min(PROBABILITY_CAP, float(o["win_probability"]) * speed * focus)
+
+    expected = sum(float(o["deal_value"]) * adjusted(o) for o in covered)
+    return {
+        "in_scope": len(in_scope),
+        "covered": len(covered),
+        "missed": len(missed),
+        "missed_expected_value": round(sum(ev[id(o)] for o in missed), 2),
+        "capacity_touchpoints": capacity,
+        "reachable_deals": reachable,
+        "utilization_percent": round((len(in_scope) * TOUCHPOINTS_PER_DEAL / max(1, capacity)) * 100.0, 1),
+        "expected_value": round(expected, 2),
+        "expected_value_no_assumptions": round(sum(ev[id(o)] for o in covered), 2),
+        "expected_deals": round(sum(adjusted(o) for o in covered)),
+        "avg_deal_size": round(sum(float(o.get("deal_value") or 0) for o in covered) / max(1, len(covered)), 2) if covered else 0.0,
+        "speed_factor": speed,
+        "focus_factor": focus,
+    }
+
+
+def _money(n: float) -> str:
+    return f"${n:,.0f}"
+
+
+def _pct_delta(new: float, old: float) -> float:
+    return round(((new - old) / old) * 100.0, 1) if old > 0 else 0.0
+
+
 class DecisionTwinSimulator:
     def simulate(self, opportunities: List[Dict[str, Any]], user_inputs: SimulationInput) -> SimulationResponse:
-        total_opps = len(opportunities)
+        snapshot = [dict(o) for o in opportunities]  # scenario works on a copy; sources are never touched
+        total_opps = len(snapshot)
         if total_opps == 0:
             return SimulationResponse(
-                simulation_id="SIM-EMPTY",
-                baseline_expected_value=0.0,
-                scenario_expected_value=0.0,
-                delta_revenue_percent=0.0,
-                rep_capacity_utilization_percent=0.0,
-                expected_closed_deals=0,
-                comparisons=[]
+                simulation_id="SIM-EMPTY", baseline_expected_value=0.0, scenario_expected_value=0.0,
+                delta_revenue_percent=0.0, rep_capacity_utilization_percent=0.0,
+                expected_closed_deals=0, comparisons=[],
             )
 
-        # Baseline Calculation (status quo: every opportunity in scope, no filters applied)
-        baseline_expected = sum(
-            float(o.get("deal_value", 0)) * float(o.get("win_probability", 0.5))
-            for o in opportunities
+        ev = {id(o): analytics.expected_value(o) for o in snapshot}
+        valid = [o for o in snapshot if ev[id(o)] is not None]
+        invalid_count = total_opps - len(valid)
+
+        scenario_p = ScenarioParams(
+            contacts_per_day=user_inputs.contacts_per_day, min_deal_value=user_inputs.min_deal_value,
+            sales_reps_count=user_inputs.sales_reps_count, followup_window_days=user_inputs.followup_window_days,
+            priority_threshold=user_inputs.priority_threshold,
         )
-        baseline_capacity = BASELINE_SALES_REPS * BASELINE_CONTACTS_PER_DAY * WORKING_DAYS_PER_MONTH
-        baseline_demand = total_opps * TOUCHPOINTS_PER_DEAL
-        baseline_utilization = round((baseline_demand / max(1, baseline_capacity)) * 100.0, 1)
+        baseline_p = user_inputs.baseline or ScenarioParams()
 
-        # Scenario Filtering: minimum deal value AND the priority cutoff lever both narrow scope
-        filtered_opps = [
-            o for o in opportunities
-            if float(o.get("deal_value", 0)) >= user_inputs.min_deal_value
-            and _composite_priority_proxy(o) >= user_inputs.priority_threshold
-        ]
+        base = _evaluate(valid, ev, baseline_p)
+        scen = _evaluate(valid, ev, scenario_p)
+        full_pipeline_ev = round(sum(ev[id(o)] for o in valid), 2)
 
-        # Calculate Rep Capacity & Workload
-        monthly_rep_capacity = user_inputs.sales_reps_count * user_inputs.contacts_per_day * WORKING_DAYS_PER_MONTH
-        total_demand = len(filtered_opps) * TOUCHPOINTS_PER_DEAL
-        utilization = round((total_demand / max(1, monthly_rep_capacity)) * 100.0, 1)
-
+        utilization = scen["utilization_percent"]
         capacity_warning = None
-        if utilization > 115.0:
-            capacity_warning = f"Warning: Workload ({utilization}%) exceeds sales team capacity. Rep burnout risk may decrease win rates by 15%."
-        elif utilization < 45.0:
-            capacity_warning = f"Notice: Sales capacity is underutilized ({utilization}%). Consider lowering the minimum deal value or priority cutoff to capture more volume."
+        if utilization > OVERLOAD_UTILIZATION:
+            capacity_warning = (f"Warning: workload ({utilization}%) exceeds team capacity; only the top {scen['covered']} of "
+                                f"{scen['in_scope']} in-scope opportunities (by expected value) can be reached.")
+        elif utilization < UNDERUSE_UTILIZATION:
+            capacity_warning = (f"Notice: sales capacity is underutilized ({utilization}%). Consider lowering the minimum "
+                                "deal value or priority cutoff to capture more volume.")
 
-        # Compute Conversion Lift based on Followup Speed & Focus
-        speed_factor = 1.0
-        if user_inputs.followup_window_days <= 3:
-            speed_factor = 1.18  # +18% lift for rapid response
-        elif user_inputs.followup_window_days <= 7:
-            speed_factor = 1.05
-        elif user_inputs.followup_window_days > 14:
-            speed_factor = 0.85  # -15% decay for slow response
+        delta_percent = _pct_delta(scen["expected_value"], base["expected_value"])
+        sensitivity = 0.0
+        if scen["expected_value_no_assumptions"] > 0:
+            sensitivity = round(abs(scen["expected_value"] - scen["expected_value_no_assumptions"])
+                                / scen["expected_value_no_assumptions"] * 100.0, 1)
 
-        focus_factor = 1.08 if user_inputs.min_deal_value >= 100000 else 1.0
-        burnout_penalty = 0.85 if utilization > 120.0 else 1.0
+        def row(parameter: str, b: float, s: float, unit: str, better_when_higher: bool = True, fmt=str, delta_fmt=None) -> ScenarioComparison:
+            d = s - b
+            impact = "neutral"
+            if d != 0:
+                impact = "positive" if (d > 0) == better_when_higher else "negative"
+            return ScenarioComparison(parameter=parameter, baseline=fmt(b), scenario=fmt(s),
+                                      delta=delta_fmt(d) if delta_fmt else f"{d:+,.0f}", unit=unit, impact=impact)
 
-        scenario_expected = sum(
-            float(o.get("deal_value", 0)) * min(0.95, float(o.get("win_probability", 0.5)) * speed_factor * focus_factor * burnout_penalty)
-            for o in filtered_opps
-        )
-
-        delta_percent = 0.0
-        if baseline_expected > 0:
-            delta_percent = round(((scenario_expected - baseline_expected) / baseline_expected) * 100.0, 1)
-
-        expected_deals = round(sum(
-            min(0.95, float(o.get("win_probability", 0.5)) * speed_factor * focus_factor * burnout_penalty)
-            for o in filtered_opps
-        ))
-        baseline_deals = round(sum(float(o.get("win_probability", 0.5)) for o in opportunities))
-
+        signed_money = lambda d: f"{'+' if d >= 0 else '-'}${abs(d):,.0f}"
         comparisons = [
-            ScenarioComparison(
-                parameter="Projected Pipeline Velocity (30-day)",
-                baseline=f"${baseline_expected:,.0f}",
-                scenario=f"${scenario_expected:,.0f}",
-                delta=f"{'+' if delta_percent >= 0 else ''}{delta_percent}%",
-                unit="USD",
-                impact="positive" if delta_percent >= 0 else "negative"
-            ),
-            ScenarioComparison(
-                parameter="Opportunities In Scope",
-                baseline=total_opps,
-                scenario=len(filtered_opps),
-                delta=f"{len(filtered_opps) - total_opps:+d}",
-                unit="Opportunities",
-                impact="neutral"
-            ),
-            ScenarioComparison(
-                parameter="Sales Rep Capacity Utilization",
-                baseline=f"{baseline_utilization}%",
-                scenario=f"{utilization}%",
-                delta=f"{utilization - baseline_utilization:+.1f}%",
-                unit="Percentage",
-                impact="positive" if 60 <= utilization <= 100 else "negative" if utilization > 110 else "neutral"
-            ),
-            ScenarioComparison(
-                parameter="Projected Closed Deals",
-                baseline=baseline_deals,
-                scenario=expected_deals,
-                delta=f"{expected_deals - baseline_deals:+d}",
-                unit="Deals",
-                impact="positive" if expected_deals >= baseline_deals else "negative"
-            ),
-            ScenarioComparison(
-                parameter="Average Deal Size in Focus",
-                baseline=f"${(sum(float(o.get('deal_value', 0)) for o in opportunities) / max(1, total_opps)):,.0f}",
-                scenario=f"${(sum(float(o.get('deal_value', 0)) for o in filtered_opps) / max(1, len(filtered_opps))):,.0f}" if filtered_opps else "$0",
-                delta="Targeted",
-                unit="USD",
-                impact="positive"
-            )
+            row("Expected Value of Covered Opportunities", base["expected_value"], scen["expected_value"], "USD",
+                fmt=_money, delta_fmt=lambda d: f"{'+' if d >= 0 else '-'}{abs(delta_percent)}%"),
+            row("Opportunities In Scope", base["in_scope"], scen["in_scope"], "Opportunities"),
+            row("Opportunities Covered (within capacity)", base["covered"], scen["covered"], "Opportunities"),
+            row("Sales Rep Capacity Utilization", base["utilization_percent"], scen["utilization_percent"], "Percentage",
+                better_when_higher=False, fmt=lambda v: f"{v}%", delta_fmt=lambda d: f"{d:+.1f}%"),
+            row("Expected Closed Deals (probability-weighted)", base["expected_deals"], scen["expected_deals"], "Deals"),
+            row("Expected Value Not Covered", base["missed_expected_value"], scen["missed_expected_value"], "USD",
+                better_when_higher=False, fmt=_money, delta_fmt=signed_money),
+            row("Average Deal Size in Focus", base["avg_deal_size"], scen["avg_deal_size"], "USD", fmt=_money, delta_fmt=signed_money),
         ]
+
+        assumptions = [
+            f"Response window multiplies win probability (assumed: <= {FAST_RESPONSE_DAYS}d x{FAST_RESPONSE_FACTOR}, "
+            f"<= {STANDARD_RESPONSE_DAYS}d x{STANDARD_RESPONSE_FACTOR}, > {SLOW_RESPONSE_DAYS}d x{SLOW_RESPONSE_FACTOR}, otherwise x1.0). "
+            f"Baseline {baseline_p.followup_window_days}d = x{base['speed_factor']}; scenario {scenario_p.followup_window_days}d = x{scen['speed_factor']}.",
+            f"Minimum deal value >= ${FOCUS_MIN_DEAL:,} multiplies win probability by {FOCUS_FACTOR} (assumed focus benefit). "
+            f"Baseline x{base['focus_factor']}; scenario x{scen['focus_factor']}.",
+            f"Each deal needs {TOUCHPOINTS_PER_DEAL} touchpoints; a rep works {WORKING_DAYS_PER_MONTH} days/month. "
+            f"Baseline capacity {base['capacity_touchpoints']:,} touchpoints ({baseline_p.sales_reps_count} reps x {baseline_p.contacts_per_day}/day); "
+            f"scenario {scen['capacity_touchpoints']:,} ({scenario_p.sales_reps_count} x {scenario_p.contacts_per_day}/day).",
+            f"Adjusted probability is capped at {PROBABILITY_CAP}.",
+            f"{invalid_count} record(s) with a missing/invalid probability or deal value are excluded from every figure.",
+        ]
+        digest = hashlib.sha256((user_inputs.model_dump_json() + "|" + baseline_p.model_dump_json() + "|"
+                                 + ",".join(sorted(str(o.get('opportunity_id', '')) for o in snapshot))).encode()).hexdigest()[:10]
 
         return SimulationResponse(
-            simulation_id=f"SIM-{user_inputs.contacts_per_day}-{int(user_inputs.min_deal_value)}-{int(user_inputs.priority_threshold)}",
-            baseline_expected_value=round(baseline_expected, 2),
-            scenario_expected_value=round(scenario_expected, 2),
+            simulation_id=f"SIM-{digest}",
+            baseline_expected_value=base["expected_value"],
+            scenario_expected_value=scen["expected_value"],
             delta_revenue_percent=delta_percent,
             rep_capacity_utilization_percent=utilization,
             capacity_warning=capacity_warning,
-            expected_closed_deals=expected_deals,
+            expected_closed_deals=scen["expected_deals"],
             comparisons=comparisons,
-            uncertainty_band_percent=12.0
+            uncertainty_band_percent=sensitivity,
+            opportunities_total=total_opps,
+            opportunities_in_scope=scen["in_scope"],
+            opportunities_covered=scen["covered"],
+            opportunities_missed=scen["missed"],
+            missed_expected_value=scen["missed_expected_value"],
+            excluded_invalid_records=invalid_count,
+            scenario_expected_value_no_assumptions=scen["expected_value_no_assumptions"],
+            baseline_params=baseline_p.model_dump(),
+            scenario_params=scenario_p.model_dump(),
+            baseline_summary=base,
+            scenario_summary=scen,
+            full_pipeline_expected_value=full_pipeline_ev,
+            assumptions=assumptions,
         )
