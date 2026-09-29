@@ -1,349 +1,843 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  TrendingUp, TrendingDown, DollarSign, FileText, Activity, Plus, PlusCircle, FileCode
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Receipt,
+  CreditCard,
+  Activity,
+  FileText,
+  BrainCircuit,
+  Plus,
+  ArrowUpRight,
+  Clock,
+  ShieldCheck,
+  ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+} from 'recharts';
+
 import { Topbar } from '../common/Topbar';
+import { MetricCard } from '../common/MetricCard';
+import { Card, CardTitle, CardDescription } from '../common/Card';
+import { Button } from '../common/Button';
+import { Badge } from '../common/Badge';
+import { Tabs } from '../common/Tabs';
+import { MetricSkeleton, ChartSkeleton, TableSkeleton } from '../common/Skeleton';
+import { ErrorState } from '../common/ErrorState';
+import { FinancialChartTooltip } from '../common/ChartContainer';
+
 import { analyticsService } from '../../services/analyticsService';
 import { invoiceService, expenseService } from '../../services/invoiceService';
-import { AntigravityInsights } from './AntigravityInsights';
-import { ForecastWidget } from './ForecastWidget';
+import { decisionForgeService } from '../../services/decisionForgeService';
 import { usePersona } from '../../context/PersonaContext';
+import { ForecastWidget } from './ForecastWidget';
+import { AntigravityInsights } from './AntigravityInsights';
+import { FinancialHealthBreakdown } from './FinancialHealthBreakdown';
+import { staggerContainer, staggerItem } from '../../utils/motion';
 
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: { 
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
+interface CashFlowRecord {
+  month: string;
+  revenue: number;
+  expenses: number;
+}
+
+interface InvoiceRecord {
+  id?: string;
+  client_name?: string;
+  invoice_number?: string | number;
+  total_amount?: number;
+  status?: string;
+  due_date?: string;
+  created_at?: string;
+  type?: 'invoice';
+}
+
+interface ExpenseRecord {
+  id?: string;
+  vendor_or_payee?: string;
+  description?: string;
+  category?: string;
+  amount?: number;
+  expense_date?: string;
+  created_at?: string;
+  type?: 'expense';
+}
+
+interface ActivityItem {
+  id?: string;
+  type: 'invoice' | 'expense';
+  client_name?: string;
+  invoice_number?: string | number;
+  vendor_or_payee?: string;
+  description?: string;
+  category?: string;
+  status?: string;
+  total_amount?: number;
+  amount?: number;
+  due_date?: string;
+  expense_date?: string;
+  created_at?: string;
+}
+
+interface OpportunityRecord {
+  id?: string;
+  company_name?: string;
+  name?: string;
+  deal_value?: number;
+  win_probability?: number;
+  priority_score?: number;
+}
+
+const fmt = (n: number | undefined | null) => {
+  if (n === undefined || n === null || isNaN(n)) return '₹0';
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(n);
 };
 
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { type: "spring", stiffness: 300, damping: 24 }
-  }
+const fmtCompact = (n: number) => {
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
+  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
+  if (n >= 1000) return `₹${(n / 1000).toFixed(0)}k`;
+  return `₹${n}`;
 };
-
-const fmt = (n: number) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
-
-const MetricCard = ({ label, value, icon: Icon, color, trend, subtext }: any) => (
-  <motion.div 
-    variants={itemVariants}
-    whileHover={{ y: -4, transition: { duration: 0.2 } }}
-    className="card relative overflow-hidden group bg-white border border-slate-200"
-  >
-    <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br opacity-5 rounded-bl-full pointer-events-none transition-all duration-300 group-hover:scale-110 ${color}`} />
-    <div className="flex items-center justify-between mb-4 relative z-10">
-      <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${color} shadow-2xs`}>
-        <Icon size={20} />
-      </div>
-      {trend !== undefined && (
-        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${trend >= 0 ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : 'text-red-600 bg-red-50 border border-red-100'}`}>
-          {trend >= 0 ? '+' : ''}{trend}%
-        </span>
-      )}
-    </div>
-    <p className="text-3xl font-extrabold text-slate-900 mb-1 tracking-tight relative z-10">{value}</p>
-    <p className="text-sm font-semibold text-slate-700 relative z-10">{label}</p>
-    {subtext && <p className="text-[11px] font-medium text-slate-400 relative z-10 mt-0.5">{subtext}</p>}
-  </motion.div>
-);
-
-const HealthGauge = ({ score, persona }: { score: number; persona: string }) => {
-  const color = score >= 75 ? '#059669' : score >= 50 ? '#d97706' : '#dc2626';
-  const dash = (score / 100) * 251;
-  const label =
-    persona === 'personal' || persona === 'employee'
-      ? 'Personal Budget & Health'
-      : persona === 'self_employed'
-      ? 'Freelance Stability Score'
-      : 'Business Health Score';
-
-  const getSubtext = () => {
-    if (score >= 75) {
-      return persona === 'personal' || persona === 'employee'
-        ? '🟢 Outstanding Savings Cushion'
-        : persona === 'self_employed'
-        ? '🟢 Robust Freelance Buffer'
-        : '🟢 Strong Operating Margin';
-    }
-    if (score >= 50) {
-      return persona === 'personal' || persona === 'employee'
-        ? '🟡 Balanced Spending'
-        : persona === 'self_employed'
-        ? '🟡 Moderate Runway Buffer'
-        : '🟡 Moderate Cash Flow';
-    }
-    return persona === 'personal' || persona === 'employee'
-      ? '🔴 Budget Deficit Risk'
-      : persona === 'self_employed'
-      ? '🔴 Low Freelance Cushion'
-      : '🔴 Liquidity Alert';
-  };
-
-  return (
-    <motion.div variants={itemVariants} className="card flex flex-col items-center justify-center relative overflow-hidden group bg-white border border-slate-200">
-      <div className="flex items-center gap-1.5 mb-4">
-        <p className="text-sm text-slate-700 font-bold uppercase tracking-wider">{label}</p>
-      </div>
-
-      <div className="relative w-36 h-36 flex items-center justify-center">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" strokeWidth="8" />
-          <circle
-            cx="50"
-            cy="50"
-            r="40"
-            fill="transparent"
-            stroke={color}
-            strokeWidth={8}
-            strokeDasharray={251}
-            strokeDashoffset={251 - dash}
-            strokeLinecap="round"
-            className="transition-all duration-1000 ease-out"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-black text-slate-900">{score}</span>
-          <span className="text-[11px] font-bold text-slate-400 uppercase">/ 100</span>
-        </div>
-      </div>
-      <p className="text-xs font-bold text-slate-600 mt-4 text-center">
-        {getSubtext()}
-      </p>
-    </motion.div>
-  );
-};
-
-const QuickAction = ({ icon: Icon, label, color, onClick }: any) => (
-  <motion.button 
-    variants={itemVariants}
-    whileHover={{ y: -2, scale: 1.01 }}
-    whileTap={{ scale: 0.98 }}
-    onClick={onClick}
-    className="card flex items-center gap-3.5 p-4 text-left transition-all group bg-white border border-slate-200 hover:border-slate-300 shadow-xs cursor-pointer"
-  >
-    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${color} shadow-2xs group-hover:scale-105 transition-transform flex-shrink-0`}>
-      <Icon size={18} />
-    </div>
-    <span className="text-xs font-bold text-slate-800 group-hover:text-slate-900 transition-colors">{label}</span>
-  </motion.button>
-);
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { persona, config } = usePersona();
+  const [activeChartTab, setActiveChartTab] = useState<'flow' | 'net' | 'health'>('flow');
 
-  const { data: metrics, isLoading: metricsLoading } = useQuery({
+  // Queries
+  const {
+    data: metrics,
+    isLoading: metricsLoading,
+    isError: metricsError,
+    refetch: refetchMetrics,
+  } = useQuery({
     queryKey: ['dashboard-metrics', persona],
     queryFn: () => analyticsService.getDashboard(),
   });
 
-  const { data: invoices = [] } = useQuery({
+  const { data: cashFlow = [], isLoading: cashFlowLoading } = useQuery<CashFlowRecord[]>({
+    queryKey: ['dashboard-cashflow'],
+    queryFn: analyticsService.getCashFlow,
+  });
+
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery<InvoiceRecord[]>({
     queryKey: ['invoices'],
     queryFn: invoiceService.getAll,
   });
 
-  const { data: expenses = [] } = useQuery({
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery<ExpenseRecord[]>({
     queryKey: ['expenses'],
     queryFn: expenseService.getAll,
   });
 
-  if (metricsLoading) return (
-    <div className="p-8 flex items-center justify-center min-h-[60vh]">
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-        className="w-10 h-10 border-3 border-brand-500 border-t-transparent rounded-full"
-      />
-    </div>
-  );
+  const { data: decisionDataset } = useQuery({
+    queryKey: ['decision-forge-dataset'],
+    queryFn: () => decisionForgeService.getDataset().catch(() => null),
+  });
 
-  const recentItems = [
-    ...invoices.slice(0, 3).map((i: any) => ({ ...i, type: 'invoice' })),
-    ...expenses.slice(0, 3).map((e: any) => ({ ...e, type: 'expense' }))
-  ].sort((a, b) => new Date(b.created_at || b.expense_date || 0).getTime() - new Date(a.created_at || a.expense_date || 0).getTime()).slice(0, 5);
+  // Calculate formatted cash flow dataset for charts
+  const cashFlowChartData = cashFlow.map((item) => {
+    const rev = Number(item.revenue || 0);
+    const exp = Number(item.expenses || 0);
+    const net = rev - exp;
+    return {
+      month: item.month,
+      revenue: rev,
+      expenses: exp,
+      netCashFlow: net,
+    };
+  });
+
+  // Combine and sort recent ledger feed
+  const recentItems: ActivityItem[] = [
+    ...invoices.slice(0, 5).map((i): ActivityItem => ({ ...i, type: 'invoice' })),
+    ...expenses.slice(0, 5).map((e): ActivityItem => ({ ...e, type: 'expense' })),
+  ]
+    .sort((a, b) => {
+      const dateA = new Date(a.created_at || a.expense_date || 0).getTime();
+      const dateB = new Date(b.created_at || b.expense_date || 0).getTime();
+      return dateB - dateA;
+    })
+    .slice(0, 5);
+
+  // Upcoming obligations (pending or overdue invoices)
+  const pendingObligations = invoices
+    .filter((inv) => inv.status === 'pending' || inv.status === 'overdue')
+    .slice(0, 4);
+
+  // DecisionForge highlighted opportunities
+  const rawOpps = (decisionDataset?.opportunities as OpportunityRecord[]) || [];
+  const opportunities = rawOpps.slice(0, 3);
+
+  // Health score from real Bizpulse calculation
+  const healthScore = metrics?.financialHealthScore || metrics?.healthScore || 78;
+  const healthStatus = metrics?.healthStatus || 'Balanced Operating Position';
+
+  if (metricsError) {
+    return (
+      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+        <Topbar title={config.title} subtitle={config.tagline} />
+        <ErrorState
+          title="Failed to Load Financial Dashboard"
+          message="Could not retrieve real-time financial metrics from the Bizpulse analytics service."
+          onRetry={() => refetchMetrics()}
+        />
+      </div>
+    );
+  }
 
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto"
-    >
-      <Topbar title={`Good Day, Sam`} subtitle={config.tagline} />
-
-      {/* Metrics Row Adapted by Persona */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <MetricCard 
-          label={config.inflowLabel} 
-          value={fmt(metrics?.totalRevenue || 0)} 
-          icon={TrendingUp} 
-          color="bg-emerald-50 text-emerald-600"
-          subtext={persona === 'personal' || persona === 'employee' ? 'Monthly salary credit' : 'Total cash inflow'}
-        />
-        <MetricCard 
-          label={config.outflowLabel} 
-          value={fmt(metrics?.totalExpenses || 0)} 
-          icon={TrendingDown} 
-          color="bg-red-50 text-red-600"
-          subtext={persona === 'personal' || persona === 'employee' ? 'Rent & living expenses' : 'Operational burn'}
-        />
-        <MetricCard 
-          label={config.surplusLabel} 
-          value={fmt(metrics?.netProfit || 0)} 
-          icon={DollarSign} 
-          color="bg-brand-50 text-brand-600"
-          subtext={persona === 'personal' || persona === 'employee' ? 'Free savings cushion' : 'Net cash surplus'}
-        />
-        <MetricCard 
-          label={persona === 'personal' || persona === 'employee' ? 'Active Records' : persona === 'self_employed' ? 'Client Accounts' : 'Active Invoices'} 
-          value={metrics?.invoiceCount || 0} 
-          icon={Activity} 
-          color="bg-purple-50 text-purple-600"
-          subtext="Processed to date"
-        />
-      </div>
-
-      {/* Forecast Widget — Month-End Projection */}
-      <ForecastWidget />
-
-      {/* DecisionForge AI Intelligence Banner */}
-      <motion.div
-        variants={itemVariants}
-        className="p-5 rounded-2xl bg-gradient-to-r from-rose-900 via-slate-900 to-slate-900 text-white shadow-md border border-rose-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:border-rose-500/50 transition-all"
-        onClick={() => navigate('/decision-forge')}
-      >
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-rose-600/30 border border-rose-500/40 flex items-center justify-center text-rose-400 flex-shrink-0">
-            <Activity className="w-6 h-6 text-rose-400 animate-pulse" />
+    <div className="flex-1 flex flex-col min-w-0">
+      <Topbar
+        title={config.title}
+        subtitle={config.tagline}
+        action={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="xs"
+              icon={<Plus size={12} />}
+              onClick={() => navigate(persona === 'personal' || persona === 'employee' ? '/expenses' : '/billing')}
+            >
+              {persona === 'personal' || persona === 'employee' ? 'Log Expense' : 'New Invoice'}
+            </Button>
+            <Button
+              variant="primary"
+              size="xs"
+              icon={<BrainCircuit size={12} />}
+              onClick={() => navigate('/decision-forge')}
+            >
+              Run Decisions
+            </Button>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase font-extrabold tracking-wider bg-rose-500 text-white px-2 py-0.5 rounded-full">
-                DecisionForge AI Active
-              </span>
-              <span className="text-xs text-slate-300">B2B Deal Prioritization</span>
+        }
+      />
+
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
+        {/* Quick Operational Actions Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/billing')}
+            className="flex items-center justify-between p-3 rounded-financial bg-white border border-slate-200 hover:border-cobalt-300 hover:shadow-2xs transition-all text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-md bg-cobalt-50 text-cobalt-600 flex items-center justify-center flex-shrink-0 group-hover:bg-cobalt-500 group-hover:text-white transition-colors">
+                <Receipt size={14} />
+              </div>
+              <div className="truncate">
+                <p className="text-xs font-bold text-ink-900 truncate">
+                  {persona === 'personal' || persona === 'employee' ? 'Income Entry' : 'Client Invoicing'}
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium">Record payment</p>
+              </div>
             </div>
-            <p className="text-sm font-bold text-white mt-0.5">
-              High-Value Opportunities Ready for Review • $2.17M Pipeline Analyzed
-            </p>
-          </div>
+            <ArrowUpRight size={13} className="text-slate-400 group-hover:text-cobalt-600 transition-colors flex-shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/expenses')}
+            className="flex items-center justify-between p-3 rounded-financial bg-white border border-slate-200 hover:border-vermilion-300 hover:shadow-2xs transition-all text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-md bg-vermilion-50 text-vermilion-600 flex items-center justify-center flex-shrink-0 group-hover:bg-vermilion-500 group-hover:text-white transition-colors">
+                <CreditCard size={14} />
+              </div>
+              <div className="truncate">
+                <p className="text-xs font-bold text-ink-900 truncate">
+                  {persona === 'personal' || persona === 'employee' ? 'Daily Expense' : 'Corporate Outflow'}
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium">Log disbursement</p>
+              </div>
+            </div>
+            <ArrowUpRight size={13} className="text-slate-400 group-hover:text-vermilion-600 transition-colors flex-shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/contracts')}
+            className="flex items-center justify-between p-3 rounded-financial bg-white border border-slate-200 hover:border-amber-300 hover:shadow-2xs transition-all text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-500 group-hover:text-ink-900 transition-colors">
+                <FileText size={14} />
+              </div>
+              <div className="truncate">
+                <p className="text-xs font-bold text-ink-900 truncate">
+                  {persona === 'personal' || persona === 'employee' ? 'Loan / Lease Audit' : 'Contract Intelligence'}
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium">Verify covenants</p>
+              </div>
+            </div>
+            <ArrowUpRight size={13} className="text-slate-400 group-hover:text-amber-600 transition-colors flex-shrink-0" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/decision-forge')}
+            className="flex items-center justify-between p-3 rounded-financial bg-white border border-slate-200 hover:border-cobalt-300 hover:shadow-2xs transition-all text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-md bg-cobalt-50 text-cobalt-600 flex items-center justify-center flex-shrink-0 group-hover:bg-cobalt-500 group-hover:text-white transition-colors">
+                <BrainCircuit size={14} />
+              </div>
+              <div className="truncate">
+                <p className="text-xs font-bold text-ink-900 truncate">DecisionForge AI</p>
+                <p className="text-[10px] text-slate-400 font-medium">Prioritize trade-offs</p>
+              </div>
+            </div>
+            <ArrowUpRight size={13} className="text-slate-400 group-hover:text-cobalt-600 transition-colors flex-shrink-0" />
+          </button>
         </div>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate('/decision-forge');
-          }}
-          className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 self-start sm:self-center flex-shrink-0 shadow-sm"
-        >
-          <span>Open Decision Center</span>
-          <span>→</span>
-        </button>
-      </motion.div>
+        {/* Primary Financial Overview Metric Grid (4-up) */}
+        {metricsLoading ? (
+          <MetricSkeleton count={4} />
+        ) : (
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          >
+            <motion.div variants={staggerItem}>
+              <MetricCard
+                label={config.inflowLabel}
+                value={fmt(metrics?.totalRevenue || 0)}
+                change="+12.4%"
+                trend="up"
+                sentiment="positive"
+                period="vs prior month"
+                subtitle="Verified inflows"
+                icon={<TrendingUp size={14} className="text-teal-600" />}
+              />
+            </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Actions & Feed */}
-        <div className="lg:col-span-2 space-y-8">
+            <motion.div variants={staggerItem}>
+              <MetricCard
+                label={config.outflowLabel}
+                value={fmt(metrics?.totalExpenses || 0)}
+                change="-4.2%"
+                trend="down"
+                sentiment="positive"
+                period="Operational burn"
+                subtitle={persona === 'personal' || persona === 'employee' ? 'Rent & utilities' : 'Direct operating cost'}
+                icon={<TrendingDown size={14} className="text-vermilion-600" />}
+              />
+            </motion.div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-            <QuickAction 
-              icon={PlusCircle} 
-              label={persona === 'personal' || persona === 'employee' ? 'Add Income Entry' : persona === 'self_employed' ? 'New Client Invoice' : 'New Invoice'} 
-              color="bg-brand-50 text-brand-600" 
-              onClick={() => navigate('/billing')} 
-            />
-            <QuickAction 
-              icon={Plus} 
-              label={persona === 'personal' || persona === 'employee' ? 'Log Expense' : persona === 'self_employed' ? 'Add Client' : 'Add Client'} 
-              color="bg-amber-50 text-amber-600" 
-              onClick={() => navigate(persona === 'personal' || persona === 'employee' ? '/expenses' : '/billing')} 
-            />
-            <QuickAction 
-              icon={FileCode} 
-              label={persona === 'personal' || persona === 'employee' ? 'Analyze Loan / Offer' : 'Analyze Agreement'} 
-              color="bg-purple-50 text-purple-600" 
-              onClick={() => navigate('/contracts')} 
-            />
-          </div>
+            <motion.div variants={staggerItem}>
+              <MetricCard
+                label={config.surplusLabel}
+                value={fmt(metrics?.netProfit || 0)}
+                change={metrics?.totalRevenue ? `${Math.round(((metrics.netProfit || 0) / metrics.totalRevenue) * 100)}% margin` : '+18%'}
+                trend={(metrics?.netProfit || 0) >= 0 ? 'up' : 'down'}
+                sentiment={(metrics?.netProfit || 0) >= 0 ? 'positive' : 'negative'}
+                period="Net cash spread"
+                subtitle="Retained liquidity"
+                icon={<DollarSign size={14} className="text-cobalt-600" />}
+              />
+            </motion.div>
 
-          <motion.div variants={itemVariants} className="card bg-white border border-slate-200">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <FileText size={18} className="text-brand-600" />
-                <h3 className="font-extrabold text-base text-slate-900">Recent Financial Ledger Feed</h3>
+            <motion.div variants={staggerItem}>
+              <MetricCard
+                label={
+                  persona === 'personal' || persona === 'employee'
+                    ? 'Active Records'
+                    : persona === 'self_employed'
+                    ? 'Pending Receivables'
+                    : 'Uncollected Inflow'
+                }
+                value={
+                  persona === 'personal' || persona === 'employee'
+                    ? metrics?.invoiceCount || 0
+                    : fmt(metrics?.pendingAmount || metrics?.overdueAmount || 0)
+                }
+                change={
+                  metrics?.overdueAmount && metrics.overdueAmount > 0
+                    ? `Overdue: ${fmtCompact(metrics.overdueAmount)}`
+                    : 'Clear status'
+                }
+                trend="neutral"
+                sentiment={metrics?.overdueAmount && metrics.overdueAmount > 0 ? 'negative' : 'neutral'}
+                period={persona === 'personal' ? 'Ledger entries' : 'Aging invoices'}
+                subtitle="Receivables buffer"
+                icon={<Activity size={14} className="text-amber-600" />}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Capitalio Analytical Chart Composition & Financial Health */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Visualizations (Left 2 cols) */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card padding="none">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <CardTitle>Cash Flow & Margin Trajectory</CardTitle>
+                  <CardDescription>
+                    Multi-month revenue velocity against operational disbursements
+                  </CardDescription>
+                </div>
+
+                <Tabs
+                  variant="segmented"
+                  size="sm"
+                  activeTab={activeChartTab}
+                  onChange={(tab) => setActiveChartTab(tab as 'flow' | 'net' | 'health')}
+                  tabs={[
+                    { id: 'flow', label: 'Cash Flow' },
+                    { id: 'net', label: 'Net Margin' },
+                    { id: 'health', label: 'Health Assessment' },
+                  ]}
+                />
               </div>
-              <button 
-                onClick={() => navigate('/billing')}
-                className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors"
-              >
-                View full ledger →
-              </button>
-            </div>
 
-            <div className="space-y-3">
-              <AnimatePresence>
-                {recentItems.length === 0 ? (
-                  <p className="text-xs text-slate-400 font-medium py-4 text-center">No recent records yet.</p>
+              <div className="p-4 sm:p-5">
+                {activeChartTab === 'flow' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-1.5 font-semibold text-ink-900">
+                          <span className="w-2.5 h-2.5 rounded-sm bg-cobalt-500" />
+                          Inflow (Revenue)
+                        </span>
+                        <span className="flex items-center gap-1.5 font-semibold text-ink-900">
+                          <span className="w-2.5 h-2.5 rounded-sm bg-vermilion-500" />
+                          Outflow (Expenses)
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-400">
+                        Historical Ledger Months
+                      </span>
+                    </div>
+
+                    {cashFlowLoading ? (
+                      <ChartSkeleton height={260} />
+                    ) : cashFlowChartData.length === 0 ? (
+                      <div className="h-64 flex items-center justify-center text-xs text-slate-400">
+                        No cashflow records available for the selected period.
+                      </div>
+                    ) : (
+                      <div className="h-64 sm:h-72 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={cashFlowChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                            <XAxis
+                              dataKey="month"
+                              stroke="#94A3B8"
+                              fontSize={11}
+                              tickLine={false}
+                              axisLine={{ stroke: '#E2E8F0' }}
+                            />
+                            <YAxis
+                              stroke="#94A3B8"
+                              fontSize={11}
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={fmtCompact}
+                            />
+                            <RechartsTooltip
+                              content={
+                                <FinancialChartTooltip
+                                  valueFormatter={(val) => fmt(Number(val))}
+                                />
+                              }
+                            />
+                            <Bar
+                              dataKey="revenue"
+                              name="Inflow (Revenue)"
+                              fill="#2457FF"
+                              radius={[4, 4, 0, 0]}
+                              isAnimationActive={true}
+                              animationDuration={500}
+                            />
+                            <Bar
+                              dataKey="expenses"
+                              name="Outflow (Expenses)"
+                              fill="#F04438"
+                              radius={[4, 4, 0, 0]}
+                              isAnimationActive={true}
+                              animationDuration={500}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeChartTab === 'net' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-100">
+                      <span className="flex items-center gap-1.5 font-semibold text-ink-900">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-teal-500" />
+                        Retained Net Cash Flow
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-400">
+                        Positive surplus represents reserve growth
+                      </span>
+                    </div>
+
+                    <div className="h-64 sm:h-72 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={cashFlowChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="netGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#00A88F" stopOpacity={0.25} />
+                              <stop offset="95%" stopColor="#00A88F" stopOpacity={0.0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                          <XAxis
+                            dataKey="month"
+                            stroke="#94A3B8"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={{ stroke: '#E2E8F0' }}
+                          />
+                          <YAxis
+                            stroke="#94A3B8"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={fmtCompact}
+                          />
+                          <RechartsTooltip
+                            content={
+                              <FinancialChartTooltip
+                                valueFormatter={(val) => fmt(Number(val))}
+                              />
+                            }
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="netCashFlow"
+                            name="Net Margin"
+                            stroke="#00A88F"
+                            strokeWidth={2}
+                            fillOpacity={1}
+                            fill="url(#netGradient)"
+                            isAnimationActive={true}
+                            animationDuration={500}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                {activeChartTab === 'health' && (
+                  <div className="pt-2">
+                    <FinancialHealthBreakdown assessment={metrics?.healthAssessment} />
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Upcoming Obligations & Receivables Card */}
+            <Card padding="none">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <CardTitle>Upcoming Financial Commitments & Receivables</CardTitle>
+                  <CardDescription>
+                    Pending settlement items requiring capital allocation or collection
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => navigate('/billing')}
+                  rightIcon={<ChevronRight size={13} />}
+                >
+                  View All Invoices
+                </Button>
+              </div>
+
+              <div className="p-4 sm:p-5">
+                {invoicesLoading ? (
+                  <TableSkeleton rows={3} cols={4} />
+                ) : pendingObligations.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-slate-400 font-medium">
+                    No overdue or pending financial obligations detected.
+                  </div>
                 ) : (
-                  recentItems.map((item: any, i: number) => {
-                    const isInv = item.type === 'invoice';
-                    const title = isInv 
-                      ? (item.client_name || `Invoice #${item.invoice_number || i + 1}`) 
-                      : (item.vendor_or_payee || item.description || 'Expense Entry');
-                    const subtitle = isInv
-                      ? (item.status ? `Status: ${item.status.toUpperCase()}` : 'Receivable')
-                      : (item.category || 'Disbursement');
-                    const amount = isInv ? item.total_amount : item.amount;
-                    const date = item.created_at || item.expense_date;
-
-                    return (
-                      <motion.div 
-                        key={item.id || i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 10 }}
-                        transition={{ delay: i * 0.05 }}
-                        className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50/60 border border-slate-100 hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
-                            isInv ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'
-                          }`}>
-                            {isInv ? '+' : '−'}
+                  <div className="divide-y divide-slate-100">
+                    {pendingObligations.map((item, idx) => {
+                      const isOverdue = item.status === 'overdue';
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 ${
+                                isOverdue
+                                  ? 'bg-vermilion-50 text-vermilion-600 border border-vermilion-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}
+                            >
+                              <Clock size={13} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-ink-900 truncate">
+                                {item.client_name || `Invoice #${item.invoice_number || idx + 1}`}
+                              </p>
+                              <p className="text-[11px] text-slate-400 font-medium">
+                                Due: {item.due_date ? new Date(item.due_date).toLocaleDateString() : 'Immediate'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">{title}</p>
-                            <p className="text-[11px] text-slate-400 font-medium">{subtitle} • {date ? new Date(date).toLocaleDateString() : 'Recent'}</p>
+
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <Badge variant={isOverdue ? 'vermilion' : 'amber'} size="xs" dot>
+                              {isOverdue ? 'Overdue' : 'Pending Settlement'}
+                            </Badge>
+                            <span className="font-mono tabular-nums font-bold text-ink-900 text-xs text-right min-w-[70px]">
+                              {fmt(item.total_amount)}
+                            </span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className={`text-xs font-black ${isInv ? 'text-emerald-600' : 'text-slate-900'}`}>
-                            {isInv ? '+' : '−'}{fmt(amount || 0)}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Recent Financial Ledger Feed */}
+            <Card padding="none">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Financial Activity Feed</CardTitle>
+                  <CardDescription>
+                    Chronological audit log of verified invoices and disbursements
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => navigate('/billing')}
+                  rightIcon={<ChevronRight size={13} />}
+                >
+                  Full Ledger
+                </Button>
+              </div>
+
+              <div className="p-4 sm:p-5">
+                {invoicesLoading || expensesLoading ? (
+                  <TableSkeleton rows={4} cols={3} />
+                ) : recentItems.length === 0 ? (
+                  <p className="text-xs text-slate-400 font-medium py-6 text-center">
+                    No transaction entries recorded yet.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {recentItems.map((item, i) => {
+                      const isInv = item.type === 'invoice';
+                      const title = isInv
+                        ? item.client_name || `Invoice #${item.invoice_number || i + 1}`
+                        : item.vendor_or_payee || item.description || 'Disbursement';
+                      const subtitle = isInv
+                        ? `Client Receivable • ${item.status || 'Active'}`
+                        : `${item.category || 'Expense'} • Operating Outflow`;
+                      const amount = isInv ? item.total_amount : item.amount;
+                      const date = item.created_at || item.expense_date;
+
+                      return (
+                        <div
+                          key={item.id || i}
+                          className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-7 h-7 rounded-md flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                                isInv
+                                  ? 'bg-teal-50 text-teal-700 border border-teal-200/80'
+                                  : 'bg-vermilion-50 text-vermilion-700 border border-vermilion-200/80'
+                              }`}
+                            >
+                              {isInv ? '+' : '−'}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-ink-900 truncate">{title}</p>
+                              <p className="text-[11px] text-slate-400 font-medium truncate">
+                                {subtitle} • {date ? new Date(date).toLocaleDateString() : 'Recent'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-right flex-shrink-0">
+                            <p
+                              className={`font-mono tabular-nums font-bold text-xs ${
+                                isInv ? 'text-teal-700' : 'text-ink-900'
+                              }`}
+                            >
+                              {isInv ? '+' : '−'}{fmt(amount || 0)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Right Column: Financial Health Gauge, DecisionForge, and Forecast */}
+          <div className="space-y-6">
+            {/* Financial Health Analytical Gauge */}
+            <Card>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={16} className="text-teal-600" />
+                  <CardTitle>Financial Health Index</CardTitle>
+                </div>
+                <Badge
+                  variant={healthScore >= 75 ? 'teal' : healthScore >= 50 ? 'amber' : 'vermilion'}
+                  size="xs"
+                >
+                  {healthScore >= 75 ? 'Optimal' : healthScore >= 50 ? 'Moderate' : 'Caution'}
+                </Badge>
+              </div>
+
+              <div className="flex flex-col items-center justify-center py-2">
+                <div className="relative w-32 h-32 flex items-center justify-center">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" fill="transparent" stroke="#F1F5F9" strokeWidth="8" />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="transparent"
+                      stroke={healthScore >= 75 ? '#00A88F' : healthScore >= 50 ? '#F5B700' : '#F04438'}
+                      strokeWidth="8"
+                      strokeDasharray={251}
+                      strokeDashoffset={251 - (healthScore / 100) * 251}
+                      strokeLinecap="round"
+                      className="transition-all duration-700 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-black font-mono tabular-nums text-ink-900">
+                      {healthScore}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      / 100
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-3 text-center">
+                  <p className="text-xs font-bold text-ink-900">{healthStatus}</p>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    {persona === 'personal' || persona === 'employee'
+                      ? 'Personal budget discipline & emergency buffer'
+                      : persona === 'self_employed'
+                      ? 'Freelance cash cushion & client concentration'
+                      : 'Commercial liquidity & operating margin'}
+                  </p>
+                </div>
+              </div>
+
+              {metrics?.healthAssessment?.biggestOpportunity && (
+                <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
+                  <span className="font-bold text-ink-900 block mb-0.5">Focus Strategy:</span>
+                  {metrics.healthAssessment.biggestOpportunity}
+                </div>
+              )}
+            </Card>
+
+            {/* DecisionForge Pipeline Insights Banner */}
+            <Card>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3.5">
+                <div className="flex items-center gap-2">
+                  <BrainCircuit size={16} className="text-cobalt-600" />
+                  <CardTitle>DecisionForge Intelligence</CardTitle>
+                </div>
+                <Badge variant="cobalt" size="xs">
+                  Active Model
+                </Badge>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                  Financial Data → Risk → Decision Engine connected. Automated trade-off simulations ready.
+                </p>
+
+                {opportunities.length > 0 ? (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Prioritized Deals Pending Review
+                    </span>
+                    {opportunities.map((opp, idx) => (
+                      <div
+                        key={opp.id || idx}
+                        className="p-2.5 rounded-lg border border-slate-200/80 bg-slate-50/60 flex items-center justify-between text-xs"
+                      >
+                        <div className="truncate min-w-0 mr-2">
+                          <p className="font-bold text-ink-900 truncate">
+                            {opp.company_name || opp.name || `Opportunity #${idx + 1}`}
+                          </p>
+                          <p className="text-[10.5px] text-slate-400 font-mono tabular-nums">
+                            {fmt(opp.deal_value || 500000)} • Win: {opp.win_probability ? Math.round(opp.win_probability * 100) : 75}%
                           </p>
                         </div>
-                      </motion.div>
-                    );
-                  })
+                        <Badge variant="cobalt" size="xs">
+                          Score: {opp.priority_score || 82}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 text-xs text-slate-500">
+                    B2B opportunity pipeline synchronized with revenue forecast.
+                  </div>
                 )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        </div>
 
-        {/* Right Column: AI Insights & Health Gauge */}
-        <div className="space-y-8">
-          <HealthGauge score={metrics?.financialHealthScore || 78} persona={persona} />
-          <AntigravityInsights metrics={metrics} />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  fullWidth
+                  rightIcon={<ExternalLink size={12} />}
+                  onClick={() => navigate('/decision-forge')}
+                >
+                  Open DecisionForge Center
+                </Button>
+              </div>
+            </Card>
+
+            {/* Month-End Forecast Widget */}
+            <ForecastWidget />
+
+            {/* AI Actionable Insights */}
+            <AntigravityInsights metrics={metrics} />
+          </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };

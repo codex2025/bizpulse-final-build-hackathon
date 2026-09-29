@@ -17,14 +17,14 @@ interface Props {
 
 export const SpendingTimeLineChart: React.FC<Props> = ({ data = [] }) => {
   return (
-    <div className="card p-6 border border-slate-200 rounded-3xl space-y-4 bg-white">
+    <div className="card p-6 border border-slate-200 rounded-3xl space-y-4 bg-white shadow-xs">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
-          <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-            <Activity size={16} className="text-indigo-600" /> Weekly Outflow Trajectory
+          <h3 className="font-extrabold text-sm text-ink-900 flex items-center gap-2">
+            <Activity size={16} className="text-cobalt-600" /> Outflow Velocity Trajectory
           </h3>
           <p className="text-xs text-slate-500 font-medium">
-            Spending rhythm across the weeks of the current month
+            Periodic spending rhythm compared against operational target limits
           </p>
         </div>
       </div>
@@ -38,21 +38,21 @@ export const SpendingTimeLineChart: React.FC<Props> = ({ data = [] }) => {
             <Tooltip
               contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}
               itemStyle={{ fontSize: 12, fontWeight: 700 }}
-              formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Outflow']}
+              formatter={(val: unknown) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Outflow']}
             />
             <Line
               type="monotone"
               dataKey="spending"
-              name="Weekly Outflow"
-              stroke="#6366f1"
+              name="Outflow"
+              stroke="#2457FF"
               strokeWidth={3}
-              dot={{ r: 5, fill: '#6366f1', strokeWidth: 2, stroke: '#ffffff' }}
-              activeDot={{ r: 7, fill: '#e11d48' }}
+              dot={{ r: 5, fill: '#2457FF', strokeWidth: 2, stroke: '#ffffff' }}
+              activeDot={{ r: 7, fill: '#F04438' }}
             />
             <Line
               type="monotone"
               dataKey="budgetLimit"
-              name="Weekly Target Limit"
+              name="Target Limit"
               stroke="#cbd5e1"
               strokeDasharray="4 4"
               strokeWidth={2}
@@ -65,7 +65,7 @@ export const SpendingTimeLineChart: React.FC<Props> = ({ data = [] }) => {
       {data.some((d) => d.isHigh) && (
         <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
           <AlertCircle size={15} className="text-amber-600 flex-shrink-0" />
-          <span>Week 3 experienced a 32% spike in non-recurring expenses.</span>
+          <span>Periodic outflow exceeded benchmark baseline due to non-recurring procurement.</span>
         </div>
       )}
     </div>

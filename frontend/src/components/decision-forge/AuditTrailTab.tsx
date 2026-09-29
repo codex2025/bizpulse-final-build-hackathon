@@ -2,7 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { History, ShieldCheck, PlayCircle, Clock, User, CheckCircle2, XCircle, Edit3, ListChecks, RefreshCw } from 'lucide-react';
 import { decisionForgeService } from '../../services/decisionForgeService';
 
+import type { AuditLogItem, ApprovalItem } from '../../services/decisionForgeService';
+
 type ApprovalFilter = 'ALL' | 'PENDING' | 'APPROVED' | 'MODIFIED' | 'REJECTED';
+
+interface ReplayRunData {
+  run: {
+    decisionRunId?: string;
+    decision_run_id?: string;
+    policyVersion?: string;
+    policy_version?: string;
+    recordsAnalyzed?: number;
+    records_analyzed?: number;
+    pipelineTotalValue?: number;
+    pipeline_total_value?: number;
+    createdAt?: string;
+    created_at?: string;
+    recommendations?: Array<{
+      recommendation_id: string;
+      company_name: string;
+      suggested_action: string;
+      priority_score: number;
+    }>;
+  };
+  policy?: Record<string, unknown>;
+  approvals?: Array<{
+    id: string;
+    status: string;
+    companyName: string;
+    approvedAction: string;
+    dealValue?: number;
+  }>;
+}
 
 const STATUS_STYLE: Record<string, string> = {
   PENDING: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -12,10 +43,10 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export const AuditTrailTab: React.FC = () => {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [approvals, setApprovals] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLogItem[]>([]);
+  const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedRun, setSelectedRun] = useState<any | null>(null);
+  const [selectedRun, setSelectedRun] = useState<ReplayRunData | null>(null);
   const [approvalFilter, setApprovalFilter] = useState<ApprovalFilter>('ALL');
 
   const fetchAll = async () => {
@@ -27,7 +58,7 @@ export const AuditTrailTab: React.FC = () => {
       ]);
       setLogs(logData);
       setApprovals(approvalData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Audit fetch error:', err);
     } finally {
       setIsLoading(false);
@@ -42,8 +73,10 @@ export const AuditTrailTab: React.FC = () => {
     try {
       const replayData = await decisionForgeService.replayDecision(runId);
       setSelectedRun(replayData);
-    } catch (err: any) {
-      alert(err.message || 'Failed to replay decision run');
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.message || 'Failed to replay decision run';
+      alert(msg);
     }
   };
 
@@ -169,7 +202,7 @@ export const AuditTrailTab: React.FC = () => {
                   <span className="text-sm font-bold text-slate-900">${Number(a.dealValue || 0).toLocaleString()}</span>
                   {a.decisionRunId && (
                     <button
-                      onClick={() => handleReplay(a.decisionRunId)}
+                      onClick={() => handleReplay(a.decisionRunId!)}
                       className="px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100/70 border border-rose-200/80 rounded-lg transition flex items-center gap-1.5"
                     >
                       <PlayCircle className="w-3.5 h-3.5" />
@@ -217,7 +250,7 @@ export const AuditTrailTab: React.FC = () => {
                   </div>
 
                   <p className="text-xs text-slate-600">
-                    {log.payload?.approvedAction || log.payload?.message || JSON.stringify(log.payload)}
+                    {String(log.payload?.approvedAction || log.payload?.message || (log.payload ? JSON.stringify(log.payload) : ''))}
                   </p>
 
                   <div className="flex items-center gap-3 text-[11px] text-slate-400">
@@ -226,14 +259,14 @@ export const AuditTrailTab: React.FC = () => {
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1 font-mono">
-                      <Clock className="w-3 h-3" /> {new Date(log.timestamp).toLocaleString()}
+                      <Clock className="w-3 h-3" /> {log.timestamp ? new Date(log.timestamp).toLocaleString() : ''}
                     </span>
                   </div>
                 </div>
 
                 {log.decisionRunId && (
                   <button
-                    onClick={() => handleReplay(log.decisionRunId)}
+                    onClick={() => handleReplay(log.decisionRunId!)}
                     className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100/70 border border-rose-200/80 rounded-lg transition flex items-center gap-1.5"
                   >
                     <PlayCircle className="w-3.5 h-3.5" />
@@ -256,7 +289,7 @@ export const AuditTrailTab: React.FC = () => {
                   Historical Decision Snapshot
                 </span>
                 <h3 className="text-base font-bold text-slate-900 mt-1">
-                  Run ID: {selectedRun.run?.decisionRunId}
+                  Run ID: {selectedRun.run?.decisionRunId || selectedRun.run?.decision_run_id}
                 </h3>
               </div>
               <button
@@ -271,27 +304,31 @@ export const AuditTrailTab: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl">
                 <div>
                   <span className="text-slate-400 block">Policy Version:</span>
-                  <span className="font-bold text-slate-800">{selectedRun.run?.policyVersion}</span>
+                  <span className="font-bold text-slate-800">{selectedRun.run?.policyVersion || selectedRun.run?.policy_version}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Opportunities Ranked:</span>
-                  <span className="font-bold text-slate-800">{selectedRun.run?.recordsAnalyzed} Deals</span>
+                  <span className="font-bold text-slate-800">{selectedRun.run?.recordsAnalyzed || selectedRun.run?.records_analyzed} Deals</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Pipeline Total:</span>
-                  <span className="font-bold text-slate-800">${selectedRun.run?.pipelineTotalValue?.toLocaleString()}</span>
+                  <span className="font-bold text-slate-800">${(selectedRun.run?.pipelineTotalValue || selectedRun.run?.pipeline_total_value || 0).toLocaleString()}</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block">Execution Timestamp:</span>
-                  <span className="font-bold text-slate-800">{new Date(selectedRun.run?.createdAt).toLocaleString()}</span>
+                  <span className="font-bold text-slate-800">
+                    {selectedRun.run?.createdAt || selectedRun.run?.created_at
+                      ? new Date((selectedRun.run.createdAt || selectedRun.run.created_at) as string).toLocaleString()
+                      : 'N/A'}
+                  </span>
                 </div>
               </div>
 
-              {selectedRun.approvals?.length > 0 && (
+              {(selectedRun.approvals?.length ?? 0) > 0 && (
                 <div>
                   <h4 className="font-bold text-slate-800 mb-2">Reviews Recorded Against This Run</h4>
                   <div className="space-y-2">
-                    {selectedRun.approvals.map((a: any) => (
+                    {selectedRun.approvals?.map((a) => (
                       <div key={a.id} className="p-3 border border-slate-200 rounded-lg flex justify-between items-center gap-3">
                         <div>
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border mr-2 ${STATUS_STYLE[a.status] || STATUS_STYLE.PENDING}`}>
@@ -310,7 +347,7 @@ export const AuditTrailTab: React.FC = () => {
               <div>
                 <h4 className="font-bold text-slate-800 mb-2">Original Recommendations Snapshot</h4>
                 <div className="space-y-2">
-                  {selectedRun.run?.recommendations?.map((r: any) => (
+                  {selectedRun.run?.recommendations?.map((r) => (
                     <div key={r.recommendation_id} className="p-3 border border-slate-200 rounded-lg flex justify-between items-center">
                       <div>
                         <span className="font-bold text-slate-900 block">{r.company_name}</span>

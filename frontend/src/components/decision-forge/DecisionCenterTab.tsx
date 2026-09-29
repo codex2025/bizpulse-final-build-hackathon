@@ -123,7 +123,7 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState<AskAnswer | null>(null);
 
-  const recommendations = decisionData?.recommendations || [];
+  const recommendations = useMemo(() => decisionData?.recommendations || [], [decisionData?.recommendations]);
 
   const visibleRecommendations = useMemo(() => {
     if (!answer?.matchedIds) return recommendations;

@@ -4,27 +4,93 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        numeric: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // Bizpulse Core Palette
+        cobalt: {
+          50: '#EEF4FF',
+          100: '#DDE9FF',
+          200: '#C2D6FF',
+          300: '#99BCFF',
+          400: '#6B9AFF',
+          500: '#2457FF', // Primary
+          600: '#1743E5',
+          700: '#1132B8',
+          800: '#0D258D',
+          900: '#0A1C68',
+        },
+        vermilion: {
+          50: '#FEF3F2',
+          100: '#FEE4E2',
+          200: '#FECDCA',
+          300: '#FDA29B',
+          400: '#F97066',
+          500: '#F04438', // Critical Risk / Danger
+          600: '#D92D20',
+          700: '#B42318',
+          800: '#912018',
+          900: '#7A271A',
+        },
+        amber: {
+          50: '#FEFBE8',
+          100: '#FEF7C3',
+          200: '#FEEA85',
+          300: '#FDD747',
+          400: '#F8C819',
+          500: '#F5B700', // Caution / Pending
+          600: '#D99B00',
+          700: '#B57E00',
+          800: '#8C6200',
+          900: '#6E4E00',
+        },
+        teal: {
+          50: '#E6F7F5',
+          100: '#CCEFEA',
+          200: '#99DFD5',
+          300: '#66CFC0',
+          400: '#33BFAB',
+          500: '#00A88F', // Healthy / Positive
+          600: '#008C77',
+          700: '#006E5E',
+          800: '#005246',
+          900: '#003830',
+        },
+        ink: {
+          50: '#F8FAFC',
+          100: '#F1F5F9',
+          200: '#E2E8F0',
+          300: '#CBD5E1',
+          400: '#94A3B8',
+          500: '#64748B',
+          600: '#475569',
+          700: '#334155',
+          800: '#1E293B',
+          900: '#111827', // Ink Navy
+          950: '#0A0F1D',
+        },
+        // Backward-compatible brand alias mapped to Cobalt
         brand: {
-          50: '#fff1f2',
-          100: '#ffe4e6',
-          400: '#fb7185',
-          500: '#f43f5e',
-          600: '#e11d48',
-          700: '#be123c',
-          900: '#881337',
+          50: '#EEF4FF',
+          100: '#DDE9FF',
+          200: '#C2D6FF',
+          300: '#99BCFF',
+          400: '#6B9AFF',
+          500: '#2457FF',
+          600: '#1743E5',
+          700: '#1132B8',
+          800: '#0D258D',
+          900: '#0A1C68',
         },
         surface: {
-          900: '#ffffff',
-          800: '#f8fafc',
-          700: '#f1f5f9',
-          600: '#e2e8f0',
+          900: '#FFFFFF',
+          800: '#F8FAFC',
+          700: '#F1F5F9',
+          600: '#E2E8F0',
         },
-        // Landing-page design tokens. Values live in CSS variables scoped to `.lp`
-        // (see components/landing/landing.css), so these utilities have no effect
-        // anywhere else in the app and switch automatically with the landing theme.
+        // Landing-page design tokens.
         lp: {
           background: 'rgb(var(--background) / <alpha-value>)',
           surface: 'rgb(var(--surface) / <alpha-value>)',
@@ -42,7 +108,20 @@ export default {
           negative: 'rgb(var(--negative) / <alpha-value>)',
         },
       },
+      boxShadow: {
+        '2xs': '0 1px 2px 0 rgba(17, 24, 39, 0.03)',
+        'xs': '0 1px 3px 0 rgba(17, 24, 39, 0.05), 0 1px 2px -1px rgba(17, 24, 39, 0.05)',
+        'subtle': '0 1px 3px 0 rgba(17, 24, 39, 0.04), 0 1px 2px -1px rgba(17, 24, 39, 0.03)',
+        'card': '0 1px 3px 0 rgba(17, 24, 39, 0.04), 0 1px 2px -1px rgba(17, 24, 39, 0.02)',
+        'elevated': '0 4px 6px -1px rgba(17, 24, 39, 0.06), 0 2px 4px -2px rgba(17, 24, 39, 0.04)',
+        'dropdown': '0 10px 15px -3px rgba(17, 24, 39, 0.08), 0 4px 6px -4px rgba(17, 24, 39, 0.03)',
+        'dialog': '0 20px 25px -5px rgba(17, 24, 39, 0.1), 0 8px 10px -6px rgba(17, 24, 39, 0.05)',
+      },
+      borderRadius: {
+        'financial': '8px',
+        'surface': '10px',
+      },
     },
   },
   plugins: [],
-}
+};

@@ -84,8 +84,10 @@ export const PolicyModal: React.FC<PolicyModalProps> = ({ onClose, onSaved }) =>
     try {
       await decisionForgeService.savePolicy(weights);
       onSaved();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save policy.');
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Failed to save policy.';
+      setError(msg);
     } finally {
       setSaving(false);
     }

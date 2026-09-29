@@ -1,501 +1,71 @@
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDropzone } from 'react-dropzone';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, FileText, AlertTriangle, CheckCircle,
   ChevronDown, ChevronUp, Loader2, Send,
   Mail, Sparkles, DollarSign,
-  Zap, ArrowRight, Lightbulb, BarChart3, Wallet,
-  Trash2, Columns, ThumbsUp, ThumbsDown,
-  AlertOctagon, Check, Globe, Mic, MicOff, Languages
+  ArrowRight, Lightbulb, Wallet,
+  Trash2, ThumbsUp, ThumbsDown,
+  AlertOctagon, Check, Globe, Mic, MicOff, Languages,
+  Search, ShieldCheck, Scale, FileCheck, RefreshCw, Bookmark
 } from 'lucide-react';
 import {
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar
 } from 'recharts';
 import { Topbar } from '../common/Topbar';
 import { contractService } from '../../services/contractService';
 import { usePersona } from '../../context/PersonaContext';
+import type {
+  ContractAnalysisData,
+  ContractClause,
+  ContractQueryMessage,
+  ContractWorkflowStep
+} from './contractTypes';
+import {
+  SUPPORTED_LANGUAGES,
+  SPEECH_LANG_MAP,
+  LOCALIZED_UI
+} from './contractTranslations';
+import { SAMPLE_CONTRACT_UJJIVAN } from './sampleContracts';
 
-const SUPPORTED_LANGUAGES = [
-  { code: 'en', name: 'English', native: 'English', flag: 'EN' },
-  { code: 'hi', name: 'Hindi', native: 'हिन्दी', flag: 'HI' },
-  { code: 'ta', name: 'Tamil', native: 'தமிழ்', flag: 'TA' },
-  { code: 'te', name: 'Telugu', native: 'తెలుగు', flag: 'TE' },
-  { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ', flag: 'KN' },
-  { code: 'mr', name: 'Marathi', native: 'मराठी', flag: 'MR' },
-  { code: 'bn', name: 'Bengali', native: 'বাংলা', flag: 'BN' },
-  { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી', flag: 'GU' },
-];
-
-const SPEECH_LANG_MAP: Record<string, string> = {
-  ta: 'ta-IN',
-  hi: 'hi-IN',
-  te: 'te-IN',
-  kn: 'kn-IN',
-  mr: 'mr-IN',
-  bn: 'bn-IN',
-  gu: 'gu-IN',
-  en: 'en-IN',
-};
-
-const LOCALIZED_UI: Record<string, Record<string, string>> = {
-  hi: {
-    recommendation: 'अंतिम वित्तीय सिफारिश',
-    ACCEPT: 'स्वीकार करें (सुरक्षित)',
-    DECLINE: 'अस्वीकार करें (हस्ताक्षर न करें)',
-    RENEGOTIATE: 'पुनर्विचार करें (पहले शर्तें बदलें)',
-    headline_accept: 'इस समझौते के साथ आगे बढ़ना सुरक्षित है',
-    headline_decline: 'इस समझौते पर हस्ताक्षर न करें',
-    headline_renegotiate: 'हस्ताक्षर रोकें — पहले मुख्य शर्तों पर बातचीत करें',
-    summary_accept: 'यह समझौता अनुकूल बाजार शर्तों, मानक कानूनी सुरक्षा और आपकी वित्तीय क्षमता के अनुसार है।',
-    summary_decline: 'इस ऋण में गंभीर वित्तीय खतरे या अनुचित शर्तें हैं जो आपके लिए बड़ा जोखिम पैदा करती हैं।',
-    summary_renegotiate: 'यह समझौता ठीक है, लेकिन इसमें कुछ जोखिम भरी शर्तें हैं जिन्हें पहले बदलना आवश्यक है।',
-    why_accept: 'आपको इसे क्यों स्वीकार करना चाहिए:',
-    why_decline: 'आपको इसे क्यों अस्वीकार करना चाहिए:',
-    why_renegotiate: 'आपको पहले बातचीत क्यों करनी चाहिए:',
-    doc_overview: 'अनुबंध दस्तावेज़ सारांश',
-    monthly_pay: 'मासिक भुगतान',
-    total_interest: 'कुल ब्याज',
-    tenure: 'अवधि',
-    key_terms: 'मुख्य शर्तें और सारांश:',
-    financial_baseline: 'आपकी वित्तीय स्थिति और ऋण सामर्थ्य',
-    baseline_desc: 'आपकी सत्यापित मासिक आय, आवर्ती व्यय और नकदी अधिशेष के आधार पर मूल्यांकन किया गया',
-    past_income: 'मासिक आय / वेतन',
-    past_expense: 'मासिक व्यय',
-    new_emi: 'नई मासिक किस्त',
-    cushion: 'शेष बचत अधिशेष',
-    free_buffer: 'सुरक्षित मासिक बचत',
-    comparison_chart: 'मासिक नकदी प्रवाह तुलना',
-    original_text: 'मूल अनुबंध पाठ (यथावत):',
-    plain_meaning: 'सरल भाषा में अर्थ:',
-    cost_impact: 'लागत प्रभाव:',
-    action_tip: 'सलाह:',
-    why_risky: 'यह आपके लिए जोखिम भरा क्यों है:',
-    tab_overview: 'कार्यकारी सारांश और निर्णय',
-    tab_clauses: 'धारा विवरण',
-    tab_baseline: 'वित्तीय स्थिति',
-    tab_schedule: 'भुगतान अनुसूची',
-    tab_assistant: 'अनुबंध सहायक',
-    assistant_title: 'इंटरैक्टिव अनुबंध सहायक',
-    assistant_desc: 'सत्यापित दस्तावेज़ संदर्भों के साथ कोई भी प्रश्न पूछें',
-    ask_placeholder: 'हिंदी में अपना प्रश्न टाइप करें या बोलें...',
-    ask_btn: 'पूछें',
-    upload_btn: 'नया अनुबंध अपलोड करें',
-    dropzone_active: 'अपना अनुबंध यहाँ छोड़ें',
-    dropzone_idle: 'कोई भी वित्तीय अनुबंध यहाँ खींचें और छोड़ें (PDF, DOCX, इमेज, या TXT)',
-    dropzone_sub: '8 भारतीय भाषाओं में व्यावसायिक ऋण, होम मॉर्गेज, व्यक्तिगत ऋण और क्रेडिट लाइनों का समर्थन करता है',
-    fixed_emi: 'नियत मासिक किस्त',
-    total_cost: 'कुल वित्तपोषण लागत',
-    total_interest_obl: 'कुल ब्याज दायित्व',
-    prepay_exit: 'समयपूर्व निकास शुल्क',
-    due_monthly: 'प्रति माह देय',
-    principal_interest: 'मूलधन + ब्याज',
-    over_months: 'महीनों में',
-    exit_charge: 'समयपूर्व भुगतान शुल्क',
-    lender_points_title: 'ऋणदाता चर्चा बिंदु',
-    lender_points_desc: 'हस्ताक्षर करने से पहले अनुशंसित समायोजन',
-    neg_1_title: '1. बेंचमार्क पारदर्शिता:',
-    neg_1_desc: 'अनुरोध करें कि मनमानी स्प्रेड वृद्धि से बचने के लिए ब्याज दर बाहरी बेंचमार्क से जुड़ी हो।',
-    neg_2_title: '2. छूट अवधि नोटिस:',
-    neg_2_desc: 'किसी भी पेनल्टी या डिफॉल्ट कार्रवाई से पहले अनिवार्य 15-दिन के लिखित नोटिस विंडो का अनुरोध करें।',
-    neg_3_title: '3. समयपूर्व भुगतान सुरक्षा:',
-    neg_3_desc: 'साधारण व्यावसायिक आय से किए गए समयपूर्व भुगतान पर 0% पेनल्टी की पुष्टि करें।'
-  },
-  ta: {
-    recommendation: 'இறுதி நிதி பரிந்துரை',
-    ACCEPT: 'ஏற்றுக்கொள்ளுங்கள் (பாதுகாப்பானது)',
-    DECLINE: 'நிராகரிக்கவும் (கையொப்பமிட வேண்டாம்)',
-    RENEGOTIATE: 'மறுபேச்சுவார்த்தை (விதிமுறைகளை மாற்றவும்)',
-    headline_accept: 'இந்த ஒப்பந்தத்தில் கையொப்பமிடுவது பாதுகாப்பானது',
-    headline_decline: 'இந்த ஒப்பந்தத்தில் கையொப்பமிட வேண்டாம்',
-    headline_renegotiate: 'கையொப்பமிடுவதை நிறுத்துங்கள் — முதலில் முக்கிய விதிமுறைகளை பேசுங்கள்',
-    summary_accept: 'இந்த ஒப்பந்தம் சாதகமான சந்தை விதிமுறைகள் மற்றும் உங்கள் நிதி திறனுக்குள் உள்ளது.',
-    summary_decline: 'இந்த கடனில் கடுமையான நிதி அபாயங்கள் அல்லது ஆபத்தான நிபந்தனைகள் உள்ளன.',
-    summary_renegotiate: 'இந்த ஒப்பந்தம் ஏற்கத்தக்கது, ஆனால் கையொப்பமிடுவதற்கு முன் சில விதிமுறைகளை மாற்ற வேண்டும்.',
-    why_accept: 'நீங்கள் இதை ஏன் ஏற்றுக்கொள்ள வேண்டும்:',
-    why_decline: 'நீங்கள் இதை ஏன் நிராகரிக்க வேண்டும்:',
-    why_renegotiate: 'நீங்கள் ஏன் முதலில் பேச்சுவார்த்தை நடத்த வேண்டும்:',
-    doc_overview: 'ஒப்பந்த ஆவண சுருக்கம்',
-    monthly_pay: 'மாதாந்திர தவணை',
-    total_interest: 'மொத்த வட்டி',
-    tenure: 'கால அளவு',
-    key_terms: 'முக்கிய விதிமுறைகள் மற்றும் சுருக்கம்:',
-    financial_baseline: 'உங்கள் நிதி நிலை மற்றும் கடன் திறன்',
-    baseline_desc: 'உங்கள் சரிபார்க்கப்பட்ட வருமானம் மற்றும் சேமிப்பு அடிப்படையில் மதிப்பீடு செய்யப்பட்டது',
-    past_income: 'மாதாந்திர வருமானம்',
-    past_expense: 'மாதாந்திர செலவுகள்',
-    new_emi: 'புதிய மாதாந்திர தவணை',
-    cushion: 'மீதமுள்ள சேமிப்பு',
-    free_buffer: 'பாதுகாப்பான மாதாந்திர இருப்பு',
-    comparison_chart: 'மாதாந்திர பணப்புழக்க ஒப்பீடு',
-    original_text: 'அசல் ஒப்பந்த உரை:',
-    plain_meaning: 'எளிய தமிழ் விளக்கம்:',
-    cost_impact: 'செலவு தாக்கம்:',
-    action_tip: 'முக்கிய ஆலோசனை:',
-    why_risky: 'இது ஏன் ஆபத்தானது:',
-    tab_overview: 'சுருக்கம் & பரிந்துரை',
-    tab_clauses: 'விதிமுறைகள் விவரம்',
-    tab_baseline: 'நிதி அடிப்படை',
-    tab_schedule: 'தவணை அட்டவணை',
-    tab_assistant: 'ஒப்பந்த உதவியாளர்',
-    assistant_title: 'ஒப்பந்த உதவியாளர்',
-    assistant_desc: 'ஆவணப் பக்கக் குறிப்புகளுடன் ஏதேனும் கேள்வி கேளுங்கள்',
-    ask_placeholder: 'தமிழில் உங்கள் கேள்வியைத் தட்டச்சு செய்யவும் அல்லது பேசவும்...',
-    ask_btn: 'கேட்க',
-    upload_btn: 'ஒப்பந்தத்தை பதிவேற்றவும்',
-    dropzone_active: 'உங்கள் ஆவணத்தை இங்கே விடுங்கள்',
-    dropzone_idle: 'எந்தவொரு நிதி ஒப்பந்தத்தையும் பதிவேற்றவும் (PDF, DOCX, படம், அல்லது TXT)',
-    dropzone_sub: '8 இந்திய மொழிகளில் வணிக கடன்கள், வீட்டுக் கடன்கள் மற்றும் தனிநபர் கடன்களை ஆதரிக்கிறது',
-    fixed_emi: 'நிலையான மாதாந்திர தவணை',
-    total_cost: 'மொத்த நிதி செலவு',
-    total_interest_obl: 'மொத்த வட்டி பொறுப்பு',
-    prepay_exit: 'முன்கூட்டியே வெளியேறும் கட்டணம்',
-    due_monthly: 'மாதாந்திர தவணை',
-    principal_interest: 'அசல் + வட்டி',
-    over_months: 'மாதங்களில்',
-    exit_charge: 'முன்கூட்டியே அடைக்கும் கட்டணம்',
-    lender_points_title: 'வங்கி பேச்சுவார்த்தை குறிப்புகள்',
-    lender_points_desc: 'கையொப்பமிடுவதற்கு முன் பரிந்துரைக்கப்படும் மாற்றங்கள்',
-    neg_1_title: '1. வட்டி வெளிப்படைத்தன்மை:',
-    neg_1_desc: 'தன்னிச்சையான வட்டி உயர்வைத் தவிர்க்க வட்டி விகிதங்கள் வெளிப்புற அளவுகோலுடன் இணைக்கப்பட வேண்டும் என்று கோருங்கள்.',
-    neg_2_title: '2. சலுகை கால அறிவிப்பு:',
-    neg_2_desc: 'அபராதக் கட்டணங்கள் வசூலிக்கப்படுவதற்கு முன்பு கட்டாயமாக 15 நாள் எழுத்துப்பூர்வ அறிவிப்பு சாளரத்தைக் கோருங்கள்.',
-    neg_3_title: '3. முன்கூட்டியே செலுத்தும் பாதுகாப்பு:',
-    neg_3_desc: 'சாதாரண வணிக வருமானத்திலிருந்து செய்யப்படும் முன்கூட்டியே செலுத்துதல்களுக்கு 0% வெளியேறும் அபராதத்தை உறுதிப்படுத்தவும்.'
-  },
-  te: {
-    recommendation: 'తుది ఆర్థిక సిఫార్సు',
-    ACCEPT: 'అంగీకరించండి (సురక్షితం)',
-    DECLINE: 'తిరస్కరించండి (సంతకం చేయవద్దు)',
-    RENEGOTIATE: 'పునఃచర్చలు (ముందుగా నిబంధనలు మార్చండి)',
-    headline_accept: 'ఈ ఒప్పందాన్ని ముందుకు తీసుకెళ్లడం సురక్షితం',
-    headline_decline: 'ఈ ఒప్పందంపై సంతకం చేయవద్దు',
-    headline_renegotiate: 'సంతకం ఆపండి — ముందుగా ముఖ్యమైన నిబంధనలపై చర్చించండి',
-    summary_accept: 'ఈ ఒప్పందం అనుకూలమైన నిబంధనలు మరియు మీ ఆర్థిక పరిమితులకు సరిపోతుంది.',
-    summary_decline: 'ఈ అప్పులో భారీ ఆర్థిక ప్రమాదాలు లేదా దోపిడీ నిబంధనలు ఉన్నాయి.',
-    summary_renegotiate: 'ఈ ఒప్పందం ఆమోదయోగ్యమైనది, కానీ కొన్ని నిబంధనలను సవరించాలి.',
-    why_accept: 'మీరు దీన్ని ఎందుకు అంగీకరించాలి:',
-    why_decline: 'మీరు దీన్ని ఎందుకు తిరస్కరించాలి:',
-    why_renegotiate: 'మీరు ముందుగా ఎందుకు చర్చించాలి:',
-    doc_overview: 'ఒప్పంద పత్రం సారాంశం',
-    monthly_pay: 'నెలవారీ చెల్లింపు',
-    total_interest: 'మొత్తం వడ్డీ',
-    tenure: 'కాలపరిమితి',
-    key_terms: 'ముఖ్య నిబంధనలు & సారాంశం:',
-    financial_baseline: 'మీ ఆర్థిక పరిస్థితి మరియు రుణ స్థోమత',
-    baseline_desc: 'మీ నెలవారీ ఆదాయం మరియు వ్యయాల ఆధారంగా విశ్లేషించబడింది',
-    past_income: 'నెలవారీ ఆదాయం',
-    past_expense: 'నెలవారీ ఖర్చులు',
-    new_emi: 'కొత్త నెలవారీ వాయిదా',
-    cushion: 'మిగిలిన నిల్వ',
-    free_buffer: 'సురక్షిత మిగులు',
-    comparison_chart: 'నెలవారీ నగదు ప్రవాహ పోలిక',
-    original_text: 'అసలు ఒప్పంద పాఠం:',
-    plain_meaning: 'సరళమైన తెలుగు అర్థం:',
-    cost_impact: 'ఖర్చు ప్రభావం:',
-    action_tip: 'సలహా:',
-    why_risky: 'ఇది ఎందుకు ప్రమాదకరం:',
-    tab_overview: 'సారాంశం & నిర్ణయం',
-    tab_clauses: 'నిబంధనల వివరాలు',
-    tab_baseline: 'ఆర్థిక పరిస్థితి',
-    tab_schedule: 'చెల్లింపుల పట్టిక',
-    tab_assistant: 'ఒప్పంద సహాయకుడు',
-    assistant_title: 'ఇంటరాక్టివ్ సహాయకుడు',
-    assistant_desc: 'పత్రం ఆధారంగా ఏదైనా ప్రశ్న అడగండి',
-    ask_placeholder: 'తెలుగులో మీ ప్రశ్నను టైప్ చేయండి లేదా మాట్లాడండి...',
-    ask_btn: 'అడగండి',
-    upload_btn: 'ఒప్పందాన్ని అప్‌లోడ్ చేయండి',
-    dropzone_active: 'మీ పత్రాన్ని ఇక్కడ వేయండి',
-    dropzone_idle: 'ఏదైనా ఆర్థిక ఒప్పందాన్ని అప్‌లోడ్ చేయండి (PDF, DOCX, ఇమేజ్, లేదా TXT)',
-    dropzone_sub: '8 భారతీయ భాషలలో వ్యాపార మరియు వ్యక్తిగత రుణాల మద్దతు',
-    fixed_emi: 'స్థిర నెలవారీ వాయిదా',
-    total_cost: 'మొత్తం రుణ ఖర్చు',
-    total_interest_obl: 'మొత్తం వడ్డీ బాధ్యత',
-    prepay_exit: 'ముందస్తు చెల్లింపు రుసుము',
-    due_monthly: 'ప్రతినెల చెల్లించాల్సింది',
-    principal_interest: 'అసలు + వడ్డీ',
-    over_months: 'నెలలలో',
-    exit_charge: 'ముందస్తు క్లోజర్ ఛార్జ్',
-    lender_points_title: 'బ్యాంక్ చర్చాంశాలు',
-    lender_points_desc: 'సంతకం చేయడానికి ముందు మార్పులు',
-    neg_1_title: '1. వడ్డీ పారదర్శకత:',
-    neg_1_desc: 'ఏకపక్ష వడ్డీ పెంపును నివారించడానికి వడ్డీ రేట్లను బాహ్య ప్రమాణంతో అనుసంధానించాలని కోరండి.',
-    neg_2_title: '2. నోటీసు గడువు:',
-    neg_2_desc: 'పెనాల్టీలు విధించే ముందు 15 రోజుల ముందస్తు రాతపూర్వక నోటీసును అడగండి.',
-    neg_3_title: '3. ముందస్తు చెల్లింపు రక్షణ:',
-    neg_3_desc: 'సాధారణ వ్యాపార ఆదాయం నుండి చేసే ముందస్తు చెల్లింపులపై 0% పెనాల్టీని నిర్ధారించుకోండి.'
-  },
-  kn: {
-    recommendation: 'ಅಂತಿಮ ಆರ್ಥಿಕ ಶಿಫಾರಸು',
-    ACCEPT: 'ಸ್ವೀಕರಿಸಿ (ಸುರಕ್ಷಿತ)',
-    DECLINE: 'ತಿರಸ್ಕರಿಸಿ (ಸಹಿ ಮಾಡಬೇಡಿ)',
-    RENEGOTIATE: 'ಮರು ಮಾತುಕತೆ (ಮೊದಲು ಷರತ್ತುಗಳನ್ನು ಬದಲಾಯಿಸಿ)',
-    headline_accept: 'ಈ ಒಪ್ಪಂದದೊಂದಿಗೆ ಮುಂದುವರಿಯುವುದು ಸುರಕ್ಷಿತ',
-    headline_decline: 'ಈ ಒಪ್ಪಂದಕ್ಕೆ ಸಹಿ ಮಾಡಬೇಡಿ',
-    headline_renegotiate: 'ಸಹಿ ಮಾಡುವುದನ್ನು ನಿಲ್ಲಿಸಿ — ಮೊದಲು ಪ್ರಮುಖ ಷರತ್ತುಗಳನ್ನು ಚರ್ಚಿಸಿ',
-    summary_accept: 'ಈ ಒಪ್ಪಂದವು ಅನುಕೂಲಕರ ಮಾರುಕಟ್ಟೆ ಷರತ್ತುಗಳು ಮತ್ತು ನಿಮ್ಮ ಆರ್ಥಿಕ ಸಾಮರ್ಥ್ಯಕ್ಕೆ ಸರಿಹೊಂದುತ್ತದೆ.',
-    summary_decline: 'ಈ ಸಾಲದಲ್ಲಿ ಗಂಭೀರ ಆರ್ಥಿಕ ಅಪಾಯಗಳು ಅಥವಾ ಮೋಸದ ಷರತ್ತುಗಳಿವೆ.',
-    summary_renegotiate: 'ಈ ಒಪ್ಪಂದವು ಕಾರ್ಯಸಾಧ್ಯವಾಗಿದೆ, ಆದರೆ ಕೆಲವು ಷರತ್ತುಗಳನ್ನು ಸರಿಪಡಿಸಿಕೊಳ್ಳಬೇಕು.',
-    why_accept: 'ನೀವು ಇದನ್ನು ಏಕೆ ಸ್ವೀಕರಿಸಬೇಕು:',
-    why_decline: 'ನೀವು ಇದನ್ನು ಏಕೆ ತಿರಸ್ಕರಿಸಬೇಕು:',
-    why_renegotiate: 'ನೀವು ಮೊದಲು ಏಕೆ ಮಾತುಕತೆ ನಡೆಸಬೇಕು:',
-    doc_overview: 'ದಾಖಲೆ ಸಾರಾಂಶ',
-    monthly_pay: 'ಮಾಸಿಕ ಪಾವತಿ',
-    total_interest: 'ಒಟ್ಟು ಬಡ್ಡಿ',
-    tenure: 'ಅವಧಿ',
-    key_terms: 'ಪ್ರಮುಖ ಷರತ್ತುಗಳು & ಸಾರಾಂಶ:',
-    financial_baseline: 'ನಿಮ್ಮ ಆರ್ಥಿಕ ಸ್ಥಿತಿ ಮತ್ತು ಸಾಲದ ಸಾಮರ್ಥ್ಯ',
-    baseline_desc: 'ನಿಮ್ಮ ಆದಾಯ ಮತ್ತು ವೆಚ್ಚಗಳ ಆಧಾರದ ಮೇಲೆ ಮೌಲ್ಯಮಾಪನ ಮಾಡಲಾಗಿದೆ',
-    past_income: 'ಮಾಸಿಕ ಆದಾಯ',
-    past_expense: 'ಮಾಸಿಕ ವೆಚ್ಚಗಳು',
-    new_emi: 'ಹೊಸ ಮಾಸಿಕ ಕಂತು',
-    cushion: 'ಉಳಿದಿರುವ ಉಳಿತಾಯ',
-    free_buffer: 'ಸುರಕ್ಷಿತ ಮಾಸಿಕ ಮೊತ್ತ',
-    comparison_chart: 'ಮಾಸಿಕ ಹಣಕಾಸು ಹೋಲಿಕೆ',
-    original_text: 'ಮೂಲ ಒಪ್ಪಂದದ ಪಠ್ಯ:',
-    plain_meaning: 'ಸರಳ ಕನ್ನಡ ಅರ್ಥ:',
-    cost_impact: 'ವೆಚ್ಚದ ಪರಿಣಾಮ:',
-    action_tip: 'ಸಲಹೆ:',
-    why_risky: 'ಇದು ಏಕೆ ಅಪಾಯಕಾರಿ:',
-    tab_overview: 'ಸಾರಾಂಶ ಮತ್ತು ನಿರ್ಧಾರ',
-    tab_clauses: 'ಷರತ್ತುಗಳ ವಿವರ',
-    tab_baseline: 'ಆರ್ಥಿಕ ಸ್ಥಿತಿ',
-    tab_schedule: 'ಪಾವತಿ ವೇಳಾಪಟ್ಟಿ',
-    tab_assistant: 'ಒಪ್ಪಂದ ಸಹಾಯಕ',
-    assistant_title: 'ಒಪ್ಪಂದ ಸಹಾಯಕ',
-    assistant_desc: 'ದಾಖಲೆಯ ಕುರಿತು ಯಾವುದೇ ಪ್ರಶ್ನೆಯನ್ನು ಕೇಳಿ',
-    ask_placeholder: 'ಕನ್ನಡದಲ್ಲಿ ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ ಅಥವಾ ಮಾತನಾಡಿ...',
-    ask_btn: 'ಕೇಳಿ',
-    upload_btn: 'ಒಪ್ಪಂದ ಅಪ್ಲೋಡ್ ಮಾಡಿ',
-    dropzone_active: 'ದಾಖಲೆಯನ್ನು ಇಲ್ಲಿ ಬಿಡಿ',
-    dropzone_idle: 'ಯಾವುದೇ ಹಣಕಾಸು ಒಪ್ಪಂದವನ್ನು ಅಪ್ಲೋಡ್ ಮಾಡಿ (PDF, DOCX, ಇಮೇಜ್, ಅಥವಾ TXT)',
-    dropzone_sub: '8 ಭಾರತೀಯ ಭಾಷೆಗಳಲ್ಲಿ ಸಾಲ ಒಪ್ಪಂದಗಳ ವಿಶ್ಲೇಷಣೆ',
-    fixed_emi: 'ನಿಗದಿತ ಮಾಸಿಕ ಕಂತು',
-    total_cost: 'ಒಟ್ಟು ಸಾಲ ವೆಚ್ಚ',
-    total_interest_obl: 'ಒಟ್ಟು ಬಡ್ಡಿ ಹೊರೆ',
-    prepay_exit: 'ಮುಂಗಡ ಪಾವತಿ ಶುಲ್ಕ',
-    due_monthly: 'ತಿಂಗಳಿಗೆ ಪಾವತಿಸಬೇಕಾದ ಮೊತ್ತ',
-    principal_interest: 'ಅಸಲು + ಬಡ್ಡಿ',
-    over_months: 'ತಿಂಗಳುಗಳಲ್ಲಿ',
-    exit_charge: 'ಮುಕ್ತಾಯ ಶುಲ್ಕ',
-    lender_points_title: 'ಸಾಲದಾತರೊಂದಿಗೆ ಚರ್ಚಿಸಬೇಕಾದ ಅಂಶಗಳು',
-    lender_points_desc: 'ಸಹಿ ಮಾಡುವ ಮೊದಲು ಶಿಫಾರಸು ಮಾಡಲಾದ ಬದಲಾವಣೆಗಳು',
-    neg_1_title: '1. ಬಡ್ಡಿ ಪಾರದರ್ಶಕತೆ:',
-    neg_1_desc: 'ಬಡ್ಡಿ ಏರಿಕೆಯನ್ನು ತಪ್ಪಿಸಲು ದರಗಳನ್ನು ಬಾಹ್ಯ ಮಾನದಂಡಕ್ಕೆ ಜೋಡಿಸಲು ವಿನಂತಿಸಿ.',
-    neg_2_title: '2. ನೋಟಿಸ್ ಅವಧಿ:',
-    neg_2_desc: 'ದಂಡ ವಿಧಿಸುವ ಮೊದಲು 15 ದಿನಗಳ ಲಿಖಿತ ನೋಟಿಸ್ ಕೇಳಿ.',
-    neg_3_title: '3. ಮುಂಗಡ ಪಾವತಿ ರಕ್ಷಣೆ:',
-    neg_3_desc: 'ಸಾಮಾನ್ಯ ವ್ಯಾಪಾರ ಆದಾಯದಿಂದ ಮಾಡುವ ಮುಂಗಡ ಪಾವತಿಗೆ 0% ದಂಡವನ್ನು ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ.'
-  },
-  mr: {
-    recommendation: 'अंतिम आर्थिक शिफारस',
-    ACCEPT: 'स्वीकारा (सुरक्षित)',
-    DECLINE: 'नाकारा (स्वाक्षरी करू नका)',
-    RENEGOTIATE: 'पुनर्विचार करा (आधी अटी बदला)',
-    headline_accept: 'हा करार स्वीकारणे सुरक्षित आहे',
-    headline_decline: 'या करारावर स्वाक्षरी करू नका',
-    headline_renegotiate: 'स्वाक्षरी थांबवा — आधी महत्त्वाच्या अटींवर चर्चा करा',
-    summary_accept: 'हा करार अनुकूल अटी, कायदेशीर संरक्षण आणि तुमच्या आर्थिक क्षमतेनुसार आहे.',
-    summary_decline: 'या कर्जात मोठे आर्थिक धोके किंवा फसव्या अटी आहेत.',
-    summary_renegotiate: 'हा करार ठीक आहे, परंतु स्वाक्षरी करण्यापूर्वी काही अटी बदलणे आवश्यक आहे.',
-    why_accept: 'तुम्ही हे का स्वीकारावे:',
-    why_decline: 'तुम्ही हे का नाकारावे:',
-    why_renegotiate: 'तुम्ही आधी चर्चा का करावी:',
-    doc_overview: 'दस्तऐवज सारांश',
-    monthly_pay: 'मासिक हप्ता',
-    total_interest: 'एकूण व्याज',
-    tenure: 'मुदत',
-    key_terms: 'मुख्य अटी आणि सारांश:',
-    financial_baseline: 'तुमची आर्थिक स्थिती आणि कर्ज क्षमता',
-    baseline_desc: 'तुमचे मासिक उत्पन्न आणि खर्चाच्या आधारावर मूल्यांकन केले',
-    past_income: 'मासिक उत्पन्न',
-    past_expense: 'मासिक खर्च',
-    new_emi: 'नवीन मासिक हप्ता',
-    cushion: 'शिल्लक बचत',
-    free_buffer: 'सुरक्षित मासिक रक्कम',
-    comparison_chart: 'मासिक रोख प्रवाह तुलना',
-    original_text: 'मूळ करार मजकूर:',
-    plain_meaning: 'सोप्या मराठीत अर्थ:',
-    cost_impact: 'खर्चाचा परिणाम:',
-    action_tip: 'सल्ला:',
-    why_risky: 'हे धोकादायक का आहे:',
-    tab_overview: 'सारांश आणि निर्णय',
-    tab_clauses: 'कलम तपशील',
-    tab_baseline: 'आर्थिक स्थिती',
-    tab_schedule: 'परतफेड वेळापत्रक',
-    tab_assistant: 'करार सहाय्यक',
-    assistant_title: 'करार सहाय्यक',
-    assistant_desc: 'दस्तऐवजाच्या आधारे कोणताही प्रश्न विचारा',
-    ask_placeholder: 'मराठीत प्रश्न विचारा किंवा बोला...',
-    ask_btn: 'विचारा',
-    upload_btn: 'करार अपलोड करा',
-    dropzone_active: 'दस्तऐवज येथे टाका',
-    dropzone_idle: 'कोणताही आर्थिक करार अपलोड करा (PDF, DOCX, इमेज, किंवा TXT)',
-    dropzone_sub: '8 भारतीय भाषांमध्ये व्यावसायिक आणि गृहकर्ज विश्लेषण',
-    fixed_emi: 'निश्चित मासिक हप्ता',
-    total_cost: 'एकूण वित्तपुरवठा खर्च',
-    total_interest_obl: 'एकूण व्याज दायित्व',
-    prepay_exit: 'मुदतपूर्व परतफेड शुल्क',
-    due_monthly: 'दरमहा देय',
-    principal_interest: 'मुद्दल + व्याज',
-    over_months: 'महिन्यांत',
-    exit_charge: 'मुदतपूर्व शुल्क',
-    lender_points_title: 'बँक चर्चा मुद्दे',
-    lender_points_desc: 'स्वाक्षरी करण्यापूर्वी महत्त्वाच्या सुधारणा',
-    neg_1_title: '1. व्याजदर पारदर्शकता:',
-    neg_1_desc: 'अनियंत्रित व्याजदर वाढ टाळण्यासाठी बाह्य बेंचमार्कशी जोडण्याची मागणी करा.',
-    neg_2_title: '2. पूर्वसूचना कालावधी:',
-    neg_2_desc: 'कोणताही दंड आकारण्यापूर्वी १५ दिवसांची लेखी नोटीस मागून घ्या.',
-    neg_3_title: '3. मुदतपूर्व परतफेड संरक्षण:',
-    neg_3_desc: 'व्यवसाय उत्पन्नातून मुदतपूर्व परतफेड केल्यास ०% दंड असल्याची खात्री करा.'
-  },
-  bn: {
-    recommendation: 'চূড়ান্ত আর্থিক সুপারিশ',
-    ACCEPT: 'গ্রহণ করুন (নিরাপদ)',
-    DECLINE: 'প্রত্যাখ্যান করুন (স্বাক্ষর করবেন না)',
-    RENEGOTIATE: 'পুনরায় আলোচনা করুন (শর্ত পরিবর্তন করুন)',
-    headline_accept: 'এই চুক্তিটি গ্রহণ করা নিরাপদ',
-    headline_decline: 'এই চুক্তিতে স্বাক্ষর করবেন না',
-    headline_renegotiate: 'স্বাক্ষর স্থগিত রাখুন — প্রথমে মূল শর্তাবলী নিয়ে আলোচনা করুন',
-    summary_accept: 'এই চুক্তিটি অনুকূল শর্তাবলী এবং আপনার আর্থিক সামর্থ্যের মধ্যে রয়েছে।',
-    summary_decline: 'এই ঋণে মারাত্মক আর্থিক ঝুঁকি এবং ক্ষতিকারক শর্তাবলী রয়েছে।',
-    summary_renegotiate: 'চুক্তিটি গ্রহণযোগ্য, তবে স্বাক্ষর করার আগে কিছু শর্ত পরিবর্তন করা উচিত।',
-    why_accept: 'আপনার কেন এটি গ্রহণ করা উচিত:',
-    why_decline: 'আপনার কেন এটি প্রত্যাখ্যান করা উচিত:',
-    why_renegotiate: 'আপনার কেন প্রথমে আলোচনা করা উচিত:',
-    doc_overview: 'নথির সারসংক্ষেপ',
-    monthly_pay: 'মাসিক কিস্তি',
-    total_interest: 'মোট সুদ',
-    tenure: 'মেয়াদ',
-    key_terms: 'মূল শর্তাবলী ও সারসংক্ষেপ:',
-    financial_baseline: 'আপনার আর্থিক অবস্থা এবং ঋণ পরিশোধের ক্ষমতা',
-    baseline_desc: 'আপনার যাচাইকৃত মাসিক আয় এবং ব্যয়ের ভিত্তিতে মূল্যায়িত',
-    past_income: 'মাসিক আয়',
-    past_expense: 'মাসিক ব্যয়',
-    new_emi: 'নতুন মাসিক কিস্তি',
-    cushion: 'অবশিষ্ট সঞ্চয়',
-    free_buffer: 'নিরাপদ মাসিক উদ্বৃত্ত',
-    comparison_chart: 'মাসিক ক্যাশ ফ্লো তুলনা',
-    original_text: 'মূল চুক্তির পাঠ্য:',
-    plain_meaning: 'সহজ বাংলায় অর্থ:',
-    cost_impact: 'ব্যয় প্রভাব:',
-    action_tip: 'পরামর্শ:',
-    why_risky: 'এটি কেন ঝুঁকিপূর্ণ:',
-    tab_overview: 'সারসংক্ষেপ ও সিদ্ধান্ত',
-    tab_clauses: 'ধারা বিবরণী',
-    tab_baseline: 'আর্থিক ভিত্তি',
-    tab_schedule: 'পরিশোধের সময়সূচী',
-    tab_assistant: 'চুক্তি সহকারী',
-    assistant_title: 'ইন্টারেক্টিভ চুক্তি সহকারী',
-    assistant_desc: 'নথি সম্পর্কিত যেকোনো প্রশ্ন জিজ্ঞাসা করুন',
-    ask_placeholder: 'বাংলায় প্রশ্ন টাইপ করুন বা বলুন...',
-    ask_btn: 'জিজ্ঞাসা',
-    upload_btn: 'চুক্তি আপলোড করুন',
-    dropzone_active: 'আপনার নথি এখানে ড্রপ করুন',
-    dropzone_idle: 'যেকোনো আর্থিক চুক্তি আপলোড করুন (PDF, DOCX, ছবি, বা TXT)',
-    dropzone_sub: '৮টি ভারতীয় ভাষায় ব্যবসায়িক ও ব্যক্তিগত ঋণ বিশ্লেষণ',
-    fixed_emi: 'নির্দিষ্ট মাসিক কিস্তি',
-    total_cost: 'মোট অর্থায়ন ব্যয়',
-    total_interest_obl: 'মোট সুদ দায়',
-    prepay_exit: 'মেয়াদপূর্ব পরিশোধ ফি',
-    due_monthly: 'প্রতি মাসে প্রদেয়',
-    principal_interest: 'আসল + সুদ',
-    over_months: 'মাসে',
-    exit_charge: 'মেয়াদপূর্ব ক্লোজার চার্জ',
-    lender_points_title: 'ঋণদাতার সাথে আলোচনার বিষয়',
-    lender_points_desc: 'স্বাক্ষর করার আগে প্রস্তাবিত সমন্বয়',
-    neg_1_title: '১. সুদের স্বচ্ছতা:',
-    neg_1_desc: 'অযৌক্তিক বৃদ্ধি এড়াতে সুদের হার বাহ্যিক বেঞ্চমার্কের সাথে যুক্ত করার অনুরোধ করুন।',
-    neg_2_title: '২. নোটিশের সময়সীমা:',
-    neg_2_desc: 'জরিমানা আরোপের আগে ১৫ দিনের লিখিত নোটিশের অনুরোধ করুন।',
-    neg_3_title: '৩. মেয়াদপূর্ব পরিশোধ সুরক্ষা:',
-    neg_3_desc: 'সাধারণ ব্যবসায়িক আয় থেকে মেয়াদপূর্ব পরিশোধে ০% ফি নিশ্চিত করুন।'
-  },
-  gu: {
-    recommendation: 'અંતિમ નાણાકીય ભલામણ',
-    ACCEPT: 'સ્વીકારો (સુરક્ષિત)',
-    DECLINE: 'નકારો (સહી ન કરો)',
-    RENEGOTIATE: 'ફરીથી વાતચીત કરો (શરતો બદલો)',
-    headline_accept: 'આ કરાર સાથે આગળ વધવું સુરક્ષિત છે',
-    headline_decline: 'આ કરાર પર સહી ન કરો',
-    headline_renegotiate: 'સહી કરવાનું રોકો — પહેલાં મુખ્ય શરતો પર ચર્ચા કરો',
-    summary_accept: 'આ કરાર અનુકૂળ શરતો અને તમારી નાણાકીય ક્ષમતા મુજબ છે.',
-    summary_decline: 'આ લોનમાં ગંભીર નાણાકીય જોખમો અથવા શોષણકારી શરતો છે.',
-    summary_renegotiate: 'આ કરાર સ્વીકાર્ય છે, પરંતુ સહી કરતાં પહેલાં કેટલીક શરતો બદલવી જરૂરી છે.',
-    why_accept: 'તમારે આ કેમ સ્વીકારવું જોઈએ:',
-    why_decline: 'તમારે આ કેમ નકારવું જોઈએ:',
-    why_renegotiate: 'તમારે પહેલાં કેમ વાતચીત કરવી જોઈએ:',
-    doc_overview: 'દસ્તાવેજ સારાંશ',
-    monthly_pay: 'માસિક હપ્તો',
-    total_interest: 'કુલ વ્યાજ',
-    tenure: 'સમયગાળો',
-    key_terms: 'મુખ્ય શરતો અને સારાંશ:',
-    financial_baseline: 'તમારી નાણાકીય સ્થિતિ અને લોન ક્ષમતા',
-    baseline_desc: 'તમારી આવક અને ખર્ચના આધારે મૂલ્યાંકન કરવામાં આવ્યું છે',
-    past_income: 'માસિક આવક',
-    past_expense: 'માસિક ખર્ચ',
-    new_emi: 'નવો માસિક હપ્તો',
-    cushion: 'બાકી રહેતી બચત',
-    free_buffer: 'સુરક્ષિત માસિક રકમ',
-    comparison_chart: 'માસિક નાણાકીય પ્રવાહ સરખામણી',
-    original_text: 'મૂળ કરાર લખાણ:',
-    plain_meaning: 'સરળ ગુજરાતીમાં અર્થ:',
-    cost_impact: 'ખર્ચ અસર:',
-    action_tip: 'સલાહ:',
-    why_risky: 'આ કેમ જોખમી છે:',
-    tab_overview: 'સારાંશ અને નિર્ણય',
-    tab_clauses: 'કલમોની વિગત',
-    tab_baseline: 'નાણાકીય સ્થિતિ',
-    tab_schedule: 'ચુકવણી શેડ્યૂલ',
-    tab_assistant: 'કરાર સહાયક',
-    assistant_title: 'ઇન્ટરેક્ટિવ કરાર સહાયક',
-    assistant_desc: 'દસ્તાવેજ સંબંધિત કોઈપણ પ્રશ્ન પૂછો',
-    ask_placeholder: 'ગુજરાતીમાં પ્રશ્ન લખો અથવા બોલો...',
-    ask_btn: 'પૂછો',
-    upload_btn: 'કરાર અપલોડ કરો',
-    dropzone_active: 'દસ્તાવેજ અહીં મૂકો',
-    dropzone_idle: 'કોઈપણ નાણાકીય કરાર અપલોડ કરો (PDF, DOCX, ઇમેજ, અથવા TXT)',
-    dropzone_sub: '8 ભારતીય ભાષાઓમાં વ્યાપારી અને વ્યક્તિગત લોન વિશ્લેષણ',
-    fixed_emi: 'નિશ્ચિત માસિક હપ્તો',
-    total_cost: 'કુલ ધિરાણ ખર્ચ',
-    total_interest_obl: 'કુલ વ્યાજ જવાબદારી',
-    prepay_exit: 'મુદત પૂર્વે ચુકવણી શુલ્ક',
-    due_monthly: 'દર મહિને ચૂકવવાપાત્ર',
-    principal_interest: 'મુદ્દલ + વ્યાજ',
-    over_months: 'મહિનાઓમાં',
-    exit_charge: 'મુદત પૂર્વે ચાર્જ',
-    lender_points_title: 'બેંક ચર્ચાના મુદ્દા',
-    lender_points_desc: 'સહી કરતા પહેલા ભલામણ કરેલ ફેરફારો',
-    neg_1_title: '1. વ્યાજ પારદર્શિતા:',
-    neg_1_desc: 'વ્યાજ દર વધારો રોકવા માટે બાહ્ય બેન્ચમાર્ક સાથે લિંક કરવાની વિનંતી કરો.',
-    neg_2_title: '2. નોટિસ વિન્ડો:',
-    neg_2_desc: 'દંડ લાદતા પહેલા 15 દિવસની લેખિત નોટિસ વિન્ડોની માંગ કરો.',
-    neg_3_title: '3. મુદત પૂર્વે ચુકવણી સુરક્ષા:',
-    neg_3_desc: 'વ્યાપાર આવકમાંથી મુદત પૂર્વે ચુકવણી પર 0% દંડની ખાતરી કરો.'
+// --- SEMANTIC RISK BADGE ---
+// Vermilion -> critical, Amber -> caution, Teal -> positive/low concern, Cobalt -> neutral
+const RiskBadge: React.FC<{ level: string; isRedFlag?: boolean }> = ({ level, isRedFlag }) => {
+  const normalized = (level || 'Low').toLowerCase();
+  
+  if (isRedFlag || normalized === 'high' || normalized === 'critical') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-vermilion-50 text-vermilion-700 border border-vermilion-200">
+        <AlertTriangle size={12} className="text-vermilion-600" />
+        Critical Risk
+      </span>
+    );
   }
-};
-
-const RiskBadge = ({ level }: { level: string }) => {
-  const cls = level === 'High' ? 'bg-red-50 text-red-700 border-red-200' : level === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  const Icon = level === 'High' ? AlertTriangle : level === 'Medium' ? Zap : CheckCircle;
+  if (normalized === 'medium' || normalized === 'moderate' || normalized === 'caution') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+        <AlertOctagon size={12} className="text-amber-600" />
+        Caution
+      </span>
+    );
+  }
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full border shadow-2xs ${cls}`}>
-      <Icon size={13} /> {level} Risk
+    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+      <CheckCircle size={12} className="text-teal-600" />
+      Low Concern
     </span>
   );
 };
 
-// Sleek Custom Multilingual Dropdown UI Component
-const CustomLanguageDropdown = ({
-  selectedLanguage,
-  onSelectLanguage,
-  translating
-}: {
+// --- MULTILINGUAL DROPDOWN ---
+const CustomLanguageDropdown: React.FC<{
   selectedLanguage: string;
   onSelectLanguage: (code: string) => void;
   translating: boolean;
-}) => {
+}> = ({ selectedLanguage, onSelectLanguage, translating }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -515,45 +85,38 @@ const CustomLanguageDropdown = ({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Trigger Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={translating}
-        className={`group px-3.5 py-2 rounded-2xl border transition-all duration-200 flex items-center gap-2.5 shadow-xs cursor-pointer ${
+        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
           isOpen
-            ? 'bg-brand-50/90 border-brand-400 ring-2 ring-brand-400/20 text-brand-900'
-            : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-800 hover:border-slate-300'
+            ? 'bg-cobalt-50 border-cobalt-300 ring-2 ring-cobalt-400/20 text-cobalt-900'
+            : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
         }`}
       >
-        <div className="w-6 h-6 rounded-lg bg-brand-500/10 text-brand-600 flex items-center justify-center flex-shrink-0 group-hover:bg-brand-500/20 transition-colors">
-          <Globe size={14} />
+        <div className="w-5 h-5 rounded-md bg-cobalt-100 text-cobalt-700 flex items-center justify-center flex-shrink-0">
+          <Globe size={13} />
         </div>
-
-        <div className="flex items-center gap-1.5 text-left">
-          <span className="font-black text-xs text-slate-900">{currentLang.native}</span>
-          <span className="text-[10px] font-semibold text-slate-600 hidden sm:inline">({currentLang.name})</span>
+        <div className="flex items-center gap-1">
+          <span className="font-bold text-slate-900">{currentLang.native}</span>
+          <span className="text-[10px] text-slate-500 hidden sm:inline">({currentLang.name})</span>
         </div>
-
         {translating ? (
-          <Loader2 size={13} className="animate-spin text-brand-600 ml-0.5" />
+          <Loader2 size={12} className="animate-spin text-cobalt-600 ml-0.5" />
         ) : (
-          <ChevronDown
-            size={14}
-            className={`text-slate-400 transition-transform duration-200 ml-0.5 ${isOpen ? 'rotate-180 text-brand-600' : 'group-hover:text-slate-600'}`}
-          />
+          <ChevronDown size={13} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         )}
       </button>
 
-      {/* Floating Animated Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/80 p-2 z-50 animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-3 py-2 border-b border-slate-100 mb-1 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">Select Output Language</span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-brand-50 text-brand-700">8 Languages</span>
+        <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-dropdown border border-slate-200 p-1.5 z-50 animate-in fade-in duration-100">
+          <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Output Language</span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cobalt-50 text-cobalt-700">8 Indian Languages</span>
           </div>
 
-          <div className="space-y-1 max-h-72 overflow-y-auto">
+          <div className="space-y-0.5 max-h-60 overflow-y-auto">
             {SUPPORTED_LANGUAGES.map((lang) => {
               const isSelected = lang.code === selectedLanguage;
               return (
@@ -564,33 +127,26 @@ const CustomLanguageDropdown = ({
                     onSelectLanguage(lang.code);
                     setIsOpen(false);
                   }}
-                  className={`w-full px-3 py-2 rounded-xl text-left flex items-center justify-between transition-all duration-150 cursor-pointer ${
+                  className={`w-full px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between transition-colors cursor-pointer text-xs ${
                     isSelected
-                      ? 'bg-brand-600 text-white font-bold shadow-xs'
-                      : 'hover:bg-slate-100 text-slate-700 hover:text-slate-900'
+                      ? 'bg-cobalt-600 text-white font-bold'
+                      : 'hover:bg-slate-100 text-slate-700'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                    }`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
                       {lang.flag}
                     </span>
                     <div>
-                      <p className={`text-xs font-black leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                      <p className={`leading-none ${isSelected ? 'text-white' : 'text-slate-900 font-semibold'}`}>
                         {lang.native}
                       </p>
-                      <p className={`text-[10px] ${isSelected ? 'text-brand-100' : 'text-slate-600 font-medium'}`}>
+                      <p className={`text-[10px] mt-0.5 ${isSelected ? 'text-cobalt-100' : 'text-slate-500'}`}>
                         {lang.name}
                       </p>
                     </div>
                   </div>
-
-                  {isSelected && (
-                    <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white">
-                      <Check size={12} strokeWidth={3} />
-                    </div>
-                  )}
+                  {isSelected && <Check size={12} strokeWidth={3} className="text-white" />}
                 </button>
               );
             })}
@@ -601,94 +157,101 @@ const CustomLanguageDropdown = ({
   );
 };
 
-// Single Clear Decision Verdict & Focused Reasons Card
-const DecisionVerdictCard = ({ contract, language }: { contract: any; language: string }) => {
+// --- DECISION VERDICT CARD (Vermilion / Amber / Teal) ---
+const DecisionVerdictCard: React.FC<{ contract: ContractAnalysisData; language: string }> = ({ contract, language }) => {
   const decision = contract.decision || {};
-  const decisionType = (decision.decision_type || 'CAUTION').toUpperCase();
+  const decisionType = (decision.decision_type || 'RENEGOTIATE').toUpperCase();
   const isDecline = decisionType === 'DECLINE';
   const isAccept = decisionType === 'ACCEPT';
 
-  const badgeClass = isDecline 
-    ? 'bg-red-600 text-white' 
-    : isAccept 
-      ? 'bg-emerald-600 text-white' 
+  const badgeClass = isDecline
+    ? 'bg-vermilion-600 text-white'
+    : isAccept
+      ? 'bg-teal-600 text-white'
       : 'bg-amber-500 text-white';
 
-  const cardBg = isDecline 
-    ? 'bg-red-50/40 border-red-200' 
-    : isAccept 
-      ? 'bg-emerald-50/40 border-emerald-200' 
-      : 'bg-amber-50/40 border-amber-200';
+  const cardBorder = isDecline
+    ? 'border-vermilion-200 bg-vermilion-50/20'
+    : isAccept
+      ? 'border-teal-200 bg-teal-50/20'
+      : 'border-amber-200 bg-amber-50/20';
 
   const Icon = isDecline ? ThumbsDown : isAccept ? ThumbsUp : AlertTriangle;
-  const reasons: string[] = decision.reasons || [
-    'Evaluated against your verified income and contract terms.'
-  ];
+  const reasons = decision.reasons && decision.reasons.length > 0
+    ? decision.reasons
+    : ['Evaluated against verified cash flow baseline and standard borrower protection standards.'];
 
   const ui = LOCALIZED_UI[language] || {};
-  const whyTitle = isDecline 
-    ? (ui.why_decline || 'Why You Should Decline / Walk Away:') 
-    : isAccept 
-      ? (ui.why_accept || 'Why You Should Accept / Proceed:') 
-      : (ui.why_renegotiate || 'Why You Should Renegotiate:');
+  const whyTitle = isDecline
+    ? (ui.why_decline || 'Why You Should Decline / Walk Away:')
+    : isAccept
+      ? (ui.why_accept || 'Why You Should Accept / Proceed:')
+      : (ui.why_renegotiate || 'Why You Should Renegotiate Terms First:');
 
-  const verdictLabel = isDecline 
-    ? (ui.DECLINE || decision.decision || 'DECLINE') 
-    : isAccept 
-      ? (ui.ACCEPT || decision.decision || 'ACCEPT') 
-      : (ui.RENEGOTIATE || decision.decision || 'RENEGOTIATE');
+  const verdictLabel = isDecline
+    ? (ui.DECLINE || 'DECLINE')
+    : isAccept
+      ? (ui.ACCEPT || 'ACCEPT')
+      : (ui.RENEGOTIATE || 'RENEGOTIATE');
 
   const actionHeadline = decision.action_headline || (
-    isDecline ? (ui.headline_decline || 'Do Not Sign This Agreement') : isAccept ? (ui.headline_accept || 'Safe to Proceed with Agreement') : (ui.headline_renegotiate || 'Hold Signing — Negotiate Key Terms')
+    isDecline
+      ? (ui.headline_decline || 'Do Not Sign This Agreement')
+      : isAccept
+        ? (ui.headline_accept || 'Safe to Proceed with Agreement')
+        : (ui.headline_renegotiate || 'Hold Signing — Renegotiate Key Clauses')
   );
 
   const actionSummary = decision.action_summary || (
-    isDecline ? (ui.summary_decline || 'High risk detected') : isAccept ? (ui.summary_accept || 'Favorable conditions') : (ui.summary_renegotiate || 'Negotiate terms first')
+    isDecline
+      ? (ui.summary_decline || 'Predatory terms and high interest burden detected')
+      : isAccept
+        ? (ui.summary_accept || 'Fair commercial terms aligned with your cash flow capacity')
+        : (ui.summary_renegotiate || 'Acceptable structure but key clauses require borrower protection')
   );
 
   return (
-    <div className={`p-6 rounded-3xl border-2 shadow-sm space-y-5 ${cardBg}`}>
-      {/* Header Verdict */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/60">
+    <div className={`p-6 rounded-2xl border ${cardBorder} shadow-card space-y-5 transition-all`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
         <div className="flex items-center gap-3.5">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm ${badgeClass}`}>
-            <Icon size={24} />
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-xs flex-shrink-0 ${badgeClass}`}>
+            <Icon size={22} />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-600">
-                {ui.recommendation || 'Final Financial Recommendation'}
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {ui.recommendation || 'Official Bizpulse Decision Verdict'}
               </span>
-              <span className={`px-3 py-0.5 text-xs font-black uppercase rounded-full shadow-2xs ${badgeClass}`}>
+              <span className={`px-2.5 py-0.5 text-[10px] font-black uppercase rounded-full shadow-2xs ${badgeClass}`}>
                 {verdictLabel}
               </span>
             </div>
-            <h3 className="font-black text-xl text-slate-900">
+            <h3 className="font-extrabold text-lg text-slate-900 tracking-tight">
               {actionHeadline}
             </h3>
-            <p className="text-xs text-slate-600 font-medium mt-0.5">
+            <p className="text-xs text-slate-600 mt-0.5">
               {actionSummary}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Concrete Reasons for THIS Decision */}
-      <div className="space-y-3">
-        <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-          <Lightbulb size={15} className={isDecline ? 'text-red-600' : isAccept ? 'text-emerald-600' : 'text-amber-600'} />
+      {/* Concrete reasons */}
+      <div className="space-y-2.5">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+          <Lightbulb size={14} className={isDecline ? 'text-vermilion-600' : isAccept ? 'text-teal-600' : 'text-amber-600'} />
           {whyTitle}
         </h4>
 
-        <div className="space-y-2.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
           {reasons.map((reason, idx) => (
-            <div key={idx} className="flex items-start gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs">
-              <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                isDecline ? 'bg-red-100 text-red-700' : isAccept ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+            <div key={idx} className="flex items-start gap-2.5 bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                isDecline ? 'bg-vermilion-100 text-vermilion-700' : isAccept ? 'bg-teal-100 text-teal-700' : 'bg-amber-100 text-amber-800'
               }`}>
-                {isDecline ? <AlertTriangle size={14} /> : isAccept ? <Check size={14} /> : <AlertOctagon size={14} />}
+                {isDecline ? <AlertTriangle size={12} /> : isAccept ? <Check size={12} /> : <AlertOctagon size={12} />}
               </div>
-              <p className="text-xs font-semibold text-slate-800 leading-relaxed">{reason}</p>
+              <p className="text-xs font-medium text-slate-800 leading-relaxed">{reason}</p>
             </div>
           ))}
         </div>
@@ -697,13 +260,19 @@ const DecisionVerdictCard = ({ contract, language }: { contract: any; language: 
   );
 };
 
-// User Past Financial Condition & Ledger Comparison
-const UserFinancialConditionCard = ({ ledgerImpact, sim, persona, language }: { ledgerImpact?: any; sim?: any; persona?: string; language: string }) => {
+// --- CASH FLOW AFFORDABILITY CARD ---
+const DebtAffordabilityCard: React.FC<{
+  contract: ContractAnalysisData;
+  persona: string;
+  language: string;
+}> = ({ contract, persona, language }) => {
   const isEmployee = persona === 'employee';
+  const ledger = contract.ledger_impact;
+  const sim = contract.simulation_results;
 
-  const income = Number(ledgerImpact?.avg_monthly_income || (isEmployee ? 55000 : 65000));
-  const expense = Number(ledgerImpact?.avg_monthly_expense || (isEmployee ? 22000 : 20000));
-  const emi = Number(ledgerImpact?.monthly_emi || sim?.monthly_emi || 16727);
+  const income = Number(ledger?.avg_monthly_income || (isEmployee ? 55000 : 65000));
+  const expense = Number(ledger?.avg_monthly_expense || (isEmployee ? 22000 : 20000));
+  const emi = Number(ledger?.monthly_emi || sim?.monthly_emi || 16727);
   const netProfitBefore = income - expense;
   const residualCash = netProfitBefore - emi;
 
@@ -714,80 +283,74 @@ const UserFinancialConditionCard = ({ ledgerImpact, sim, persona, language }: { 
   const ui = LOCALIZED_UI[language] || {};
 
   const barData = [
-    { name: ui.past_income || (isEmployee ? 'Monthly Salary' : 'Monthly Cash In'), amount: income, fill: '#059669' },
-    { name: ui.past_expense || (isEmployee ? 'Living Expenses' : 'Operating Expenses'), amount: expense, fill: '#64748b' },
-    { name: ui.new_emi || 'Proposed EMI', amount: emi, fill: '#e11d48' },
-    { name: ui.cushion || 'Free Savings Buffer', amount: Math.max(0, residualCash), fill: isHeavy ? '#dc2626' : '#2563eb' }
+    { name: ui.past_income || (isEmployee ? 'Monthly Salary' : 'Monthly Cash In'), amount: income, fill: '#00A88F' }, // Teal
+    { name: ui.past_expense || (isEmployee ? 'Living Expenses' : 'Operating Expenses'), amount: expense, fill: '#64748B' }, // Slate
+    { name: ui.new_emi || 'Proposed EMI', amount: emi, fill: '#F04438' }, // Vermilion
+    { name: ui.cushion || 'Free Savings Buffer', amount: Math.max(0, residualCash), fill: isHeavy ? '#F04438' : '#2457FF' } // Vermilion or Cobalt
   ];
 
   return (
-    <div className="card p-6 border border-slate-200 rounded-3xl bg-white shadow-sm space-y-5">
+    <div className="bg-white p-6 border border-slate-200 rounded-2xl shadow-card space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-brand-50 flex items-center justify-center text-brand-600">
+          <div className="w-10 h-10 rounded-xl bg-cobalt-50 text-cobalt-600 flex items-center justify-center">
             <Wallet size={20} />
           </div>
           <div>
-            <h3 className="font-black text-lg text-slate-900">{ui.financial_baseline || 'Your Financial Baseline & Debt Affordability'}</h3>
-            <p className="text-xs text-slate-600 font-medium">{ui.baseline_desc || 'Evaluated against your verified monthly income, recurring expenses, and cash reserves'}</p>
+            <h3 className="font-extrabold text-base text-slate-900">{ui.financial_baseline || 'Financial Baseline & Debt Affordability'}</h3>
+            <p className="text-xs text-slate-500 font-medium">{ui.baseline_desc || 'Evaluated against verified monthly income, recurring expenses, and cash reserves'}</p>
           </div>
         </div>
         <span className={`px-3 py-1 text-xs font-bold rounded-full ${
-          isHeavy ? 'bg-red-50 text-red-700 border border-red-200' : isModerate ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          isHeavy ? 'bg-vermilion-50 text-vermilion-700 border border-vermilion-200' : isModerate ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-teal-50 text-teal-700 border border-teal-200'
         }`}>
-          {isHeavy ? 'High Cash Flow Strain' : isModerate ? 'Moderate Budget Strain' : 'Easily Affordable'}
+          {isHeavy ? 'Critical Cash Flow Deficit' : isModerate ? 'Moderate Budget Strain' : 'Easily Affordable (Safe Buffer)'}
         </span>
       </div>
 
-      {/* 4-Stat Overview */}
+      {/* 4-Stat Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-3.5 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
-          <p className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
-            {ui.past_income || 'Past Monthly Salary'}
-          </p>
-          <p className="text-lg font-black text-emerald-950 mt-0.5">₹{income.toLocaleString('en-IN')}</p>
-          <span className="text-[10px] text-emerald-700 font-medium">{isEmployee ? 'Net Take-Home Pay' : 'Average Revenue'}</span>
+        <div className="p-3.5 bg-teal-50/50 border border-teal-100 rounded-xl">
+          <p className="text-[10px] font-bold text-teal-800 uppercase tracking-wider">{ui.past_income || 'Monthly Inflow'}</p>
+          <p className="text-lg font-black text-teal-950 font-mono tabular-nums mt-0.5">₹{income.toLocaleString('en-IN')}</p>
+          <span className="text-[10px] text-teal-700">{isEmployee ? 'Net Take-Home Pay' : 'Average Revenue'}</span>
         </div>
 
-        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
-          <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-            {ui.past_expense || 'Past Monthly Expenses'}
-          </p>
-          <p className="text-lg font-black text-slate-900 mt-0.5">₹{expense.toLocaleString('en-IN')}</p>
-          <span className="text-[10px] text-slate-600 font-medium">{isEmployee ? 'Living Costs & Bills' : 'Operating Costs'}</span>
+        <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{ui.past_expense || 'Monthly Expenses'}</p>
+          <p className="text-lg font-black text-slate-900 font-mono tabular-nums mt-0.5">₹{expense.toLocaleString('en-IN')}</p>
+          <span className="text-[10px] text-slate-500">{isEmployee ? 'Living Costs & Bills' : 'Operating Outflow'}</span>
         </div>
 
-        <div className="p-3.5 bg-red-50/50 border border-red-100 rounded-2xl">
-          <p className="text-[11px] font-bold text-red-800 uppercase tracking-wider">{ui.new_emi || 'New Monthly Payment'}</p>
-          <p className="text-lg font-black text-red-950 mt-0.5">₹{emi.toLocaleString('en-IN')}</p>
-          <span className="text-[10px] text-red-700 font-medium">{emiToProfitPct}% of monthly surplus</span>
+        <div className="p-3.5 bg-vermilion-50/50 border border-vermilion-100 rounded-xl">
+          <p className="text-[10px] font-bold text-vermilion-800 uppercase tracking-wider">{ui.new_emi || 'New Loan EMI'}</p>
+          <p className="text-lg font-black text-vermilion-950 font-mono tabular-nums mt-0.5">₹{emi.toLocaleString('en-IN')}</p>
+          <span className="text-[10px] text-vermilion-700 font-semibold">{emiToProfitPct}% of monthly surplus</span>
         </div>
 
-        <div className={`p-3.5 rounded-2xl border ${isHeavy ? 'bg-red-50 border-red-200' : 'bg-blue-50/60 border-blue-100'}`}>
-          <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-            {ui.cushion || 'Remaining Savings'}
-          </p>
-          <p className={`text-lg font-black mt-0.5 ${isHeavy ? 'text-red-700' : 'text-blue-950'}`}>
+        <div className={`p-3.5 rounded-xl border ${isHeavy ? 'bg-vermilion-50/80 border-vermilion-200' : 'bg-cobalt-50/60 border-cobalt-100'}`}>
+          <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{ui.cushion || 'Residual Savings Buffer'}</p>
+          <p className={`text-lg font-black font-mono tabular-nums mt-0.5 ${isHeavy ? 'text-vermilion-700' : 'text-cobalt-950'}`}>
             ₹{residualCash.toLocaleString('en-IN')}
           </p>
-          <span className="text-[10px] text-slate-600 font-medium">{ui.free_buffer || 'Free Monthly Buffer'}</span>
+          <span className="text-[10px] text-slate-500">{ui.free_buffer || 'Free Monthly Buffer'}</span>
         </div>
       </div>
 
       {/* Chart */}
       <div className="pt-2">
-        <p className="text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-2">{ui.comparison_chart || 'Monthly Cash Flow Comparison'}</p>
+        <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2">{ui.comparison_chart || 'Monthly Cash Flow Stress Test'}</p>
         <div className="h-44 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={11} />
-              <YAxis stroke="#64748b" fontSize={11} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-              <Tooltip
-                formatter={(val: any) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Amount']}
-                contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 600 }}
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="name" stroke="#64748b" fontSize={11} tickLine={false} />
+              <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
+              <RechartsTooltip
+                formatter={(val) => [`₹${Number(val).toLocaleString('en-IN')}`, 'Amount']}
+                contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 600 }}
               />
-              <Bar dataKey="amount" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="amount" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -796,34 +359,38 @@ const UserFinancialConditionCard = ({ ledgerImpact, sim, persona, language }: { 
   );
 };
 
-// Side-by-Side Clause Visualizer Component
-const SideBySideClauseRow = ({ clause, language }: { clause: any; language: string }) => {
-  const [expanded, setExpanded] = useState(true);
-  const isHighRisk = clause.risk_level === 'High';
+// --- CLAUSE ROW COMPONENT ---
+const ClauseInspectionRow: React.FC<{
+  clause: ContractClause;
+  language: string;
+  isInitiallyExpanded?: boolean;
+}> = ({ clause, language, isInitiallyExpanded = false }) => {
+  const [expanded, setExpanded] = useState(isInitiallyExpanded);
+  const isHighRisk = clause.risk_level === 'High' || clause.is_red_flag;
   const isRedFlag = clause.is_red_flag;
   const ui = LOCALIZED_UI[language] || {};
 
   return (
-    <div className={`border rounded-2xl overflow-hidden shadow-2xs transition-all ${
-      isRedFlag || isHighRisk ? 'border-red-200 bg-red-50/10' : 'border-slate-200 bg-white'
+    <div className={`border rounded-xl overflow-hidden transition-all duration-150 ${
+      isRedFlag ? 'border-vermilion-200 bg-vermilion-50/15' : isHighRisk ? 'border-amber-200 bg-white' : 'border-slate-200 bg-white'
     }`}>
       {/* Header Bar */}
-      <div 
+      <div
         onClick={() => setExpanded(!expanded)}
-        className="p-4 flex items-center justify-between cursor-pointer bg-slate-50/80 hover:bg-slate-100/80 transition-colors border-b border-slate-100"
+        className="p-3.5 flex items-center justify-between cursor-pointer bg-slate-50/70 hover:bg-slate-100/70 transition-colors border-b border-slate-100"
       >
         <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-            isRedFlag || isHighRisk ? 'bg-red-100 text-red-700' : 'bg-brand-50 text-brand-700'
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
+            isRedFlag ? 'bg-vermilion-100 text-vermilion-700' : 'bg-cobalt-50 text-cobalt-700'
           }`}>
-            {isRedFlag ? <AlertOctagon size={16} /> : <FileText size={16} />}
+            {isRedFlag ? <AlertOctagon size={15} /> : <FileText size={15} />}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="font-black text-slate-900 text-sm">{clause.clause_type}</h4>
+              <h4 className="font-bold text-slate-900 text-sm">{clause.clause_type}</h4>
               {isRedFlag && (
-                <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-md bg-red-600 text-white shadow-2xs">
-                  Red Flag Trap
+                <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-vermilion-600 text-white">
+                  Predatory Trap
                 </span>
               )}
             </div>
@@ -833,69 +400,69 @@ const SideBySideClauseRow = ({ clause, language }: { clause: any; language: stri
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <RiskBadge level={clause.risk_level || 'Low'} />
-          <button type="button" className="text-slate-400 hover:text-slate-600">
-            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        <div className="flex items-center gap-2.5">
+          <RiskBadge level={clause.risk_level} isRedFlag={clause.is_red_flag} />
+          <button type="button" className="text-slate-400 hover:text-slate-600 p-1">
+            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
         </div>
       </div>
 
       {/* Expanded Split-View */}
       {expanded && (
-        <div className="p-5 space-y-4">
+        <div className="p-4 space-y-3.5">
           {/* Red Flag Warning Box */}
           {isRedFlag && clause.red_flag_reason && (
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5">
-              <AlertTriangle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
+            <div className="p-3 bg-vermilion-50 border border-vermilion-200 rounded-lg flex items-start gap-2.5">
+              <AlertTriangle size={15} className="text-vermilion-600 mt-0.5 flex-shrink-0" />
               <div>
-                <span className="text-xs font-black uppercase text-red-900 block tracking-tight">{ui.why_risky || 'Why this clause is risky for you:'}</span>
-                <p className="text-xs font-semibold text-red-800 leading-relaxed mt-0.5">{clause.red_flag_reason}</p>
+                <span className="text-[11px] font-black uppercase text-vermilion-900 block">{ui.why_risky || 'Why this clause is risky for you:'}</span>
+                <p className="text-xs font-medium text-vermilion-800 leading-relaxed mt-0.5">{clause.red_flag_reason}</p>
               </div>
             </div>
           )}
 
-          {/* 2-Column Split: Original Contract Text vs Plain-English Translation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 2-Column Split: Original vs Plain Meaning */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {/* Left: Original Contract Text */}
-            <div className="bg-slate-100/80 border border-slate-200 rounded-xl p-4 flex flex-col justify-between">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 flex flex-col justify-between">
               <div>
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 block mb-1.5 flex items-center gap-1.5">
-                  <FileText size={13} className="text-slate-500" /> {ui.original_text || 'Original Contract Text (Verbatim):'}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
+                  <FileText size={12} className="text-slate-400" /> {ui.original_text || 'Original Contract Text (Verbatim):'}
                 </span>
-                <p className="text-xs text-slate-800 font-mono leading-relaxed bg-white/90 p-3 rounded-lg border border-slate-200/80">
+                <p className="text-xs text-slate-800 font-mono leading-relaxed bg-white p-2.5 rounded border border-slate-200">
                   {clause.original_text || 'Original text excerpted from agreement document.'}
                 </p>
               </div>
-              <div className="mt-3 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500 font-semibold">
-                <span>Location</span>
+              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                <span>Verified Source Location</span>
                 <span>Page {clause.source_page || 1}</span>
               </div>
             </div>
 
-            {/* Right: Plain Translation */}
-            <div className="bg-brand-50/50 border border-brand-200/80 rounded-xl p-4 flex flex-col justify-between">
+            {/* Right: Plain Meaning */}
+            <div className="bg-cobalt-50/40 border border-cobalt-200/80 rounded-lg p-3.5 flex flex-col justify-between">
               <div>
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-brand-900 block mb-1.5 flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-brand-600" /> {ui.plain_meaning || 'Plain Meaning:'}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cobalt-800 block mb-1.5 flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-cobalt-600" /> {ui.plain_meaning || 'Plain Meaning:'}
                 </span>
-                <p className="text-xs font-semibold text-slate-900 leading-relaxed bg-white/90 p-3 rounded-lg border border-brand-100">
-                  {clause.simple_explanation || clause.plain_explanation}
+                <p className="text-xs font-medium text-slate-900 leading-relaxed bg-white p-2.5 rounded border border-cobalt-100">
+                  {clause.simple_explanation || clause.plain_explanation || 'Clear plain language breakdown.'}
                 </p>
               </div>
 
-              {/* Tips & Financial Impact */}
-              <div className="mt-3 pt-2 border-t border-brand-100 space-y-2">
+              {/* Practical Impact and Advice */}
+              <div className="mt-2.5 pt-2 border-t border-cobalt-100 space-y-1.5">
                 {clause.financial_impact && (
                   <div className="flex items-start gap-1.5 text-xs">
-                    <DollarSign size={14} className="text-brand-600 mt-0.5 flex-shrink-0" />
-                    <span className="font-bold text-slate-800">{ui.cost_impact || 'Cost Impact:'} <span className="font-normal text-slate-700">{clause.financial_impact}</span></span>
+                    <DollarSign size={13} className="text-cobalt-600 mt-0.5 flex-shrink-0" />
+                    <span className="font-semibold text-slate-800">{ui.cost_impact || 'Cost Impact:'} <span className="font-normal text-slate-600">{clause.financial_impact}</span></span>
                   </div>
                 )}
                 {clause.actionable_tip && (
                   <div className="flex items-start gap-1.5 text-xs">
-                    <Lightbulb size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                    <span className="font-bold text-slate-800">{ui.action_tip || 'Action Tip:'} <span className="font-normal text-slate-700">{clause.actionable_tip}</span></span>
+                    <Lightbulb size={13} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                    <span className="font-semibold text-slate-800">{ui.action_tip || 'Action Tip:'} <span className="font-normal text-slate-600">{clause.actionable_tip}</span></span>
                   </div>
                 )}
               </div>
@@ -907,75 +474,85 @@ const SideBySideClauseRow = ({ clause, language }: { clause: any; language: stri
   );
 };
 
-// Executive Summary Hero Card (Step 1: Document Summary First)
-const ExecutiveSummaryHero = ({ contract, language }: { contract: any; language: string }) => {
-  const executivePoints = contract.executive_summary || [
-    `Principal loan sum of ₹${Number(contract.simulation_results?.loan_amount || 500000).toLocaleString('en-IN')} over ${contract.simulation_results?.tenure_months || 36} months.`,
-    `Estimated monthly obligation is ₹${Number(contract.simulation_results?.monthly_emi || 0).toLocaleString('en-IN')}.`,
-    `Total repayment amounts to ₹${Number(contract.simulation_results?.total_repayment || 0).toLocaleString('en-IN')}.`
-  ];
-
-  const ui = LOCALIZED_UI[language] || {};
+// --- SUPPORTING EVIDENCE SECTION ---
+const SupportingEvidenceAudit: React.FC<{ contract: ContractAnalysisData }> = ({ contract }) => {
+  const clauses = contract.clauses || [];
+  const redFlags = clauses.filter(c => c.is_red_flag || c.risk_level === 'High');
 
   return (
-    <div className="rounded-3xl p-8 bg-gradient-to-br from-slate-950 via-brand-950 to-slate-900 text-white shadow-xl relative overflow-hidden border border-white/10 space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/10">
-        <div>
-          <span className="text-xs font-extrabold uppercase tracking-widest text-brand-300 block mb-1">
-            {ui.doc_overview || 'Contract Document Overview'}
-          </span>
-          <h2 className="text-3xl font-black tracking-tight">{contract.document_name || 'Financial Agreement Summary'}</h2>
-          <p className="text-xs text-slate-300 font-medium mt-1">Plain-language summary and financial obligations breakdown</p>
-        </div>
-
-        {/* Quick Numbers Bar */}
-        <div className="flex items-center gap-6 bg-white/10 backdrop-blur-xl px-6 py-4 rounded-2xl border border-white/10 shadow-lg">
-          <div>
-            <p className="text-[11px] uppercase font-extrabold tracking-wider text-slate-300">{ui.monthly_pay || 'Monthly Payment'}</p>
-            <p className="text-2xl font-black text-brand-300">₹{Number(contract.simulation_results?.monthly_emi || 0).toLocaleString('en-IN')}</p>
+    <div className="space-y-4">
+      <div className="bg-white p-5 border border-slate-200 rounded-2xl shadow-card">
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-cobalt-50 text-cobalt-600 flex items-center justify-center">
+            <Scale size={16} />
           </div>
-          <div className="w-px h-10 bg-white/20" />
           <div>
-            <p className="text-[11px] uppercase font-extrabold tracking-wider text-slate-300">{ui.total_interest || 'Total Interest'}</p>
-            <p className="text-2xl font-black text-amber-300">₹{Number(contract.simulation_results?.total_interest || 0).toLocaleString('en-IN')}</p>
-          </div>
-          <div className="w-px h-10 bg-white/20" />
-          <div>
-            <p className="text-[11px] uppercase font-extrabold tracking-wider text-slate-300">{ui.tenure || 'Tenure'}</p>
-            <p className="text-2xl font-black text-white">{contract.simulation_results?.tenure_months || 36}m</p>
+            <h3 className="font-extrabold text-base text-slate-900">Legal Audit: Claim → Supporting Evidence → Interpretation</h3>
+            <p className="text-xs text-slate-500">Every decision conclusion is directly mapped to verbatim clause citations from the source contract</p>
           </div>
         </div>
-      </div>
 
-      {/* Summary Bullets */}
-      <div className="space-y-3">
-        <p className="text-xs font-extrabold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-          <Sparkles size={16} className="text-brand-400" /> {ui.key_terms || 'Key Terms & Summary:'}
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
-          {executivePoints.map((pt: string, idx: number) => (
-            <div key={idx} className="flex items-start gap-2.5 bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-2xl p-4 text-xs leading-relaxed font-medium text-slate-100">
-              <ArrowRight size={16} className="text-brand-400 mt-0.5 flex-shrink-0" />
-              <span>{pt}</span>
+        <div className="space-y-3 mt-4">
+          {redFlags.length === 0 ? (
+            <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl text-xs text-teal-800 flex items-center gap-2">
+              <CheckCircle size={16} className="text-teal-600" />
+              <span>No critical or predatory red flags detected in this agreement.</span>
             </div>
-          ))}
+          ) : (
+            redFlags.map((c, i) => (
+              <div key={i} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] flex items-center justify-center font-bold">{i + 1}</span>
+                    {c.clause_type}
+                  </span>
+                  <span className="text-[10px] font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-600">
+                    Source Page {c.source_page || 1}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Step 1: Claim */}
+                  <div className="p-3 bg-white rounded-lg border border-slate-200">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">1. Legal Finding</span>
+                    <p className="text-xs font-medium text-slate-800">{c.red_flag_reason || c.simple_explanation}</p>
+                  </div>
+
+                  {/* Step 2: Verbatim Evidence */}
+                  <div className="p-3 bg-white rounded-lg border border-slate-200">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cobalt-700 block mb-1">2. Verbatim Contract Excerpt</span>
+                    <p className="text-xs font-mono text-slate-700 bg-slate-50 p-2 rounded border border-slate-100 leading-relaxed">
+                      "{c.original_text || 'Original wording'}"
+                    </p>
+                  </div>
+
+                  {/* Step 3: Risk & Interpretation */}
+                  <div className="p-3 bg-vermilion-50/60 rounded-lg border border-vermilion-200">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-vermilion-800 block mb-1">3. Practical Financial Risk</span>
+                    <p className="text-xs text-vermilion-900 font-medium">{c.financial_impact || 'Directly binds personal or business cash reserves upon default.'}</p>
+                    {c.actionable_tip && (
+                      <p className="text-[11px] text-slate-600 mt-1.5 italic">Tip: {c.actionable_tip}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-// Interactive Agreement Assistant with Regional Voice & Input Support
-const ContractAssistant = ({ contractId, language }: { contractId: string; language: string }) => {
+// --- INTERACTIVE AGREEMENT ASSISTANT ---
+const ContractAssistant: React.FC<{
+  contractId: string;
+  language: string;
+}> = ({ contractId, language }) => {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [messages, setMessages] = useState<Array<{
-    id?: string;
-    question: string;
-    answer: string;
-    cited_clauses?: any[];
-  }>>([]);
+  const [messages, setMessages] = useState<ContractQueryMessage[]>([]);
 
   const ui = LOCALIZED_UI[language] || {};
   const currentLang = useMemo(() => {
@@ -986,7 +563,7 @@ const ContractAssistant = ({ contractId, language }: { contractId: string; langu
     try {
       const data = await contractService.getQueries(contractId);
       if (Array.isArray(data)) setMessages(data);
-    } catch (e) {
+    } catch {
       // Ignored
     }
   }, [contractId]);
@@ -995,8 +572,9 @@ const ContractAssistant = ({ contractId, language }: { contractId: string; langu
     loadQueries();
   }, [loadQueries]);
 
-  // Voice speech recognition in target regional language
+  // Voice speech recognition
   const toggleVoiceInput = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert('Speech recognition is not supported in this browser. Please type your query.');
@@ -1009,27 +587,19 @@ const ContractAssistant = ({ contractId, language }: { contractId: string; langu
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = SPEECH_LANG_MAP[language] || 'ta-IN';
+    recognition.lang = SPEECH_LANG_MAP[language] || 'en-IN';
     recognition.continuous = false;
     recognition.interimResults = false;
 
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
+    recognition.onstart = () => setIsListening(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       setQuestion(transcript);
       setIsListening(false);
     };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
 
     recognition.start();
   };
@@ -1039,7 +609,7 @@ const ContractAssistant = ({ contractId, language }: { contractId: string; langu
     if (!q.trim() || loading) return;
 
     const optimisticIndex = messages.length;
-    setMessages(prev => [...prev, { question: q, answer: 'Analyzing agreement terms…' }]);
+    setMessages(prev => [...prev, { question: q, answer: 'Analyzing contract terms…' }]);
     setQuestion('');
     setLoading(true);
 
@@ -1050,12 +620,12 @@ const ContractAssistant = ({ contractId, language }: { contractId: string; langu
         next[optimisticIndex] = res;
         return next;
       });
-    } catch (err) {
+    } catch {
       setMessages(prev => {
         const next = [...prev];
         next[optimisticIndex] = {
           question: q,
-          answer: 'Unable to process question. Please ensure the service is running.',
+          answer: 'Unable to process question. Please ensure the backend AI service is running.',
         };
         return next;
       });
@@ -1069,95 +639,51 @@ const ContractAssistant = ({ contractId, language }: { contractId: string; langu
       return [
         'வட்டி விகிதம் நிலையானதா அல்லது மிதக்கும் விகிதமா?',
         'முன்கூட்டியே கடனை அடைத்தால் என்ன கட்டணம் விதிக்கப்படும்?',
-        'வங்கிக்கு எனது தனிப்பட்ட வீடு அல்லது சேமிப்பு மீது உரிமை உள்ளதா?',
-        'தாமதக் கட்டணங்கள் விதிக்கப்படுவதற்கு முன் சலுகைக் காலம் உள்ளதா?'
+        'வங்கிக்கு எனது தனிப்பட்ட வீடு அல்லது சேமிப்பு மீது உரிமை உள்ளதா?'
       ];
     }
     if (language === 'hi') {
       return [
         'ब्याज दर फ्लोटिंग है या फिक्स्ड?',
         'क्या मैं बिना पेनल्टी के समयपूर्व भुगतान कर सकता हूँ?',
-        'क्या बैंक के पास मेरे व्यक्तिगत घर या बचत पर अधिकार है?',
-        'विलंब शुल्क लगने से पहले क्या कोई छूट अवधि है?'
-      ];
-    }
-    if (language === 'te') {
-      return [
-        'వడ్డీ రేటు స్థిరమైనదా లేదా ఫ్లోటింగా?',
-        'ముందస్తుగా చెల్లిస్తే ఏమైనా పెనాల్టీ ఉంటుందా?',
-        'బ్యాంకుకు నా సొంత ఇల్లుపై హక్కు ఉందా?',
-        'ఆలస్య చెల్లింపులపై ఏదైనా నోటీసు గడువు ఉందా?'
-      ];
-    }
-    if (language === 'kn') {
-      return [
-        'ಬಡ್ಡಿ ದರ ನಿಗದಿತವೇ ಅಥವಾ ಬದಲಾಗುತ್ತದೆಯೇ?',
-        'ಮುಂಚಿತವಾಗಿ ಸಾಲ ಮರುಪಾವತಿಸಿದರೆ ದಂಡವಿದೆಯೇ?',
-        'ಬ್ಯಾಂಕಿಗೆ ನನ್ನ ಸ್ವಂತ ಮನೆಯ ಮೇಲೆ ಹಕ್ಕಿದೆಯೇ?',
-        'ತಡವಾದ ಪಾವತಿಗಳಿಗೆ ಗ್ರೇಸ್ ಅವಧಿ ಇದೆಯೇ?'
-      ];
-    }
-    if (language === 'mr') {
-      return [
-        'व्याजदर स्थिर आहे की फ्लोटिंग?',
-        'मुदतपूर्व कर्ज फेडल्यास दंड आकारला जातो का?',
-        'बँकेला माझ्या वैयक्तिक घरावर अधिकार आहे का?',
-        'थकबाकीवर सूट कालावधी आहे का?'
-      ];
-    }
-    if (language === 'bn') {
-      return [
-        'সুদের হার নির্দিষ্ট নাকি পরিবর্তনশীল?',
-        'সময়সীমার আগে ঋণ পরিশোধে কি জরিমানা আছে?',
-        'ব্যাঙ্কের কি আমার ব্যক্তিগত সম্পত্তির ওপর অধিকার আছে?',
-        'দেরিতে পরিশোধের জন্য কি কোনো নোটিশ দেওয়া হয়?'
-      ];
-    }
-    if (language === 'gu') {
-      return [
-        'વ્યાજ દર સ્થિર છે કે ફ્લોટિંગ?',
-        'મુદત પહેલાં લોન ભરપાઈ કરવા પર કોઈ દંડ છે?',
-        'શું બેંક પાસે મારા અંગત ઘર પર અધિકાર છે?',
-        'વિલંબિત ચુકવણી માટે કોઈ નોટિસ સમયગાળો છે?'
+        'क्या बैंक के पास मेरे व्यक्तिगत घर या बचत पर अधिकार है?'
       ];
     }
     return [
       'Is the interest rate floating or fixed?',
       'What happens if I make an early prepayment?',
-      'Does the bank have rights over my personal home or savings?',
-      'What is the grace period before late penalties apply?'
+      'Does the bank have rights over my personal residential property?'
     ];
   }, [language]);
 
   return (
-    <div className="card shadow-sm p-6 border border-slate-200 rounded-3xl flex flex-col h-[580px] bg-white">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+    <div className="bg-white shadow-card p-6 border border-slate-200 rounded-2xl flex flex-col h-[520px]">
+      <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shadow-2xs">
-            <Sparkles size={18} />
+          <div className="w-8 h-8 rounded-lg bg-cobalt-50 text-cobalt-600 flex items-center justify-center">
+            <Sparkles size={16} />
           </div>
           <div>
-            <h4 className="text-base font-extrabold text-slate-900">{ui.assistant_title || 'Interactive Agreement Assistant'}</h4>
-            <p className="text-xs text-slate-500 font-medium">{ui.assistant_desc || 'Ask any question in your native language with verified page citations'}</p>
+            <h4 className="text-sm font-bold text-slate-900">{ui.assistant_title || 'Contract Intelligence Assistant'}</h4>
+            <p className="text-[11px] text-slate-500 font-medium">{ui.assistant_desc || 'Ask questions with verified citations from this document'}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-brand-50 border border-brand-200/80 px-2.5 py-1 rounded-xl text-brand-800 text-[11px] font-bold">
-          <Languages size={13} />
+        <div className="flex items-center gap-1.5 bg-cobalt-50 border border-cobalt-200 px-2 py-0.5 rounded-lg text-cobalt-800 text-[11px] font-bold">
+          <Languages size={12} />
           <span>{currentLang.native}</span>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+      <div className="flex-1 overflow-y-auto py-3.5 space-y-3.5 pr-1">
         {messages.length === 0 ? (
-          <div className="text-center py-6 px-4">
+          <div className="text-center py-6 px-3">
             <p className="text-xs font-bold text-slate-800 mb-1">
-              {language === 'ta' ? 'இந்த ஒப்பந்தம் குறித்து கேள்விகளைக் கேளுங்கள்' : language === 'hi' ? 'इस समझौते के बारे में प्रश्न पूछें' : 'Ask questions about this agreement'}
+              Ask anything about this loan agreement
             </p>
-            <p className="text-xs text-slate-500 mb-4">
-              {language === 'ta' ? 'எந்தவொரு மொழியிலும் கேட்கலாம். உடனடி தெளிவான பதில் கிடைக்கும்.' : 'Every answer is verified against the specific text in your document.'}
+            <p className="text-[11px] text-slate-500 mb-3.5">
+              Verified answers with page numbers and clause quotes
             </p>
             <div className="flex flex-col gap-2">
               {samplePrompts.map((p, i) => (
@@ -1165,29 +691,29 @@ const ContractAssistant = ({ contractId, language }: { contractId: string; langu
                   key={i}
                   type="button"
                   onClick={() => handleAsk(p)}
-                  className="text-xs font-medium bg-slate-50 hover:bg-brand-50 border border-slate-200 hover:border-brand-200 text-slate-700 hover:text-brand-700 rounded-2xl px-4 py-3 text-left transition-all flex items-center justify-between shadow-2xs cursor-pointer"
+                  className="text-xs font-medium bg-slate-50 hover:bg-cobalt-50 border border-slate-200 hover:border-cobalt-200 text-slate-700 hover:text-cobalt-700 rounded-xl px-3 py-2 text-left transition-colors flex items-center justify-between cursor-pointer"
                 >
-                  <span className="font-semibold">{p}</span>
-                  <ArrowRight size={13} className="text-slate-400" />
+                  <span>{p}</span>
+                  <ArrowRight size={12} className="text-slate-400" />
                 </button>
               ))}
             </div>
           </div>
         ) : (
           messages.map((m, idx) => (
-            <div key={idx} className="space-y-2">
+            <div key={idx} className="space-y-1.5">
               <div className="flex justify-end">
-                <div className="bg-brand-600 text-white text-xs font-bold px-4 py-2.5 rounded-2xl rounded-tr-sm max-w-[85%] shadow-sm leading-relaxed">
+                <div className="bg-cobalt-600 text-white text-xs font-medium px-3.5 py-2 rounded-xl rounded-tr-xs max-w-[85%] shadow-xs">
                   {m.question}
                 </div>
               </div>
               <div className="flex justify-start">
-                <div className="bg-slate-50 border border-slate-200 text-slate-800 text-xs px-4 py-3.5 rounded-2xl rounded-tl-sm max-w-[95%] shadow-sm space-y-2.5">
-                  <p className="leading-relaxed whitespace-pre-wrap font-semibold text-slate-900">{m.answer}</p>
+                <div className="bg-slate-50 border border-slate-200 text-slate-800 text-xs px-3.5 py-2.5 rounded-xl rounded-tl-xs max-w-[95%] space-y-2">
+                  <p className="leading-relaxed whitespace-pre-wrap font-medium">{m.answer}</p>
                   {m.cited_clauses && m.cited_clauses.length > 0 && (
-                    <div className="pt-2.5 border-t border-slate-200 flex flex-wrap gap-1.5">
-                      {m.cited_clauses.map((c: any, cIdx: number) => (
-                        <span key={cIdx} className="text-[10px] font-bold bg-white border border-brand-200 text-brand-700 px-2.5 py-0.5 rounded-lg shadow-2xs">
+                    <div className="pt-2 border-t border-slate-200 flex flex-wrap gap-1.5">
+                      {m.cited_clauses.map((c, cIdx) => (
+                        <span key={cIdx} className="text-[10px] font-bold bg-white border border-cobalt-200 text-cobalt-700 px-2 py-0.5 rounded">
                           Page {c.page_number || 1}: {c.section_title || 'Contract Excerpt'}
                         </span>
                       ))}
@@ -1200,73 +726,62 @@ const ContractAssistant = ({ contractId, language }: { contractId: string; langu
         )}
       </div>
 
-      {/* Input Box with Regional Language Badge, Mic Voice Input & Submit */}
-      <form onSubmit={(e) => { e.preventDefault(); handleAsk(); }} className="pt-3 border-t border-slate-100 space-y-2">
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 focus-within:border-brand-500 focus-within:bg-white p-1.5 rounded-2xl transition-all shadow-2xs">
-          {/* Active Regional Language Indicator */}
-          <div className="hidden sm:flex items-center gap-1 bg-white border border-slate-200 px-2.5 py-1 rounded-xl text-[10px] font-black text-slate-700 shadow-2xs flex-shrink-0">
-            <span>{currentLang.flag}</span>
-            <span>{currentLang.native}</span>
-          </div>
-
+      {/* Input */}
+      <form onSubmit={(e) => { e.preventDefault(); handleAsk(); }} className="pt-3 border-t border-slate-100">
+        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 focus-within:border-cobalt-500 focus-within:bg-white p-1 rounded-xl transition-all">
           <input
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder={ui.ask_placeholder || 'Type your question in any regional language...'}
+            placeholder={ui.ask_placeholder || 'Type or speak in any supported language...'}
             disabled={loading}
-            className="flex-1 text-xs px-2 py-1.5 bg-transparent focus:outline-none font-semibold text-slate-900 placeholder:text-slate-400"
+            className="flex-1 text-xs px-2.5 py-1 bg-transparent focus:outline-none font-medium text-slate-900 placeholder:text-slate-400"
           />
-
-          {/* Regional Speech Input (Microphone Button) */}
           <button
             type="button"
             onClick={toggleVoiceInput}
-            title={`Speak in ${currentLang.name} (${currentLang.native})`}
-            className={`p-2 rounded-xl transition-all cursor-pointer ${
-              isListening
-                ? 'bg-red-500 text-white animate-pulse'
-                : 'hover:bg-slate-200 text-slate-500 hover:text-slate-800'
+            title={`Speak in ${currentLang.name}`}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+              isListening ? 'bg-vermilion-500 text-white animate-pulse' : 'text-slate-400 hover:text-slate-700'
             }`}
           >
-            {isListening ? <MicOff size={15} /> : <Mic size={15} />}
+            {isListening ? <MicOff size={14} /> : <Mic size={14} />}
           </button>
-
-          {/* Ask Button */}
           <button
             type="submit"
             disabled={loading || !question.trim()}
-            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm flex-shrink-0 cursor-pointer"
+            className="px-3 py-1.5 bg-cobalt-600 hover:bg-cobalt-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
           >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            {ui.ask_btn || 'Ask'}
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            <span>Ask</span>
           </button>
         </div>
-
-        {isListening && (
-          <p className="text-[11px] font-bold text-red-600 animate-pulse text-center">
-            🎙️ Listening in {currentLang.name} ({currentLang.native})… speak now
-          </p>
-        )}
       </form>
     </div>
   );
 };
 
+// --- MAIN CONTRACTS PAGE COMPONENT ---
 export const ContractsPage: React.FC = () => {
   const { persona } = usePersona();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const [translating, setTranslating] = useState<boolean>(false);
-  const [translatedContractCache, setTranslatedContractCache] = useState<Record<string, any>>({});
+  const [translatedContractCache, setTranslatedContractCache] = useState<Record<string, ContractAnalysisData>>({});
   const [analyzing, setAnalyzing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'sidebyside' | 'ledger' | 'charts' | 'assistant'>('overview');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<ContractWorkflowStep>('extracted');
+  const [clauseSearch, setClauseSearch] = useState('');
+  const [clauseFilter, setClauseFilter] = useState<'all' | 'critical' | 'caution' | 'low' | 'red_flags'>('all');
   const qc = useQueryClient();
 
-  const { data: contracts = [] } = useQuery({ queryKey: ['contracts'], queryFn: contractService.getAll });
-  const rawActiveContract = contracts.find((c: any) => c.id === activeId);
+  const { data: contracts = [] } = useQuery<ContractAnalysisData[]>({
+    queryKey: ['contracts'],
+    queryFn: contractService.getAll,
+  });
 
-  // Active contract with active language translation overlay
+  const rawActiveContract = contracts.find((c) => c.id === activeId);
+
   const activeContract = useMemo(() => {
     if (!rawActiveContract) return null;
     if (selectedLanguage === 'en') return rawActiveContract;
@@ -1274,15 +789,13 @@ export const ContractsPage: React.FC = () => {
     return translatedContractCache[cacheKey] || rawActiveContract;
   }, [rawActiveContract, selectedLanguage, translatedContractCache]);
 
-  const ui = LOCALIZED_UI[selectedLanguage] || {};
-
   useEffect(() => {
     if (!activeId && contracts.length > 0) {
       setActiveId(contracts[0].id);
     }
   }, [contracts, activeId]);
 
-  // Handle language change with translation API
+  // Handle translation
   const handleLanguageChange = async (lang: string) => {
     setSelectedLanguage(lang);
     if (lang === 'en' || !rawActiveContract) return;
@@ -1304,30 +817,55 @@ export const ContractsPage: React.FC = () => {
     }
   };
 
+  // Upload handler
   const onDrop = useCallback(async (files: File[]) => {
     if (!files || files.length === 0) return;
     setAnalyzing(true);
+    setUploadError(null);
     try {
       const result = await contractService.uploadAndAnalyze(files[0]);
       qc.invalidateQueries({ queryKey: ['contracts'] });
       setActiveId(result.id);
-      setActiveTab('overview');
-    } catch (err: any) {
+      setActiveTab('extracted');
+    } catch (err: unknown) {
       console.error('Upload failed:', err);
-      const msg = err?.response?.data?.message || err?.message || 'Could not analyze file. Please ensure the backend and AI service are running.';
-      alert(`Upload Error: ${msg}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Could not analyze file. Please verify the AI service is operational.';
+      setUploadError(msg);
     } finally {
       setAnalyzing(false);
     }
   }, [qc]);
 
+  // Load sample contract
+  const handleLoadSample = async () => {
+    setAnalyzing(true);
+    setUploadError(null);
+    try {
+      const result = await contractService.analyzeTextAsContract(
+        SAMPLE_CONTRACT_UJJIVAN.text,
+        SAMPLE_CONTRACT_UJJIVAN.filename
+      );
+      qc.invalidateQueries({ queryKey: ['contracts'] });
+      setActiveId(result.id);
+      setActiveTab('extracted');
+    } catch (err: unknown) {
+      console.error('Sample load failed:', err);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Failed to analyze sample agreement.';
+      setUploadError(msg);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleDeleteContract = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this agreement and purge its data?')) return;
+    if (!confirm('Are you sure you want to delete this agreement?')) return;
     try {
       await contractService.deleteContract(id);
       qc.invalidateQueries({ queryKey: ['contracts'] });
       setActiveId(null);
-    } catch (e) {
+    } catch {
       alert('Failed to delete contract.');
     }
   };
@@ -1336,8 +874,8 @@ export const ContractsPage: React.FC = () => {
     onDrop,
     noClick: false,
     noKeyboard: false,
-    accept: { 
-      'application/pdf': ['.pdf'], 
+    accept: {
+      'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'text/plain': ['.txt'],
       'image/*': ['.png', '.jpg', '.jpeg']
@@ -1345,42 +883,67 @@ export const ContractsPage: React.FC = () => {
   });
 
   const sim = activeContract?.simulation_results || {
-    loan_amount: 500000,
-    annual_interest_rate: 12.5,
-    tenure_months: 36,
-    monthly_emi: 16727,
-    total_repayment: 602172,
-    total_interest: 102172,
+    loan_amount: 7500000,
+    annual_interest_rate: 12.75,
+    tenure_months: 60,
+    monthly_emi: 169690,
+    total_repayment: 10181400,
+    total_interest: 2681400,
+    prepayment_penalty: 3.5
   };
+
+  // Filter clauses
+  const filteredClauses = useMemo(() => {
+    if (!activeContract?.clauses) return [];
+    return activeContract.clauses.filter((c) => {
+      // Risk filter
+      if (clauseFilter === 'critical' && c.risk_level !== 'High') return false;
+      if (clauseFilter === 'caution' && c.risk_level !== 'Medium') return false;
+      if (clauseFilter === 'low' && c.risk_level !== 'Low') return false;
+      if (clauseFilter === 'red_flags' && !c.is_red_flag) return false;
+
+      // Search filter
+      if (clauseSearch.trim()) {
+        const query = clauseSearch.toLowerCase();
+        const typeMatch = c.clause_type.toLowerCase().includes(query);
+        const textMatch = (c.original_text || '').toLowerCase().includes(query);
+        const plainMatch = (c.simple_explanation || c.plain_explanation || '').toLowerCase().includes(query);
+        return typeMatch || textMatch || plainMatch;
+      }
+      return true;
+    });
+  }, [activeContract?.clauses, clauseFilter, clauseSearch]);
+
+  const ui = LOCALIZED_UI[selectedLanguage] || {};
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <Topbar 
-        title="Financial Contract Simplifier AI" 
-        subtitle="Analyze any loan, mortgage, lease, or debt agreement with clear executive summaries and unambiguous financial recommendations." 
+      <Topbar
+        title="Contract Intelligence AI"
+        subtitle="Extract terms, stress-test borrower obligations, and uncover predatory red flags with authoritative financial reasoning."
       />
 
-      {/* Hidden file input controlled by dropzone */}
+      {/* Hidden file input */}
       <input {...getInputProps()} id="contracts-global-file-input" />
 
-      {/* Top Controls: Contract Switcher, Custom Language Selector, Delete & Upload */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-slate-200/90 shadow-sm">
+      {/* Controls Bar: Active Contract, Multilingual Selector, Sample Contract & Upload */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-card">
         {/* Left: Document Switcher */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 font-bold shadow-2xs">
+          <div className="w-10 h-10 rounded-xl bg-cobalt-50 text-cobalt-600 flex items-center justify-center flex-shrink-0">
             <FileText size={18} />
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 block mb-0.5">Active Agreement</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Active Contract</label>
             <select
               value={activeId || ''}
               onChange={(e) => setActiveId(e.target.value)}
-              className="text-sm font-black text-slate-800 bg-transparent focus:outline-none cursor-pointer pr-4 hover:text-brand-600 transition-colors"
+              className="text-sm font-bold text-slate-900 bg-transparent focus:outline-none cursor-pointer pr-4 hover:text-cobalt-600 transition-colors"
             >
               {contracts.length === 0 ? (
                 <option value="">No contracts analyzed yet</option>
               ) : (
-                contracts.map((c: any) => (
+                contracts.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.document_name || 'Financial Agreement'} ({new Date(c.created_at).toLocaleDateString()})
                   </option>
@@ -1390,24 +953,36 @@ export const ContractsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Controls: Sleek Custom Language Dropdown, Delete, and Upload */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Custom Designed Multilingual Selector */}
+        {/* Right Controls */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Custom Multilingual Dropdown */}
           <CustomLanguageDropdown
             selectedLanguage={selectedLanguage}
             onSelectLanguage={handleLanguageChange}
             translating={translating}
           />
 
+          {/* Quick Sample Button */}
+          <button
+            type="button"
+            onClick={handleLoadSample}
+            disabled={analyzing}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+            title="Load the Ujjivan MSE Secured Business Loan sample"
+          >
+            <Bookmark size={13} className="text-slate-600" />
+            <span>Try Sample</span>
+          </button>
+
           {activeContract && (
             <button
               type="button"
               onClick={() => handleDeleteContract(activeContract.id)}
-              className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-red-200/60"
-              title="Delete this agreement and purge stored data"
+              className="px-3 py-1.5 bg-vermilion-50 hover:bg-vermilion-100 text-vermilion-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-vermilion-200"
+              title="Delete contract and purge stored embeddings"
             >
-              <Trash2 size={14} />
-              <span className="hidden sm:inline">Delete Data</span>
+              <Trash2 size={13} />
+              <span className="hidden sm:inline">Delete</span>
             </button>
           )}
 
@@ -1415,219 +990,537 @@ export const ContractsPage: React.FC = () => {
             type="button"
             onClick={open}
             disabled={analyzing}
-            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-2xl text-xs font-extrabold flex items-center gap-2 shadow-sm transition-all cursor-pointer"
+            className="px-3.5 py-1.5 bg-cobalt-600 hover:bg-cobalt-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
           >
-            {analyzing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-            {analyzing ? 'Analyzing Agreement…' : (ui.upload_btn || 'Upload Agreement')}
+            {analyzing ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+            <span>{analyzing ? 'Analyzing…' : (ui.upload_btn || 'Upload Contract')}</span>
           </button>
         </div>
       </div>
 
-      {/* Upload Dropzone Area */}
+      {/* Upload Drag & Drop Interaction with purposeful motion */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer transition-all duration-200 ${
-          isDragActive ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-brand-300 hover:bg-slate-50'
+        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
+          isDragActive
+            ? 'border-cobalt-500 bg-cobalt-50/60 scale-[1.005]'
+            : 'border-slate-200 hover:border-cobalt-300 hover:bg-slate-50/50 bg-white'
         }`}
       >
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
           {analyzing ? (
-            <div className="py-4 flex flex-col items-center gap-2.5">
-              <Loader2 size={36} className="text-brand-600 animate-spin" />
-              <p className="text-base font-extrabold text-slate-900">
-                Analyzing agreement against your financial baseline…
+            <div className="py-2 flex flex-col items-center gap-2">
+              <Loader2 size={32} className="text-cobalt-600 animate-spin" />
+              <p className="text-sm font-bold text-slate-900">
+                Processing document: Extracting terms, semantic chunking & simulating cash flow…
               </p>
-              <p className="text-xs text-slate-600 font-medium">Extracting key terms, calculating affordability, and determining final recommendation</p>
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                <span className="w-2 h-2 rounded-full bg-cobalt-500 animate-pulse" />
+                <span>Running risk engine in {selectedLanguage.toUpperCase()}</span>
+              </div>
             </div>
           ) : (
             <>
-              <div className="w-12 h-12 bg-brand-100 rounded-2xl flex items-center justify-center text-brand-600">
-                <Upload size={22} />
+              <div className="w-10 h-10 bg-cobalt-50 text-cobalt-600 rounded-xl flex items-center justify-center">
+                <Upload size={18} />
               </div>
-              <p className="text-slate-800 font-extrabold text-base">
-                {isDragActive ? (ui.dropzone_active || 'Drop your agreement here') : (ui.dropzone_idle || 'Drag & drop any financial agreement (PDF, DOCX, Scanned Image, or TXT)')}
+              <p className="text-sm font-bold text-slate-900">
+                {isDragActive
+                  ? (ui.dropzone_active || 'Drop your contract here')
+                  : (ui.dropzone_idle || 'Drag & drop any financial agreement (PDF, DOCX, Scanned Image, or TXT)')}
               </p>
-              <p className="text-xs text-slate-600 font-medium">{ui.dropzone_sub || 'Supports Business Loans, Home Mortgages, Personal Debt, Equipment Leases & Credit Lines in 8 Indian Languages'}</p>
+              <p className="text-xs text-slate-500">
+                {ui.dropzone_sub || 'Supports Commercial Loans, Mortgages, Equipment Leases & Personal Debt across 8 Indian Languages'}
+              </p>
             </>
           )}
         </div>
       </div>
 
-      {/* Full-Width Active Analysis Stage */}
+      {/* Upload Error Alert */}
+      {uploadError && (
+        <div className="p-4 bg-vermilion-50 border border-vermilion-200 rounded-2xl text-xs text-vermilion-900 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={16} className="text-vermilion-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <span className="font-bold block">Analysis Failed</span>
+              <p className="mt-0.5 text-vermilion-800">{uploadError}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            className="text-vermilion-700 hover:text-vermilion-900 font-bold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* WORKFLOW VIEW TABS */}
       {activeContract && activeContract.analysis_status === 'completed' && (
         <div className="space-y-6">
-          {/* Navigation View Tabs */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
-            {[
-              { id: 'overview', label: ui.tab_overview || 'Executive Summary & Decision', icon: Sparkles },
-              { id: 'sidebyside', label: `${ui.tab_clauses || 'Clause Breakdown'} (${activeContract.clauses?.length || 0})`, icon: Columns },
-              { id: 'ledger', label: ui.tab_baseline || 'Financial Baseline', icon: Wallet },
-              { id: 'charts', label: ui.tab_schedule || 'Payment Schedule', icon: BarChart3 },
-              { id: 'assistant', label: ui.tab_assistant || 'Agreement Assistant', icon: Mail },
-            ].map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveTab(id as any)}
-                className={`px-4 py-2 rounded-xl text-xs font-extrabold flex items-center gap-2 transition-all cursor-pointer ${
-                  activeTab === id
-                    ? 'bg-brand-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-brand-600 hover:bg-slate-100'
-                }`}
-              >
-                <Icon size={14} />
-                {label}
-              </button>
-            ))}
+          {/* Stepper Navigation */}
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2 overflow-x-auto">
+            <div className="flex items-center gap-1.5">
+              {[
+                { id: 'extracted', label: '1. Extracted Information', icon: FileCheck },
+                { id: 'risk', label: '2. Risk & Affordability', icon: AlertTriangle },
+                { id: 'clauses', label: `3. Clause Analysis (${activeContract.clauses?.length || 0})`, icon: Scale },
+                { id: 'evidence', label: '4. Supporting Evidence', icon: ShieldCheck },
+                { id: 'assistant', label: '5. Contract Assistant', icon: Sparkles },
+              ].map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id as ContractWorkflowStep)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                    activeTab === id
+                      ? 'bg-cobalt-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-cobalt-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Icon size={13} />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="hidden lg:flex items-center gap-2 text-xs font-medium text-slate-500">
+              <span className="w-2 h-2 rounded-full bg-teal-500" />
+              <span>Status: Completed</span>
+            </div>
           </div>
 
-          {/* TAB 1: EXECUTIVE SUMMARY & DECISION */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Step 1: Executive Summary First */}
-              <ExecutiveSummaryHero contract={activeContract} language={selectedLanguage} />
+          <AnimatePresence mode="wait">
+            {/* STAGE 1: EXTRACTED INFORMATION */}
+            {activeTab === 'extracted' && (
+              <motion.div
+                key="extracted"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="space-y-6"
+              >
+                {/* Contract Overview Strip */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-card space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-cobalt-700 block mb-0.5">Document Dossier</span>
+                      <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">{activeContract.document_name}</h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Analyzed on {new Date(activeContract.created_at).toLocaleDateString()} • {activeContract.total_chunks || 12} Semantic Chunks Ingested
+                      </p>
+                    </div>
 
-              {/* Step 2: Decision Verdict (Either Accept or Decline with Focused Reasons) */}
-              <DecisionVerdictCard contract={activeContract} language={selectedLanguage} />
-
-              {/* Step 3: User's Financial Condition Impact */}
-              <UserFinancialConditionCard 
-                ledgerImpact={activeContract.ledger_impact} 
-                sim={activeContract.simulation_results} 
-                persona={persona} 
-                language={selectedLanguage}
-              />
-
-              {/* Step 4: Key Clauses Preview */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-extrabold text-lg text-slate-900">Key Clauses (Original vs Plain Translation)</h3>
-                    <p className="text-xs text-slate-600 font-medium">Click any clause to inspect original wording and borrower tips</p>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200 flex items-center gap-1">
+                        <CheckCircle size={13} /> OCR Verified
+                      </span>
+                    </div>
                   </div>
+
+                  {/* 4-Stat Primary Financial Parameter Strip */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Sanctioned Principal</p>
+                      <p className="text-xl font-black font-mono tabular-nums text-slate-900 mt-0.5">
+                        ₹{Number(sim.loan_amount || 0).toLocaleString('en-IN')}
+                      </p>
+                      <span className="text-[10px] text-slate-500">Term Loan Facility</span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Interest Rate</p>
+                      <p className="text-xl font-black font-mono tabular-nums text-cobalt-600 mt-0.5">
+                        {sim.annual_interest_rate || 12.75}% p.a.
+                      </p>
+                      <span className="text-[10px] text-slate-500">Floating Benchmark</span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Monthly Installment (EMI)</p>
+                      <p className="text-xl font-black font-mono tabular-nums text-slate-900 mt-0.5">
+                        ₹{Number(sim.monthly_emi || 0).toLocaleString('en-IN')}
+                      </p>
+                      <span className="text-[10px] text-slate-500">Over {sim.tenure_months || 60} Months</span>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Financing Cost</p>
+                      <p className="text-xl font-black font-mono tabular-nums text-amber-700 mt-0.5">
+                        ₹{Number(sim.total_repayment || 0).toLocaleString('en-IN')}
+                      </p>
+                      <span className="text-[10px] text-slate-500">Principal + Total Interest</span>
+                    </div>
+                  </div>
+
+                  {/* Obligations Strip */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                      <span className="font-bold text-slate-700 block mb-0.5">Prepayment Exit Fee</span>
+                      <span className="text-slate-900 font-semibold">{sim.prepayment_penalty ? `${sim.prepayment_penalty}% Foreclosure Charge` : '0% (Mandatory Free Exit)'}</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                      <span className="font-bold text-slate-700 block mb-0.5">Default Interest / Penalty</span>
+                      <span className="text-slate-900 font-semibold">{sim.penalty_rate ? `${sim.penalty_rate}% per month` : '2.0% per month (24% p.a.)'}</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                      <span className="font-bold text-slate-700 block mb-0.5">Collateral Security</span>
+                      <span className="text-slate-900 font-semibold">Hypothecation of Plant & Machinery</span>
+                    </div>
+                  </div>
+
+                  {/* Executive Summary Takeaways */}
+                  <div className="pt-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 mb-2.5">
+                      <Sparkles size={14} className="text-cobalt-600" />
+                      Executive Summary & Key Takeaways
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {(activeContract.executive_summary || [
+                        `Sanctioned loan principal of ₹${Number(sim.loan_amount || 0).toLocaleString('en-IN')} across ${sim.tenure_months || 60} months.`,
+                        `Monthly EMI obligation is ₹${Number(sim.monthly_emi || 0).toLocaleString('en-IN')}.`,
+                        `Total interest burden across tenure amounts to ₹${Number(sim.total_interest || 0).toLocaleString('en-IN')}.`
+                      ]).map((pt, i) => (
+                        <div key={i} className="flex items-start gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-xs leading-relaxed text-slate-800">
+                          <ArrowRight size={13} className="text-cobalt-600 mt-0.5 flex-shrink-0" />
+                          <span>{pt}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Next Stage Link */}
+                <div className="flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setActiveTab('sidebyside')}
-                    className="text-xs font-bold text-brand-600 hover:text-brand-700 flex items-center gap-1 cursor-pointer"
+                    onClick={() => setActiveTab('risk')}
+                    className="px-4 py-2 bg-cobalt-600 hover:bg-cobalt-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
-                    View All {activeContract.clauses?.length || 0} Clauses <ArrowRight size={13} />
+                    <span>Proceed to Risk Analysis</span>
+                    <ArrowRight size={13} />
                   </button>
                 </div>
+              </motion.div>
+            )}
 
-                <div className="space-y-3">
-                  {activeContract.clauses?.slice(0, 4).map((clause: any, i: number) => (
-                    <SideBySideClauseRow 
-                      key={i} 
-                      clause={clause} 
-                      language={selectedLanguage}
+            {/* STAGE 2: RISK ANALYSIS */}
+            {activeTab === 'risk' && (
+              <motion.div
+                key="risk"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="space-y-6"
+              >
+                {/* Decision Verdict Card */}
+                <DecisionVerdictCard contract={activeContract} language={selectedLanguage} />
+
+                {/* Debt Affordability Card */}
+                <DebtAffordabilityCard
+                  contract={activeContract}
+                  persona={persona}
+                  language={selectedLanguage}
+                />
+
+                {/* Predatory Red Flags Callout Box */}
+                {activeContract.red_flags && activeContract.red_flags.length > 0 ? (
+                  <div className="p-5 rounded-2xl bg-vermilion-50/40 border border-vermilion-200 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle size={18} className="text-vermilion-600" />
+                      <h4 className="font-bold text-sm text-vermilion-900">
+                        {activeContract.red_flags.length} Predatory Red Flags Detected
+                      </h4>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {activeContract.red_flags.map((rf, idx) => (
+                        <div key={idx} className="bg-white p-3.5 rounded-xl border border-vermilion-200 shadow-2xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-slate-900">{rf.clause_name}</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-vermilion-100 text-vermilion-800">
+                              {rf.severity || 'High'} Severity
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700 leading-relaxed">{rf.why_risky}</p>
+                          {rf.mitigation_tip && (
+                            <p className="text-[11px] text-cobalt-700 font-medium pt-1">
+                              <strong>Borrower Defense:</strong> {rf.mitigation_tip}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-800 flex items-center gap-2">
+                    <CheckCircle size={16} className="text-teal-600" />
+                    <span>No critical or predatory red flags detected in this agreement.</span>
+                  </div>
+                )}
+
+                {/* Navigation Button */}
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('extracted')}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    ← Back to Terms
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('clauses')}
+                    className="px-4 py-2 bg-cobalt-600 hover:bg-cobalt-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <span>Inspect Clauses</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* STAGE 3: CLAUSE ANALYSIS */}
+            {activeTab === 'clauses' && (
+              <motion.div
+                key="clauses"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="space-y-4"
+              >
+                {/* Search & Filter Controls */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-card">
+                  {/* Search Input */}
+                  <div className="relative flex-1 max-w-sm">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={clauseSearch}
+                      onChange={(e) => setClauseSearch(e.target.value)}
+                      placeholder="Search clauses by keyword or title…"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-cobalt-500 text-slate-900"
                     />
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: SIDE-BY-SIDE CLAUSE VISUALIZER (FULL) */}
-          {activeTab === 'sidebyside' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-extrabold text-lg text-slate-900">{ui.tab_clauses || 'Clause-by-Clause Breakdown'}</h3>
-                  <p className="text-xs text-slate-600 font-medium">
-                    Original contract text displayed directly alongside the plain translation
-                  </p>
-                </div>
-                <span className="text-xs font-bold text-brand-700 bg-brand-50 border border-brand-200 px-3 py-1 rounded-full">
-                  {activeContract.clauses?.length || 0} Clauses Analyzed
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {activeContract.clauses?.map((clause: any, i: number) => (
-                  <SideBySideClauseRow 
-                    key={i} 
-                    clause={clause} 
-                    language={selectedLanguage}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: FINANCIAL BASELINE */}
-          {activeTab === 'ledger' && (
-            <div className="space-y-6">
-              <UserFinancialConditionCard 
-                ledgerImpact={activeContract.ledger_impact} 
-                sim={activeContract.simulation_results} 
-                persona={persona} 
-                language={selectedLanguage}
-              />
-            </div>
-          )}
-
-          {/* TAB 4: PAYMENT SCHEDULE */}
-          {activeTab === 'charts' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="card p-5 border border-slate-200 rounded-2xl bg-white shadow-sm">
-                  <p className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">{ui.fixed_emi || 'Fixed Monthly Installment'}</p>
-                  <p className="text-xl font-black text-brand-600 mt-1">₹{Number(sim.monthly_emi || 0).toLocaleString('en-IN')}</p>
-                  <p className="text-xs text-slate-500 font-medium mt-1">{ui.due_monthly || 'Due monthly'}</p>
-                </div>
-                <div className="card p-5 border border-slate-200 rounded-2xl bg-white shadow-sm">
-                  <p className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">{ui.total_cost || 'Total Financing Cost'}</p>
-                  <p className="text-xl font-black text-slate-900 mt-1">₹{Number(sim.total_repayment || 0).toLocaleString('en-IN')}</p>
-                  <p className="text-xs text-slate-500 font-medium mt-1">{ui.principal_interest || 'Principal + Interest'}</p>
-                </div>
-                <div className="card p-5 border border-slate-200 rounded-2xl bg-white shadow-sm">
-                  <p className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">{ui.total_interest_obl || 'Total Interest Obligation'}</p>
-                  <p className="text-xl font-black text-amber-600 mt-1">₹{Number(sim.total_interest || 0).toLocaleString('en-IN')}</p>
-                  <p className="text-xs text-slate-500 font-medium mt-1">{sim.tenure_months || 36} {ui.over_months || 'months'}</p>
-                </div>
-                <div className="card p-5 border border-slate-200 rounded-2xl bg-white shadow-sm">
-                  <p className="text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">{ui.prepay_exit || 'Prepayment Exit Fee'}</p>
-                  <p className="text-xl font-black text-emerald-600 mt-1">{sim.prepayment_penalty ? `${sim.prepayment_penalty}%` : '0% (Free)'}</p>
-                  <p className="text-xs text-slate-500 font-medium mt-1">{ui.exit_charge || 'Exit charge for early payoff'}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: INTERACTIVE ASSISTANT */}
-          {activeTab === 'assistant' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ContractAssistant contractId={activeContract.id} language={selectedLanguage} />
-              
-              {/* Negotiation Playbook */}
-              <div className="card p-6 border border-slate-200 rounded-2xl shadow-sm space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600">
-                    <Mail size={18} />
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-base text-slate-900">{ui.lender_points_title || 'Lender Discussion Points'}</h4>
-                    <p className="text-xs text-slate-600 font-medium">{ui.lender_points_desc || 'Recommended adjustments before signing'}</p>
+
+                  {/* Filter Pills */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[
+                      { id: 'all', label: 'All' },
+                      { id: 'critical', label: 'Critical' },
+                      { id: 'caution', label: 'Caution' },
+                      { id: 'low', label: 'Low Concern' },
+                      { id: 'red_flags', label: 'Traps Only' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setClauseFilter(f.id as typeof clauseFilter)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                          clauseFilter === f.id
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="space-y-2.5 text-xs text-slate-700">
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                    <span className="font-bold text-slate-900 block mb-0.5">{ui.neg_1_title || '1. Benchmark Transparency:'}</span>
-                    <span>{ui.neg_1_desc || 'Request that interest rates be pegged to an external benchmark to avoid arbitrary spread increases.'}</span>
+                {/* Clause List */}
+                <div className="space-y-3">
+                  {filteredClauses.length === 0 ? (
+                    <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-xs">
+                      No clauses match the current filter or search query.
+                    </div>
+                  ) : (
+                    filteredClauses.map((clause, idx) => (
+                      <ClauseInspectionRow
+                        key={clause.id || idx}
+                        clause={clause}
+                        language={selectedLanguage}
+                        isInitiallyExpanded={idx === 0}
+                      />
+                    ))
+                  )}
+                </div>
+
+                {/* Navigation Button */}
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('risk')}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    ← Back to Risk
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('evidence')}
+                    className="px-4 py-2 bg-cobalt-600 hover:bg-cobalt-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <span>View Supporting Evidence</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* STAGE 4: SUPPORTING EVIDENCE */}
+            {activeTab === 'evidence' && (
+              <motion.div
+                key="evidence"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="space-y-6"
+              >
+                <SupportingEvidenceAudit contract={activeContract} />
+
+                {/* Lender Discussion Points */}
+                <div className="bg-white p-5 border border-slate-200 rounded-2xl shadow-card space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-cobalt-50 text-cobalt-600 flex items-center justify-center">
+                      <Mail size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900">{ui.lender_points_title || 'Lender Discussion Points & Counter-Proposals'}</h4>
+                      <p className="text-xs text-slate-500">{ui.lender_points_desc || 'Specific amendments to request before signing'}</p>
+                    </div>
                   </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                    <span className="font-bold text-slate-900 block mb-0.5">{ui.neg_2_title || '2. Grace Period Notice:'}</span>
-                    <span>{ui.neg_2_desc || 'Request a mandatory 15-day written notice window before any default remedies or penalty fees can be charged.'}</span>
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                    <span className="font-bold text-slate-900 block mb-0.5">{ui.neg_3_title || '3. Early Payoff Protection:'}</span>
-                    <span>{ui.neg_3_desc || 'Confirm 0% exit penalties for prepayments made from ordinary business income.'}</span>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-700 pt-1">
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <span className="font-bold text-slate-900 block mb-0.5">{ui.neg_1_title || '1. Benchmark Transparency:'}</span>
+                      <span className="leading-relaxed">{ui.neg_1_desc || 'Request that interest rates be pegged strictly to an external benchmark to avoid arbitrary spread increases.'}</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <span className="font-bold text-slate-900 block mb-0.5">{ui.neg_2_title || '2. Grace Period Notice:'}</span>
+                      <span className="leading-relaxed">{ui.neg_2_desc || 'Request a mandatory 15-day written notice window before any default remedies or penalty fees can be charged.'}</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <span className="font-bold text-slate-900 block mb-0.5">{ui.neg_3_title || '3. Early Payoff Protection:'}</span>
+                      <span className="leading-relaxed">{ui.neg_3_desc || 'Confirm 0% exit penalties for prepayments made from ordinary business income.'}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+
+                {/* Navigation Button */}
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('clauses')}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    ← Back to Clauses
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('assistant')}
+                    className="px-4 py-2 bg-cobalt-600 hover:bg-cobalt-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <span>Launch Agreement Assistant</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* STAGE 5: INTERACTIVE ASSISTANT */}
+            {activeTab === 'assistant' && (
+              <motion.div
+                key="assistant"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+              >
+                <div className="lg:col-span-2">
+                  <ContractAssistant contractId={activeContract.id} language={selectedLanguage} />
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-white p-5 border border-slate-200 rounded-2xl shadow-card space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={16} className="text-teal-600" />
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-slate-800">Verification Engine</h4>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      All responses are grounded directly in the indexed vector embeddings of this document. Citing exact page coordinates prevents hallucinations.
+                    </p>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1">
+                      <div className="flex justify-between">
+                        <span>ChromaDB Index:</span>
+                        <span className="font-mono font-bold text-slate-900">{activeContract.chroma_collection_id || 'Active'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Language Model:</span>
+                        <span className="font-bold text-slate-900">Multilingual RAG</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-5 border border-slate-200 rounded-2xl shadow-card space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw size={15} className="text-cobalt-600" />
+                      <h4 className="font-bold text-xs uppercase tracking-wider text-slate-800">Quick Reset</h4>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Need to inspect another agreement or run an updated version? Use the top controls to switch or upload a new file.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('extracted')}
+                      className="w-full mt-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer text-center"
+                    >
+                      Return to Overview
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Empty State when no contract is loaded */}
+      {contracts.length === 0 && !analyzing && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-12 text-center max-w-xl mx-auto space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-cobalt-50 text-cobalt-600 mx-auto flex items-center justify-center">
+            <FileText size={24} />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-lg text-slate-900">No Contracts Analyzed Yet</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              Upload any loan agreement, commercial lease, or mortgage document to uncover hidden traps, calculate real affordability, and receive clear recommendations.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleLoadSample}
+              className="px-4 py-2 bg-cobalt-600 hover:bg-cobalt-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Bookmark size={13} />
+              <span>Load Sample MSE Agreement</span>
+            </button>
+            <button
+              type="button"
+              onClick={open}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Upload size={13} />
+              <span>Upload Document</span>
+            </button>
+          </div>
         </div>
       )}
     </div>
