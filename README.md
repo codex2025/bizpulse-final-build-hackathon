@@ -1,78 +1,65 @@
 # Bizpulse / DecisionForge
 
-AI Build Challenge 2026 — **PS-04 Decision Engine**. Bizpulse is a business-intelligence workspace; its
-**DecisionForge AI** module ranks sales opportunities with a deterministic, explainable scoring engine and
-traces every recommendation back to cited public data.
+AI Build Challenge 2026 — **PS-04 Data / Business Intelligence: AI Decision Engine for Business Data.**
 
-## What DecisionForge does
+Bizpulse is a business workspace (invoicing, expenses, contracts, analytics). Its **DecisionForge AI** module turns
+scattered CRM data into **answers, analytics, evidence-backed decisions, explainable recommendations and human-approved
+actions** for one concrete persona and task:
 
-- **Decision engine** — a 5-factor weighted score (deal value, win probability, engagement, recency,
-  external signal) classifies each account as `IMMEDIATE_ACTION`, `PROCEED_WITH_QUALIFICATION` or
-  `NURTURE_MONITOR`. The same snapshot + policy always yields the same scores.
-- **RAG over business data** — rep notes are indexed and retrieved as evidence quotes for each decision.
-- **Data-analytics Q&A** — `POST /decision-forge/ask` answers pipeline questions (what to prioritize, who
-  has gone cold, highest expected value, weakest region). Answers are computed from the live decision run.
-- **Evidence packs** — every recommendation carries its factor breakdown, RAG notes, sourced facts and
-  `provenance` (publisher, URL, published date).
-- **Fetch-gated external context** — a market signal never changes a score until a user explicitly fetches
-  it. Signals are labelled *"Cached validated snapshot (not a live web crawl)"*.
-- **Decision Twin** — what-if simulation of outreach volume, rep capacity and deal thresholds.
+> **B2B sales manager — "Which opportunities should our team prioritize right now, why do they matter, and what should we do?"**
 
-## Persona and task
+## The problem and the approach
 
-An enterprise sales team at an **industrial automation equipment vendor** ranks **real companies that have
-publicly announced new plants or major expansions** (Amazon, Eli Lilly, Pirelli, U.S. Steel, FANUC America,
-Chobani, Ford, GE Appliances, Toyotetsu Mid America, Hansae Mobility, Hanwha Defense, LEGO Group). An
-announced facility is a live capital-equipment buying window. The engine decides who to contact first, and a
-human approves the outreach.
+CRM data is scattered, duplicated and stale, and teams still decide by gut feeling. DecisionForge:
 
-## Sourced vs. estimated — the honesty rule
+1. **Checks the data first.** Missing, invalid, conflicting, duplicate and stale records are detected and shown — never silently fixed. They lower the decision's confidence.
+2. **Understands the question.** A deterministic intent planner (optionally an LLM constrained to a fixed intent list) maps it to a plan, and only the tools that plan needs are run.
+3. **Calculates with code, not a model.** All arithmetic is in deterministic analytics tools; each result carries its source, snapshot time and formula.
+4. **Retrieves evidence.** Rep notes are chunked, indexed and retrieved with full source references; if nothing is relevant the answer is "Insufficient evidence."
+5. **Decides by a versioned policy.** A configurable weighted score with a visible factor breakdown, a confidence value and warnings.
+6. **Lets you test alternatives.** Decision Twin recomputes on a copy of the data, respects rep capacity, and lists its assumptions.
+7. **Keeps a human in control.** Draft → Review → Approve / Modify / Reject, with a frozen evidence snapshot, and a step-by-step replay of why.
 
-Each record in `ai-service/data/real_industrial_crm.json` has three blocks:
-
-| Block | Contents | Trust |
-| --- | --- | --- |
-| `sourced` | investment, location, size, announced jobs, timeline | Traceable to a cited URL |
-| `modeled` | deal value, win probability, engagement, last contact, stage, notes | **Our estimates / synthetic CRM state**, each with a `_basis` |
-| `provenance` | `{claim, publisher, url, published_date, retrieved_date}` | Real, dated citations |
-
-No private CRM data for these companies is public and we do not claim otherwise. Contacts are role
-placeholders; no named individuals or email addresses are invented. Details:
-[`ai-service/data/README-data-provenance.md`](ai-service/data/README-data-provenance.md).
+The LLM is optional and never the source of truth: the whole system works with no API key.
 
 ## Architecture
 
 ```
-frontend (React + Vite, :5173)
-    -> backend (NestJS gateway, :3001)
-        -> ai-service (FastAPI, :8000)
-              app/decision_forge/
-                schema_mapper.py    nested + legacy dataset loading (auto-detected via `dataset_meta`)
-                external_gateway.py signals built from each record's provenance; fetch gating
-                decision_engine.py  deterministic scoring, evidence packs
-                rag_service.py      in-memory vector index over rep notes
-                qa.py               computed pipeline Q&A
-                decision_twin.py    scenario simulator
-                router.py           API, mounted at /decision-forge
+React + Vite (5173) --JWT--> NestJS gateway (3001, SQLite) --workspace header--> FastAPI ai-service (8000)
+   Decision Center · Twin · Data Quality · Evidence & Audit     runs, approvals, audit,        planner · analytics · RAG ·
+                                                                policy, replay                 engine · twin · per-user data
 ```
+
+Details, status of every component, and known limits: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORGE_ARCHITECTURE.md).
+What was found in the original codebase and what changed: [`docs/CODEBASE_AUDIT.md`](docs/CODEBASE_AUDIT.md).
+
+## Datasets
+
+| Key | What | Use |
+|---|---|---|
+| `real` (default) | 12 real companies that publicly announced new plants/expansions, with cited sources. Public facts are marked **SOURCED**; deal value, win probability etc. are our **ESTIMATES**, each with its basis | Credibility: click through to real citations |
+| `synthetic` | 520 generated opportunities, 2,240 activities, 646 notes, 120 customers, 12 reps; fixed seed; planted test cases A–H; fictional names, no URLs or emails | Scale, data-quality handling, evaluation, Decision Twin capacity story |
+| `legacy` | 8 fictional flat records | Fallback |
+
+See [`ai-service/data/README-data-provenance.md`](ai-service/data/README-data-provenance.md) (real data methodology and sources) and
+[`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
 
 ## Run locally
 
-Prerequisites: Python 3.11+, Node 18+.
+Prerequisites: Python 3.11+, Node 18+. No API key, database server or internet access is required.
 
 ```bash
 # 1. ai-service  (http://localhost:8000, docs at /docs)
 cd ai-service
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
-cp .env.example .env
-uvicorn app.main:app --reload --port 8000
+cp .env.example .env                                   # optional
+uvicorn app.main:app --port 8000
 
-# 2. backend gateway  (http://localhost:3001)
+# 2. backend gateway  (http://localhost:3001/api)
 cd backend
 npm install
-cp ../.env.example .env
-npm run start:dev
+npm run start:dev                                      # local SQLite file, seeded demo user
 
 # 3. frontend  (http://localhost:5173)
 cd frontend
@@ -80,32 +67,68 @@ npm install
 npm run dev
 ```
 
-The ai-service works on its own: try `POST http://localhost:8000/decision-forge/decide/run`.
-Everything can also be started with `docker compose up`.
+**Demo login:** `demo@bizpulse.com` / `demo123` (seeded on first start). `docker compose up` is also provided but was not
+exercised while preparing this submission.
 
-The embedding model (`sentence-transformers`) is optional; without it a deterministic offline fallback
-embedding is used, so tests and demos run with no network access.
+## Environment variables
 
-## Run the tests
+| Variable | Where | Purpose | Default |
+|---|---|---|---|
+| `AI_SERVICE_URL` | backend | ai-service address | `http://localhost:8000` |
+| `AI_SERVICE_TOKEN` | backend **and** ai-service | Shared secret; when set, ai-service rejects requests without it | unset (off) |
+| `JWT_SECRET` | backend | Token signing | see `.env.example` — **change for any real deployment** |
+| `OPENAI_API_KEY` | ai-service | Enables the optional LLM query planner | unset (rules planner) |
+| `DECISION_PLANNER_MODEL` | ai-service | Planner model | `gpt-4o-mini` |
+| `VITE_API_URL` | frontend | Gateway address | `http://localhost:3001/api` |
+
+## Tests
 
 ```bash
-cd ai-service
-pip install -r requirements-dev.txt
-python -m pytest tests -q
+cd ai-service && python -m pytest tests -q        # 145 tests
+cd backend    && npx jest                          # 22 tests
+cd frontend   && npx tsc -b && npx vite build      # typecheck + build (no UI test suite yet)
+cd ai-service && python evals/run_eval.py          # workflow evaluation (26 cases, per-metric report)
 ```
 
-The suite covers provenance integrity (including a guard against fake placeholder-domain citations),
-determinism, sourced/modeled separation, score spread, stale detection, Q&A, graceful degradation, and the
-HTTP API end to end.
+Coverage highlights: data quality and ingestion (valid/invalid/oversized/binary uploads, duplicates, stale, missing),
+deterministic analytics, RAG (relevance floor, no cross-record citation, outage), scoring and policy versioning,
+missing-data penalty and confidence, Decision Twin (no mutation, capacity limits, correct delta), the LLM planner
+(validation, single retry, fallback, injection), tenant isolation (dataset, RAG, fetch state, API, gateway ownership),
+approval state machine, replay, prompt injection, demo-reset repeatability. Method and results of the evaluation:
+[`docs/AI_EVALUATION.md`](docs/AI_EVALUATION.md).
 
-## Key endpoints (`/decision-forge`)
+## Demo
+
+A repeatable 3-minute script with the exact numbers to expect: [`docs/DECISIONFORGE_DEMO.md`](docs/DECISIONFORGE_DEMO.md).
+
+## API (gateway, all authenticated; `/api/decision-forge/...`)
 
 | Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/dataset` | Active records, quality scorecard, `dataset_meta` |
-| POST | `/decide/run` | Ranked recommendations with evidence packs |
-| POST | `/opportunities/{id}/fetch-context` | Explicitly fetch the cited external signal |
-| POST | `/ask` | Computed answer to a pipeline question |
-| GET | `/ask/suggestions` | The four suggested questions |
-| POST | `/twin/simulate` | Decision Twin scenario |
-| POST | `/reset-demo` | Reload the real dataset, clear fetch state |
+|---|---|---|
+| POST | `decisions/query` | Question → plan → analytics → RAG → answer (with trace) |
+| POST | `decide/run` | Ranked recommendations with evidence packs |
+| GET | `decisions`, `decisions/:runId`, `decisions/:runId/evidence` | History, replay, evidence |
+| POST | `recommendations/:id/review \| approve \| modify \| reject` | Human approval state machine |
+| POST | `recommendations/:id/convert-to-client` | Explicit action, only after approval |
+| POST | `twin/simulate` | Decision Twin scenario |
+| GET | `dataset`, `quality`, `datasets`, `summary` | Data, issues, dataset list, dashboard counts |
+| POST | `ingest/file`, `ingest/apply-mapping` | Validate then activate a CSV |
+| POST | `reset-demo` | Reload a dataset; `clearHistory: true` also resets runs/approvals/policy (audit log is kept) |
+| GET/POST | `policy` | Versioned scoring policy |
+| POST | `opportunities/:id/fetch-context` | Optional cited external context (cached snapshot) |
+| GET | `audit`, `approvals` | Audit log and reviews |
+
+## Limits, stated plainly
+
+- Retrieval uses hashed bag-of-words embeddings unless `sentence-transformers` is installed; the LLM planner has been tested with a fake client but not against a real model (no key was available).
+- Datasets and RAG indexes live in memory (rebuilt on restart); gateway data is SQLite.
+- "Fetch fresh context" uses a cached, cited snapshot — not a live crawl — and its relevance weight is a modeled value that the UI labels.
+- Estimates in the real dataset are ours, labelled as such; the synthetic dataset is entirely generated.
+- Rate limiting is per user on questions only; the ai-service token is optional and off by default locally.
+- Developed and tested on Python 3.12 and Node 18+; Python 3.11 compatibility was not tested. Not exercised: `docker compose`, Vercel/Render deployment, mobile layouts, accessibility tooling.
+
+## Repository map
+
+`frontend/` React app · `backend/` NestJS gateway · `ai-service/` FastAPI (`app/decision_forge/` is DecisionForge;
+`tests/`, `evals/`) · `docs/` audit, architecture, data model, evaluation, demo · the remaining modules (invoices,
+expenses, contracts, wealth, goals) are the original Bizpulse application and were not changed.
