@@ -11,10 +11,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Topbar } from '../common/Topbar';
+import { AnimatedNumber } from '../common/AnimatedNumber';
 import { analyticsService } from '../../services/analyticsService';
 import { contractService } from '../../services/contractService';
 import { decisionForgeService } from '../../services/decisionForgeService';
 import { usePersona } from '../../context/PersonaContext';
+import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
 
 // Visualizations
 import { HorizontalCategoryBar } from './visualizations/HorizontalCategoryBar';
@@ -43,6 +45,7 @@ type AnalyticsTab = 'ALL' | 'CASH_FLOW' | 'BUDGET' | 'CONTRACTS' | 'DECISIONS';
 
 export const AnalyticsPage: React.FC = () => {
   const { persona } = usePersona();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('ALL');
   const [timeframe, setTimeframe] = useState('1m');
   const [customStart, setCustomStart] = useState(() => {
@@ -145,7 +148,11 @@ export const AnalyticsPage: React.FC = () => {
 
       {/* High-Level Financial Executive Ribbon */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs">
+        <motion.div
+          whileHover={!prefersReducedMotion ? { y: -2 } : undefined}
+          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
+          className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs transition-shadow hover:shadow-md"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Inflow / Gross</span>
             <div className="w-8 h-8 rounded-xl bg-cobalt-50 text-cobalt-600 border border-cobalt-100 flex items-center justify-center">
@@ -154,16 +161,20 @@ export const AnalyticsPage: React.FC = () => {
           </div>
           <div>
             <span className="text-2xl font-black text-ink-900 font-mono tabular-nums">
-              ₹{grossIncome.toLocaleString('en-IN')}
+              <AnimatedNumber value={grossIncome} formatFn={(v) => '₹' + Math.round(v).toLocaleString('en-IN')} />
             </span>
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-600 mt-1">
               <TrendingUp size={13} />
               <span>Inflow pacing benchmark</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs">
+        <motion.div
+          whileHover={!prefersReducedMotion ? { y: -2 } : undefined}
+          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
+          className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs transition-shadow hover:shadow-md"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Operating Outflows</span>
             <div className="w-8 h-8 rounded-xl bg-vermilion-50 text-vermilion-600 border border-vermilion-100 flex items-center justify-center">
@@ -172,15 +183,19 @@ export const AnalyticsPage: React.FC = () => {
           </div>
           <div>
             <span className="text-2xl font-black text-ink-900 font-mono tabular-nums">
-              ₹{totalExpenses.toLocaleString('en-IN')}
+              <AnimatedNumber value={totalExpenses} formatFn={(v) => '₹' + Math.round(v).toLocaleString('en-IN')} />
             </span>
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 mt-1 font-mono tabular-nums">
               <span>{Math.round((totalExpenses / grossIncome) * 100)}% of gross revenue</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs">
+        <motion.div
+          whileHover={!prefersReducedMotion ? { y: -2 } : undefined}
+          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
+          className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs transition-shadow hover:shadow-md"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Net Retained Margin</span>
             <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center">
@@ -189,15 +204,19 @@ export const AnalyticsPage: React.FC = () => {
           </div>
           <div>
             <span className="text-2xl font-black text-teal-600 font-mono tabular-nums">
-              ₹{retainedSavings.toLocaleString('en-IN')}
+              <AnimatedNumber value={retainedSavings} formatFn={(v) => '₹' + Math.round(v).toLocaleString('en-IN')} />
             </span>
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-700 mt-1 font-mono tabular-nums">
               <span>{savingsPct}% retained working capital</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs">
+        <motion.div
+          whileHover={!prefersReducedMotion ? { y: -2 } : undefined}
+          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
+          className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs transition-shadow hover:shadow-md"
+        >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Contract Obligations</span>
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
@@ -212,7 +231,7 @@ export const AnalyticsPage: React.FC = () => {
               <span>₹75L active MSE loan principal</span>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Control Bar: Timeframe Preset & Lens Selector */}
@@ -220,61 +239,34 @@ export const AnalyticsPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Analytical Lenses */}
           <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
-            <button
-              type="button"
-              onClick={() => setActiveTab('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                activeTab === 'ALL'
-                  ? 'bg-white text-ink-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-ink-900'
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('CASH_FLOW')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                activeTab === 'CASH_FLOW'
-                  ? 'bg-white text-ink-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-ink-900'
-              }`}
-            >
-              Cash Flow
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('BUDGET')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                activeTab === 'BUDGET'
-                  ? 'bg-white text-ink-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-ink-900'
-              }`}
-            >
-              Budget & Variance
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('CONTRACTS')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                activeTab === 'CONTRACTS'
-                  ? 'bg-white text-ink-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-ink-900'
-              }`}
-            >
-              Contract Exposure
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('DECISIONS')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                activeTab === 'DECISIONS'
-                  ? 'bg-white text-ink-900 shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-ink-900'
-              }`}
-            >
-              Commercial Decisions
-            </button>
+            {[
+              { id: 'ALL', label: 'Overview' },
+              { id: 'CASH_FLOW', label: 'Cash Flow' },
+              { id: 'BUDGET', label: 'Budget & Variance' },
+              { id: 'CONTRACTS', label: 'Contract Exposure' },
+              { id: 'DECISIONS', label: 'Commercial Decisions' },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id as AnalyticsTab)}
+                  className={`relative px-3 py-1.5 rounded-xl text-xs font-extrabold transition-colors cursor-pointer ${
+                    isActive ? 'text-ink-900' : 'text-slate-600 hover:text-ink-900'
+                  }`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId={!prefersReducedMotion ? 'activeAnalyticsLens' : undefined}
+                      className="absolute inset-0 bg-white rounded-xl shadow-xs border border-slate-200 -z-10"
+                      transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10">{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Timeframe Presets */}
@@ -283,19 +275,24 @@ export const AnalyticsPage: React.FC = () => {
               <Calendar size={13} /> Window:
             </span>
             {TIMEFRAME_PRESETS.map((preset) => {
-              const active = timeframe === preset.id;
+              const isActive = timeframe === preset.id;
               return (
                 <button
                   key={preset.id}
                   type="button"
                   onClick={() => setTimeframe(preset.id)}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    active
-                      ? 'bg-white text-ink-900 shadow-xs border border-slate-200 font-extrabold'
-                      : 'text-slate-600 hover:text-ink-900'
+                  className={`relative px-2.5 py-1 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                    isActive ? 'text-ink-900 font-extrabold' : 'text-slate-600 hover:text-ink-900'
                   }`}
                 >
-                  {preset.label}
+                  {isActive && (
+                    <motion.div
+                      layoutId={!prefersReducedMotion ? 'activeAnalyticsPreset' : undefined}
+                      className="absolute inset-0 bg-white rounded-xl shadow-xs border border-slate-200 -z-10"
+                      transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10">{preset.label}</span>
                 </button>
               );
             })}

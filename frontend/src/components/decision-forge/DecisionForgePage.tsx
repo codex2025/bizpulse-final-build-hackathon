@@ -12,6 +12,7 @@ import {
   Compass,
   Building
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Topbar } from '../common/Topbar';
 import { DecisionProgressionEvaluator } from './DecisionProgressionEvaluator';
 import { DecisionCenterTab } from './DecisionCenterTab';
@@ -23,6 +24,7 @@ import { ApprovalModal } from './ApprovalModal';
 import { PolicyModal } from './PolicyModal';
 import { decisionForgeService } from '../../services/decisionForgeService';
 import type { DecisionRunData, RecommendationItem } from '../../services/decisionForgeService';
+import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
 
 export interface ScoreFlash {
   opportunityId: string;
@@ -32,6 +34,7 @@ export interface ScoreFlash {
 
 export const DecisionForgePage: React.FC = () => {
   const navigate = useNavigate();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [activeTab, setActiveTab] = useState<'evaluator' | 'center' | 'twin' | 'ingestion' | 'audit'>('evaluator');
   const [decisionData, setDecisionData] = useState<DecisionRunData | null>(null);
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
@@ -206,14 +209,23 @@ export const DecisionForgePage: React.FC = () => {
                   <button
                     key={rec.opportunity_id}
                     onClick={() => setSelectedOpportunityId(rec.opportunity_id)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                    className={`relative px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
                       isSelected
-                        ? 'bg-slate-900 text-white font-bold shadow-2xs'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                        ? 'text-white font-bold'
+                        : 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200'
                     }`}
                   >
-                    <span>{rec.company_name}</span>
-                    <span className="ml-1.5 font-mono text-[10px] opacity-75">({rec.priority_score})</span>
+                    {isSelected && (
+                      <motion.div
+                        layoutId={!prefersReducedMotion ? 'activeOpportunityPill' : undefined}
+                        className="absolute inset-0 bg-slate-900 rounded-lg shadow-2xs -z-10"
+                        transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <span className="relative z-10">
+                      <span>{rec.company_name}</span>
+                      <span className="ml-1.5 font-mono text-[10px] opacity-75">({rec.priority_score})</span>
+                    </span>
                   </button>
                 );
               })}
@@ -223,116 +235,90 @@ export const DecisionForgePage: React.FC = () => {
 
         {/* Tab Switcher */}
         <div className="flex border-b border-slate-200 pt-2 overflow-x-auto gap-2">
-          <button
-            onClick={() => setActiveTab('evaluator')}
-            className={`py-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-              activeTab === 'evaluator'
-                ? 'border-cobalt-600 text-cobalt-600'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Compass className="w-4 h-4" />
-            <span>Decision Progression (7-Step Evaluator)</span>
-            <span className="px-1.5 py-0.2 text-[9px] uppercase tracking-wider rounded bg-cobalt-600 text-white font-extrabold">
-              Flagship
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('center')}
-            className={`py-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-              activeTab === 'center'
-                ? 'border-cobalt-600 text-cobalt-600'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>Pipeline Decision Center</span>
-            {decisionData?.high_priority_count ? (
-              <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
-                {decisionData.high_priority_count} Deals
-              </span>
-            ) : null}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('twin')}
-            className={`py-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-              activeTab === 'twin'
-                ? 'border-cobalt-600 text-cobalt-600'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            <span>Decision Twin Simulator</span>
-            <span className="px-1.5 py-0.2 text-[9px] uppercase tracking-wider rounded bg-slate-100 text-slate-700 border border-slate-200 font-bold">
-              What-If
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('ingestion')}
-            className={`py-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-              activeTab === 'ingestion'
-                ? 'border-cobalt-600 text-cobalt-600'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <UploadCloud className="w-4 h-4" />
-            <span>Data Ingestion & Quality</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('audit')}
-            className={`py-2.5 px-3.5 text-xs font-bold flex items-center gap-2 border-b-2 transition whitespace-nowrap cursor-pointer ${
-              activeTab === 'audit'
-                ? 'border-cobalt-600 text-cobalt-600'
-                : 'border-transparent text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>Governance & Audit Trail</span>
-          </button>
+          {[
+            { id: 'evaluator', label: 'Decision Progression (7-Step Evaluator)', icon: Compass, badge: 'Flagship', badgeColor: 'bg-cobalt-600 text-white' },
+            { id: 'center', label: 'Pipeline Decision Center', icon: Layers, badge: decisionData?.high_priority_count ? `${decisionData.high_priority_count} Deals` : undefined, badgeColor: 'bg-teal-50 text-teal-700 border border-teal-200' },
+            { id: 'twin', label: 'Decision Twin Simulator', icon: Sliders, badge: 'What-If', badgeColor: 'bg-slate-100 text-slate-700 border border-slate-200' },
+            { id: 'ingestion', label: 'Data Ingestion & Quality', icon: UploadCloud },
+            { id: 'audit', label: 'Governance & Audit Trail', icon: History },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`relative py-2.5 px-3.5 text-xs font-bold flex items-center gap-2 transition whitespace-nowrap cursor-pointer ${
+                  isActive ? 'text-cobalt-600' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+                {tab.badge && (
+                  <span className={`px-1.5 py-0.2 text-[9px] uppercase tracking-wider rounded font-extrabold ${tab.badgeColor}`}>
+                    {tab.badge}
+                  </span>
+                )}
+                {isActive && (
+                  <motion.div
+                    layoutId={!prefersReducedMotion ? 'decisionForgeTabIndicator' : undefined}
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-cobalt-600"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Tab Panels */}
-      {activeTab === 'evaluator' && activeOpportunity && (
-        <DecisionProgressionEvaluator
-          recommendation={activeOpportunity}
-          policyVersion={decisionData?.policy_version || '1.0'}
-          decisionRunId={decisionData?.decision_run_id || 'run-live'}
-          onOpenApproval={(item) => setApprovalItem(item)}
-          onFetchContext={handleFetchContext}
-          fetchingContextId={fetchingContextId}
-        />
-      )}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={!prefersReducedMotion ? { opacity: 0, y: 4 } : false}
+          animate={{ opacity: 1, y: 0 }}
+          exit={!prefersReducedMotion ? { opacity: 0, y: -4 } : undefined}
+          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
+        >
+          {activeTab === 'evaluator' && activeOpportunity && (
+            <DecisionProgressionEvaluator
+              recommendation={activeOpportunity}
+              policyVersion={decisionData?.policy_version || '1.0'}
+              decisionRunId={decisionData?.decision_run_id || 'run-live'}
+              onOpenApproval={(item) => setApprovalItem(item)}
+              onFetchContext={handleFetchContext}
+              fetchingContextId={fetchingContextId}
+            />
+          )}
 
-      {activeTab === 'center' && (
-        <DecisionCenterTab
-          decisionData={decisionData}
-          isLoading={isLoading}
-          onOpenEvidence={(item) => setEvidenceItem(item)}
-          onOpenApproval={(item) => setApprovalItem(item)}
-          onRunDecisions={fetchDecisions}
-          onFetchContext={handleFetchContext}
-          fetchingContextId={fetchingContextId}
-          scoreFlash={scoreFlash}
-        />
-      )}
+          {activeTab === 'center' && (
+            <DecisionCenterTab
+              decisionData={decisionData}
+              isLoading={isLoading}
+              onOpenEvidence={(item) => setEvidenceItem(item)}
+              onOpenApproval={(item) => setApprovalItem(item)}
+              onRunDecisions={fetchDecisions}
+              onFetchContext={handleFetchContext}
+              fetchingContextId={fetchingContextId}
+              scoreFlash={scoreFlash}
+            />
+          )}
 
-      {activeTab === 'twin' && <DecisionTwinTab />}
+          {activeTab === 'twin' && <DecisionTwinTab />}
 
-      {activeTab === 'ingestion' && (
-        <DataIngestionTab
-          onDatasetUpdated={() => {
-            fetchDecisions();
-            showNotification('New CRM dataset activated and analyzed.');
-          }}
-        />
-      )}
+          {activeTab === 'ingestion' && (
+            <DataIngestionTab
+              onDatasetUpdated={() => {
+                fetchDecisions();
+                showNotification('New CRM dataset activated and analyzed.');
+              }}
+            />
+          )}
 
-      {activeTab === 'audit' && <AuditTrailTab />}
+          {activeTab === 'audit' && <AuditTrailTab />}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Evidence Side Drawer */}
       <EvidenceDrawer

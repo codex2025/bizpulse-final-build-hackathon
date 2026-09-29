@@ -16,3 +16,4 @@ export * from './Breadcrumb';
 export * from './Sidebar';
 export * from './Topbar';
 export * from './Layout';
+export * from './AnimatedNumber';

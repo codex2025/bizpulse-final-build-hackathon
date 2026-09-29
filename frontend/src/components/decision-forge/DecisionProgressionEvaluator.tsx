@@ -6,6 +6,8 @@ import {
   RefreshCw, Mail, CheckCircle2, AlertOctagon,
   ChevronDown, ChevronUp, Info, Loader2, Check
 } from 'lucide-react';
+import { AnimatedNumber } from '../common/AnimatedNumber';
+import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
 import type { RecommendationItem } from '../../services/decisionForgeService';
 
 interface DecisionProgressionEvaluatorProps {
@@ -25,6 +27,7 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
   onFetchContext,
   fetchingContextId,
 }) => {
+  const prefersReducedMotion = usePrefersReducedMotion();
   // Interactive Overrides / What-If editing
   const [overrideDealValue, setOverrideDealValue] = useState<number>(recommendation.deal_value);
   const [overrideWinProb, setOverrideWinProb] = useState<number>(recommendation.win_probability * 100);
@@ -184,7 +187,7 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Decision Score</span>
               <div className="flex items-center justify-end gap-1.5 mt-0.5">
                 <span className="text-2xl font-black font-mono tabular-nums text-slate-900">
-                  {liveCalculations.computedScore}
+                  <AnimatedNumber value={liveCalculations.computedScore} formatFn={(v) => v.toFixed(1)} />
                 </span>
                 <span className="text-xs text-slate-400">/ 100</span>
               </div>
@@ -360,11 +363,11 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
         <AnimatePresence>
           {expandCalculations && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
+              initial={!prefersReducedMotion ? { opacity: 0, height: 0 } : false}
               animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.15 }}
-              className="space-y-4 pt-1"
+              exit={!prefersReducedMotion ? { opacity: 0, height: 0 } : undefined}
+              transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
+              className="space-y-4 pt-1 overflow-hidden"
             >
               {/* Formula Callout */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
@@ -432,11 +435,11 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
         <AnimatePresence>
           {expandRisks && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
+              initial={!prefersReducedMotion ? { opacity: 0, height: 0 } : false}
               animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.15 }}
-              className="space-y-2.5 pt-1"
+              exit={!prefersReducedMotion ? { opacity: 0, height: 0 } : undefined}
+              transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
+              className="space-y-2.5 pt-1 overflow-hidden"
             >
               {liveCalculations.risks.map((risk, idx) => {
                 const isCrit = risk.severity === 'critical';
@@ -495,11 +498,11 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
         <AnimatePresence>
           {expandEvidence && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
+              initial={!prefersReducedMotion ? { opacity: 0, height: 0 } : false}
               animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.15 }}
-              className="space-y-3 pt-1"
+              exit={!prefersReducedMotion ? { opacity: 0, height: 0 } : undefined}
+              transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
+              className="space-y-3 pt-1 overflow-hidden"
             >
               {/* Evidence Tab Buttons */}
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
@@ -685,11 +688,11 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
         <AnimatePresence>
           {expandAudit && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
+              initial={!prefersReducedMotion ? { opacity: 0, height: 0 } : false}
               animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.15 }}
-              className="space-y-2 pt-1 text-xs"
+              exit={!prefersReducedMotion ? { opacity: 0, height: 0 } : undefined}
+              transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
+              className="space-y-2 pt-1 text-xs overflow-hidden"
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">

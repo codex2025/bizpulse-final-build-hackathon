@@ -18,6 +18,7 @@ import {
 import { Topbar } from '../common/Topbar';
 import { contractService } from '../../services/contractService';
 import { usePersona } from '../../context/PersonaContext';
+import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
 import type {
   ContractAnalysisData,
   ContractClause,
@@ -365,6 +366,7 @@ const ClauseInspectionRow: React.FC<{
   language: string;
   isInitiallyExpanded?: boolean;
 }> = ({ clause, language, isInitiallyExpanded = false }) => {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [expanded, setExpanded] = useState(isInitiallyExpanded);
   const isHighRisk = clause.risk_level === 'High' || clause.is_red_flag;
   const isRedFlag = clause.is_red_flag;
@@ -409,67 +411,77 @@ const ClauseInspectionRow: React.FC<{
       </div>
 
       {/* Expanded Split-View */}
-      {expanded && (
-        <div className="p-4 space-y-3.5">
-          {/* Red Flag Warning Box */}
-          {isRedFlag && clause.red_flag_reason && (
-            <div className="p-3 bg-vermilion-50 border border-vermilion-200 rounded-lg flex items-start gap-2.5">
-              <AlertTriangle size={15} className="text-vermilion-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <span className="text-[11px] font-black uppercase text-vermilion-900 block">{ui.why_risky || 'Why this clause is risky for you:'}</span>
-                <p className="text-xs font-medium text-vermilion-800 leading-relaxed mt-0.5">{clause.red_flag_reason}</p>
-              </div>
-            </div>
-          )}
-
-          {/* 2-Column Split: Original vs Plain Meaning */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {/* Left: Original Contract Text */}
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
-                  <FileText size={12} className="text-slate-400" /> {ui.original_text || 'Original Contract Text (Verbatim):'}
-                </span>
-                <p className="text-xs text-slate-800 font-mono leading-relaxed bg-white p-2.5 rounded border border-slate-200">
-                  {clause.original_text || 'Original text excerpted from agreement document.'}
-                </p>
-              </div>
-              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
-                <span>Verified Source Location</span>
-                <span>Page {clause.source_page || 1}</span>
-              </div>
-            </div>
-
-            {/* Right: Plain Meaning */}
-            <div className="bg-cobalt-50/40 border border-cobalt-200/80 rounded-lg p-3.5 flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-cobalt-800 block mb-1.5 flex items-center gap-1.5">
-                  <Sparkles size={12} className="text-cobalt-600" /> {ui.plain_meaning || 'Plain Meaning:'}
-                </span>
-                <p className="text-xs font-medium text-slate-900 leading-relaxed bg-white p-2.5 rounded border border-cobalt-100">
-                  {clause.simple_explanation || clause.plain_explanation || 'Clear plain language breakdown.'}
-                </p>
-              </div>
-
-              {/* Practical Impact and Advice */}
-              <div className="mt-2.5 pt-2 border-t border-cobalt-100 space-y-1.5">
-                {clause.financial_impact && (
-                  <div className="flex items-start gap-1.5 text-xs">
-                    <DollarSign size={13} className="text-cobalt-600 mt-0.5 flex-shrink-0" />
-                    <span className="font-semibold text-slate-800">{ui.cost_impact || 'Cost Impact:'} <span className="font-normal text-slate-600">{clause.financial_impact}</span></span>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={!prefersReducedMotion ? { opacity: 0, height: 0 } : false}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={!prefersReducedMotion ? { opacity: 0, height: 0 } : undefined}
+            transition={{ duration: 0.2, ease: EASE_FINANCIAL }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 space-y-3.5">
+              {/* Red Flag Warning Box */}
+              {isRedFlag && clause.red_flag_reason && (
+                <div className="p-3 bg-vermilion-50 border border-vermilion-200 rounded-lg flex items-start gap-2.5">
+                  <AlertTriangle size={15} className="text-vermilion-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="text-[11px] font-black uppercase text-vermilion-900 block">{ui.why_risky || 'Why this clause is risky for you:'}</span>
+                    <p className="text-xs font-medium text-vermilion-800 leading-relaxed mt-0.5">{clause.red_flag_reason}</p>
                   </div>
-                )}
-                {clause.actionable_tip && (
-                  <div className="flex items-start gap-1.5 text-xs">
-                    <Lightbulb size={13} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                    <span className="font-semibold text-slate-800">{ui.action_tip || 'Action Tip:'} <span className="font-normal text-slate-600">{clause.actionable_tip}</span></span>
+                </div>
+              )}
+
+              {/* 2-Column Split: Original vs Plain Meaning */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Left: Original Contract Text */}
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
+                      <FileText size={12} className="text-slate-400" /> {ui.original_text || 'Original Contract Text (Verbatim):'}
+                    </span>
+                    <p className="text-xs text-slate-800 font-mono leading-relaxed bg-white p-2.5 rounded border border-slate-200">
+                      {clause.original_text || 'Original text excerpted from agreement document.'}
+                    </p>
                   </div>
-                )}
+                  <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500 font-semibold">
+                    <span>Verified Source Location</span>
+                    <span>Page {clause.source_page || 1}</span>
+                  </div>
+                </div>
+
+                {/* Right: Plain Meaning */}
+                <div className="bg-cobalt-50/40 border border-cobalt-200/80 rounded-lg p-3.5 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cobalt-800 block mb-1.5 flex items-center gap-1.5">
+                      <Sparkles size={12} className="text-cobalt-600" /> {ui.plain_meaning || 'Plain Meaning:'}
+                    </span>
+                    <p className="text-xs font-medium text-slate-900 leading-relaxed bg-white p-2.5 rounded border border-cobalt-100">
+                      {clause.simple_explanation || clause.plain_explanation || 'Clear plain language breakdown.'}
+                    </p>
+                  </div>
+
+                  {/* Practical Impact and Advice */}
+                  <div className="mt-2.5 pt-2 border-t border-cobalt-100 space-y-1.5">
+                    {clause.financial_impact && (
+                      <div className="flex items-start gap-1.5 text-xs">
+                        <DollarSign size={13} className="text-cobalt-600 mt-0.5 flex-shrink-0" />
+                        <span className="font-semibold text-slate-800">{ui.cost_impact || 'Cost Impact:'} <span className="font-normal text-slate-600">{clause.financial_impact}</span></span>
+                      </div>
+                    )}
+                    {clause.actionable_tip && (
+                      <div className="flex items-start gap-1.5 text-xs">
+                        <Lightbulb size={13} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                        <span className="font-semibold text-slate-800">{ui.action_tip || 'Action Tip:'} <span className="font-normal text-slate-600">{clause.actionable_tip}</span></span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -764,6 +776,7 @@ const ContractAssistant: React.FC<{
 // --- MAIN CONTRACTS PAGE COMPONENT ---
 export const ContractsPage: React.FC = () => {
   const { persona } = usePersona();
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const [translating, setTranslating] = useState<boolean>(false);
@@ -1062,28 +1075,38 @@ export const ContractsPage: React.FC = () => {
         <div className="space-y-6">
           {/* Stepper Navigation */}
           <div className="flex items-center justify-between border-b border-slate-200 pb-2 overflow-x-auto">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/60">
               {[
                 { id: 'extracted', label: '1. Extracted Information', icon: FileCheck },
                 { id: 'risk', label: '2. Risk & Affordability', icon: AlertTriangle },
                 { id: 'clauses', label: `3. Clause Analysis (${activeContract.clauses?.length || 0})`, icon: Scale },
                 { id: 'evidence', label: '4. Supporting Evidence', icon: ShieldCheck },
                 { id: 'assistant', label: '5. Contract Assistant', icon: Sparkles },
-              ].map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setActiveTab(id as ContractWorkflowStep)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
-                    activeTab === id
-                      ? 'bg-cobalt-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-cobalt-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <Icon size={13} />
-                  {label}
-                </button>
-              ))}
+              ].map(({ id, label, icon: Icon }) => {
+                const isActive = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTab(id as ContractWorkflowStep)}
+                    className={`relative px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                      isActive ? 'text-white' : 'text-slate-600 hover:text-ink-900'
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId={!prefersReducedMotion ? 'contractWorkflowPill' : undefined}
+                        className="absolute inset-0 bg-cobalt-600 rounded-xl shadow-xs -z-10"
+                        transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center gap-1.5">
+                      <Icon size={13} />
+                      {label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="hidden lg:flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -1316,20 +1339,28 @@ export const ContractsPage: React.FC = () => {
                       { id: 'caution', label: 'Caution' },
                       { id: 'low', label: 'Low Concern' },
                       { id: 'red_flags', label: 'Traps Only' },
-                    ].map((f) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setClauseFilter(f.id as typeof clauseFilter)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                          clauseFilter === f.id
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
+                    ].map((f) => {
+                      const isActive = clauseFilter === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setClauseFilter(f.id as typeof clauseFilter)}
+                          className={`relative px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                            isActive ? 'text-white font-bold' : 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200'
+                          }`}
+                        >
+                          {isActive && (
+                            <motion.div
+                              layoutId={!prefersReducedMotion ? 'clauseFilterPill' : undefined}
+                              className="absolute inset-0 bg-slate-900 rounded-lg shadow-2xs -z-10"
+                              transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                            />
+                          )}
+                          <span className="relative z-10">{f.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

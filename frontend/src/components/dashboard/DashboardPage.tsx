@@ -32,6 +32,7 @@ import {
 
 import { Topbar } from '../common/Topbar';
 import { MetricCard } from '../common/MetricCard';
+import { AnimatedNumber } from '../common/AnimatedNumber';
 import { Card, CardTitle, CardDescription } from '../common/Card';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
@@ -323,7 +324,7 @@ export const DashboardPage: React.FC = () => {
             <motion.div variants={staggerItem}>
               <MetricCard
                 label={config.inflowLabel}
-                value={fmt(metrics?.totalRevenue || 0)}
+                value={<AnimatedNumber value={metrics?.totalRevenue || 0} formatFn={fmt} />}
                 change="+12.4%"
                 trend="up"
                 sentiment="positive"
@@ -336,7 +337,7 @@ export const DashboardPage: React.FC = () => {
             <motion.div variants={staggerItem}>
               <MetricCard
                 label={config.outflowLabel}
-                value={fmt(metrics?.totalExpenses || 0)}
+                value={<AnimatedNumber value={metrics?.totalExpenses || 0} formatFn={fmt} />}
                 change="-4.2%"
                 trend="down"
                 sentiment="positive"
@@ -349,7 +350,7 @@ export const DashboardPage: React.FC = () => {
             <motion.div variants={staggerItem}>
               <MetricCard
                 label={config.surplusLabel}
-                value={fmt(metrics?.netProfit || 0)}
+                value={<AnimatedNumber value={metrics?.netProfit || 0} formatFn={fmt} />}
                 change={metrics?.totalRevenue ? `${Math.round(((metrics.netProfit || 0) / metrics.totalRevenue) * 100)}% margin` : '+18%'}
                 trend={(metrics?.netProfit || 0) >= 0 ? 'up' : 'down'}
                 sentiment={(metrics?.netProfit || 0) >= 0 ? 'positive' : 'negative'}
@@ -370,8 +371,8 @@ export const DashboardPage: React.FC = () => {
                 }
                 value={
                   persona === 'personal' || persona === 'employee'
-                    ? metrics?.invoiceCount || 0
-                    : fmt(metrics?.pendingAmount || metrics?.overdueAmount || 0)
+                    ? (metrics?.invoiceCount || 0)
+                    : <AnimatedNumber value={metrics?.pendingAmount || metrics?.overdueAmount || 0} formatFn={fmt} />
                 }
                 change={
                   metrics?.overdueAmount && metrics.overdueAmount > 0

@@ -1,12 +1,14 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
 
 export type TrendDirection = 'up' | 'down' | 'neutral';
 export type TrendSentiment = 'positive' | 'negative' | 'neutral';
 
 export interface MetricCardProps {
   label: string;
-  value: string | number;
+  value: React.ReactNode | string | number;
   change?: string | number;
   trend?: TrendDirection;
   sentiment?: TrendSentiment;
@@ -31,8 +33,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   action,
   className = '',
 }) => {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
   // Infer sentiment if not explicitly provided
-  // In finance, up is usually positive, down is negative
   const resolvedSentiment =
     sentiment || (trend === 'up' ? 'positive' : trend === 'down' ? 'negative' : 'neutral');
 
@@ -57,8 +60,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   const currentSentiment = sentimentStyles[resolvedSentiment];
 
   return (
-    <div
-      className={`bg-white border border-slate-200 rounded-financial p-4 sm:p-5 shadow-card hover:border-slate-300 transition-all ${className}`}
+    <motion.div
+      whileHover={!prefersReducedMotion ? { y: -2, transition: { duration: 0.18, ease: EASE_FINANCIAL } } : undefined}
+      className={`bg-white border border-slate-200 rounded-financial p-4 sm:p-5 shadow-card hover:border-slate-300 transition-colors ${className}`}
     >
       <div className="flex items-center justify-between gap-2 mb-2.5">
         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">
@@ -92,6 +96,6 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           {subtitle && <span className="text-slate-500 font-semibold truncate">{subtitle}</span>}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
