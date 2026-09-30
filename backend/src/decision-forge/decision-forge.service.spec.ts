@@ -1,33 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import { DecisionForgeService, canTransition } from './decision-forge.service';
-
-/** Minimal in-memory stand-in for a TypeORM repository (equality `where`, no relations). */
-class FakeRepo<T extends Record<string, any>> {
-  rows: T[] = [];
-  private seq = 0;
-  private matches(row: T, where: Record<string, any> = {}) {
-    return Object.entries(where).every(([k, v]) => row[k] === v);
-  }
-  async findOne({ where }: { where: Record<string, any>; order?: any }) {
-    const found = [...this.rows].reverse().find((r) => this.matches(r, where));
-    return found ? { ...found } : null;
-  }
-  async find({ where = {}, take }: { where?: Record<string, any>; order?: any; take?: number } = {}) {
-    const rows = [...this.rows].reverse().filter((r) => this.matches(r, where)).map((r) => ({ ...r }));
-    return take ? rows.slice(0, take) : rows;
-  }
-  async save(entity: any) {
-    const row = { id: `id-${++this.seq}`, createdAt: new Date(), updatedAt: new Date(), ...entity };
-    this.rows.push(row);
-    return { ...row };
-  }
-  async delete(where: Record<string, any>) {
-    this.rows = this.rows.filter((r) => !this.matches(r, where));
-  }
-  async update(where: Record<string, any>, patch: Record<string, any>) {
-    this.rows.filter((r) => this.matches(r, where)).forEach((r) => Object.assign(r, patch));
-  }
-}
+import { FakeRepo } from '../../test/helpers/fake-repo';
 
 class TestableService extends DecisionForgeService {
   aiCalls: Array<{ method: string; path: string; workspace: string; body?: any }> = [];
@@ -63,7 +36,7 @@ async function setup() {
   const queries = new FakeRepo<any>();
   const clients = new FakeRepo<any>();
   const config = { get: (_k: string, d: string) => d };
-  const svc = new TestableService(config as any, runs as any, approvals as any, audit as any, policies as any, queries as any, clients as any);
+  const svc = new TestableService(config as any, runs as any, approvals as any, audit as any, policies as any, queries as any, clients as any, new FakeRepo() as any);
   await runs.save({ decisionRunId: 'DR-A', userId: 'user-a', policyVersion: 'v1', snapshotId: 'snap-1', recordsAnalyzed: 1,
     recommendations: [REC('DR-A')], dataSnapshot: '2026-09-27', highPriorityCount: 1, staleWarningCount: 0 });
   return { svc, runs, approvals, audit, clients };
@@ -215,6 +188,43 @@ describe('workspace scoping and query trail', () => {
     expect(replay.replay[6].detail.policy).toEqual({ w: 1 });
   });
 
+  it('records a what-if asked in words as a simulation, with its parameters and result', async () => {
+    const { svc, audit } = await setup();
+    svc.aiResponses['/decisions/query'] = {
+      answer: 'Scenario estimate (not a forecast): 6 sales reps (baseline 4) ...', intent: 'scenario_simulation', confidence: 0.8,
+      plan: { intent: 'scenario_simulation', planner: 'rules', analytics_tools: ['run_decision_twin'] },
+      analytics: [{ tool: 'run_decision_twin', result: { simulation_id: 'SIM-abc' } }],
+      rag: { status: 'not_required', evidence: [] }, trace: [{ step: 'plan' }, { step: 'scenario_parse' }],
+      snapshot_id: 'snap-9', dataset_key: 'synthetic',
+      scenario: {
+        recognized: true,
+        levers: [{ lever: 'sales_reps_count', label: 'sales reps', baseline: 4, scenario: 6, note: '4 baseline + 2' }],
+        baseline_params: { sales_reps_count: 4 }, scenario_params: { sales_reps_count: 6 },
+        simulation: { simulation_id: 'SIM-abc', delta_revenue_percent: -47, rep_capacity_utilization_percent: 7.2, comparisons: [] },
+      },
+    };
+    const res = await svc.queryDecision('What happens if we add two sales reps?', 'user-a', 'a@x.com');
+    expect(res.scenario.recognized).toBe(true);                                   // the UI payload passes through untouched
+    expect((svc as any).queryRepo.rows[0].analytics[0].tool).toBe('run_decision_twin');
+    expect(audit.rows.find((r) => r.eventType === 'QUERY_RUN').payload).toMatchObject({ intent: 'scenario_simulation', tools: ['run_decision_twin'] });
+    const sim = audit.rows.find((r) => r.eventType === 'SIMULATION_RUN');
+    expect(sim.payload).toMatchObject({ source: 'question', inputs: { sales_reps_count: 6 }, baseline: { sales_reps_count: 4 }, simulationId: 'SIM-abc', deltaRevenuePercent: -47 });
+    expect(sim.payload.message).toContain('sales reps 4 -> 6');
+    expect(sim.payload.message).toContain('-47%');
+  });
+
+  it('a blocked what-if (nothing simulated) logs the question but no simulation', async () => {
+    const { svc, audit } = await setup();
+    svc.aiResponses['/decisions/query'] = {
+      answer: "I can't run that scenario as asked.", intent: 'scenario_simulation', confidence: 0,
+      plan: { intent: 'scenario_simulation', planner: 'rules', analytics_tools: ['run_decision_twin'] }, analytics: [],
+      rag: { status: 'not_required', evidence: [] }, trace: [], scenario: { recognized: false, levers: [], simulation: null },
+    };
+    await svc.queryDecision('What if we add 50 reps?', 'user-a', 'a@x.com');
+    expect(audit.rows.some((r) => r.eventType === 'QUERY_RUN')).toBe(true);
+    expect(audit.rows.some((r) => r.eventType === 'SIMULATION_RUN')).toBe(false);
+  });
+
   it('rejects empty and oversized questions', async () => {
     const { svc } = await setup();
     expect(await status(svc.queryDecision('   ', 'user-a', 'a@x.com'))).toBe(400);
@@ -261,10 +271,10 @@ describe('rate limiting and service token', () => {
     const runs = new FakeRepo<any>();
     const config = { get: (k: string, d: any) => (k === 'AI_SERVICE_TOKEN' ? 'tok-123' : d) };
     const svc: any = new DecisionForgeService(config as any, runs as any, new FakeRepo() as any, new FakeRepo() as any,
-      new FakeRepo() as any, new FakeRepo() as any, new FakeRepo() as any);
+      new FakeRepo() as any, new FakeRepo() as any, new FakeRepo() as any, new FakeRepo() as any);
     expect(svc.serviceHeaders()).toEqual({ 'X-Internal-Token': 'tok-123' });
     const noToken: any = new DecisionForgeService({ get: (_k: string, d: any) => d } as any, runs as any, new FakeRepo() as any,
-      new FakeRepo() as any, new FakeRepo() as any, new FakeRepo() as any, new FakeRepo() as any);
+      new FakeRepo() as any, new FakeRepo() as any, new FakeRepo() as any, new FakeRepo() as any, new FakeRepo() as any);
     expect(noToken.serviceHeaders()).toEqual({});
   });
 });

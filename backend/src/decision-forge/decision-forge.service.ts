@@ -2,12 +2,13 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { DecisionRun } from './entities/decision-run.entity';
 import { DecisionApproval, ApprovalStatus } from './entities/approval.entity';
 import { DecisionAuditLog } from './entities/audit-log.entity';
 import { DecisionPolicyConfig } from './entities/policy-config.entity';
 import { DecisionQueryLog } from './entities/query-log.entity';
+import { DecisionWorkspaceState } from './entities/workspace-state.entity';
 import { Client } from '../clients/entities/client.entity';
 
 const DEFAULT_POLICY = {
@@ -50,6 +51,19 @@ function cleanText(value: any, max: number, field: string): string {
   return value.trim();
 }
 
+/**
+ * The ai-service address as configured. Hosting platforms hand out different shapes (Render's
+ * `hostport` is `name:10000` with no scheme), so a missing scheme means plain http on a private
+ * network; trailing slashes are dropped.
+ */
+export function normalizeServiceUrl(raw?: string): string {
+  const value = (raw || '').trim().replace(/\/+$/, '');
+  if (!value) return 'http://localhost:8000';
+  return /^https?:\/\//i.test(value) ? value : `http://${value}`;
+}
+
+const RESTORE_REQUIRED = 'WORKSPACE_RESTORE_REQUIRED';
+
 @Injectable()
 export class DecisionForgeService {
   private readonly logger = new Logger(DecisionForgeService.name);
@@ -69,8 +83,10 @@ export class DecisionForgeService {
     private readonly queryRepo: Repository<DecisionQueryLog>,
     @InjectRepository(Client)
     private readonly clientRepo: Repository<Client>,
+    @InjectRepository(DecisionWorkspaceState)
+    private readonly workspaceRepo: Repository<DecisionWorkspaceState>,
   ) {
-    this.aiUrl = this.config.get('AI_SERVICE_URL', 'http://localhost:8000');
+    this.aiUrl = normalizeServiceUrl(this.config.get('AI_SERVICE_URL', 'http://localhost:8000'));
   }
 
   /**
@@ -78,11 +94,115 @@ export class DecisionForgeService {
    * user's id, so every dataset, RAG index and fetch state on the ai-service side is per user.
    */
   protected ai(userId: string): AxiosInstance {
-    return axios.create({
+    const client = axios.create({
       baseURL: `${this.aiUrl}/decision-forge`,
       timeout: 30000,
       headers: { 'X-Workspace-Id': userId, ...this.serviceHeaders() },
     });
+
+    // Say which workspace state we expect the ai-service to hold (dataset, upload, fetched context).
+    client.interceptors.request.use(async (cfg) => {
+      const state = await this.getWorkspaceState(userId);
+      if (state?.stateFingerprint) cfg.headers.set('X-Workspace-State', state.stateFingerprint);
+      return cfg;
+    });
+
+    // A cold, restarted or different ai-service instance answers 409 rather than serving a default
+    // dataset: rebuild the workspace from what we persisted, then retry the original call once.
+    client.interceptors.response.use(undefined, async (err) => {
+      const cfg = err?.config as (InternalAxiosRequestConfig & { restoreTried?: boolean }) | undefined;
+      const code = err?.response?.data?.detail?.code;
+      if (cfg && !cfg.restoreTried && err?.response?.status === 409 && code === RESTORE_REQUIRED) {
+        cfg.restoreTried = true;
+        await this.restoreWorkspace(userId);
+        return client.request(cfg);
+      }
+      throw err;
+    });
+    return client;
+  }
+
+  // ---- recoverable workspace state ------------------------------------------------------------
+
+  protected getWorkspaceState(userId: string) {
+    return this.workspaceRepo.findOne({ where: { userId } });
+  }
+
+  /** Remembers what this user's ai-service workspace was built from (see workspace-state.entity.ts). */
+  private async saveWorkspaceState(
+    userId: string,
+    next: { datasetKey: string; snapshotId?: string; stateFingerprint?: string; records: any[] | null; fetchedOpportunityIds: string[] },
+  ) {
+    if (!next.stateFingerprint) {
+      // The ai-service did not describe its state, so nothing we could store would be checkable.
+      await this.workspaceRepo.delete({ userId });
+      return;
+    }
+    const existing = await this.getWorkspaceState(userId);
+    if (existing) await this.workspaceRepo.update({ userId }, next);
+    else await this.workspaceRepo.save({ userId, ...next });
+  }
+
+  /** Adds an opportunity whose external context was fetched, and adopts the ai-service's new fingerprint. */
+  private async recordFetched(userId: string, opportunityId: string, view: any) {
+    if (!view?.state_fingerprint) return;
+    const existing = await this.getWorkspaceState(userId);
+    if (existing) {
+      const ids = Array.from(new Set([...(existing.fetchedOpportunityIds || []), opportunityId]));
+      await this.workspaceRepo.update({ userId }, {
+        fetchedOpportunityIds: ids, stateFingerprint: view.state_fingerprint, snapshotId: view.snapshot_id,
+      });
+    } else if (view.dataset_key && view.dataset_key !== 'custom') {
+      // Default (never explicitly reset) preset workspace; an uploaded one cannot be rebuilt without its records.
+      await this.workspaceRepo.save({
+        userId, datasetKey: view.dataset_key, snapshotId: view.snapshot_id, stateFingerprint: view.state_fingerprint,
+        records: null, fetchedOpportunityIds: [opportunityId],
+      });
+    }
+  }
+
+  private restoring = new Map<string, Promise<void>>();
+
+  /**
+   * Rebuilds the caller's workspace on the ai-service from the persisted state. Parallel requests that
+   * all hit a cold instance share ONE restore. Nothing persisted means the ai-service default is right.
+   */
+  protected restoreWorkspace(userId: string): Promise<void> {
+    const inflight = this.restoring.get(userId);
+    if (inflight) return inflight;
+    const job = (async () => {
+      const state = await this.getWorkspaceState(userId);
+      if (!state) return;
+      const res = await axios.post(
+        `${this.aiUrl}/decision-forge/workspace/restore`,
+        {
+          dataset_key: state.datasetKey,
+          records: state.datasetKey === 'custom' ? state.records || [] : undefined,
+          fetched_opportunity_ids: state.fetchedOpportunityIds || [],
+          expected_state: state.stateFingerprint,
+        },
+        { timeout: 60000, headers: { 'X-Workspace-Id': userId, ...this.serviceHeaders() } },
+      );
+      const restored = res.data || {};
+      if (restored.state_fingerprint && restored.state_fingerprint !== state.stateFingerprint) {
+        // Rebuilt from the same inputs but the data differs from when it was saved (for example a new
+        // release of a preset dataset). Adopt the new fingerprint so the mismatch is not repeated.
+        await this.workspaceRepo.update({ userId }, {
+          stateFingerprint: restored.state_fingerprint, snapshotId: restored.snapshot_id,
+        });
+      }
+      await this.auditRepo.save({
+        eventType: 'WORKSPACE_RESTORED',
+        actorId: userId,
+        payload: {
+          datasetKey: state.datasetKey, snapshotId: restored.snapshot_id, matchesExpected: restored.matches_expected,
+          uploadedRecords: state.datasetKey === 'custom' ? (state.records || []).length : 0,
+          fetchedContext: (state.fetchedOpportunityIds || []).length,
+        },
+      });
+    })().finally(() => this.restoring.delete(userId));
+    this.restoring.set(userId, job);
+    return job;
   }
 
   /** Shared secret proving the caller is this gateway (see ai-service security.py). Optional locally. */
@@ -153,6 +273,13 @@ export class DecisionForgeService {
     const key = dataset || 'real';
     try {
       const res = await this.ai(userId).post('/reset-demo', { dataset: key });
+      await this.saveWorkspaceState(userId, {
+        datasetKey: res.data.dataset_key || key,
+        snapshotId: res.data.snapshot_id,
+        stateFingerprint: res.data.state_fingerprint,
+        records: null,
+        fetchedOpportunityIds: [],
+      });
       if (clearHistory) {
         await this.approvalRepo.delete({ userId });
         await this.queryRepo.delete({ userId });
@@ -202,6 +329,13 @@ export class DecisionForgeService {
     }
     try {
       const res = await this.ai(userId).post('/ingest/apply-mapping', { records });
+      await this.saveWorkspaceState(userId, {
+        datasetKey: 'custom',
+        snapshotId: res.data.snapshot_id,
+        stateFingerprint: res.data.state_fingerprint,
+        records,
+        fetchedOpportunityIds: [],
+      });
 
       await this.auditRepo.save({
         eventType: 'DATASET_ACTIVATED',
@@ -381,6 +515,29 @@ export class DecisionForgeService {
         actorEmail: email,
         payload: { intent: data.intent, planner: data.plan?.planner, tools: data.plan?.analytics_tools, confidence: data.confidence },
       });
+      if (data.scenario?.simulation) {
+        // A what-if asked in words is a simulation like a slider run: record its parameters and result the same way.
+        const sim = data.scenario.simulation;
+        const levers = (data.scenario.levers || []).map((l: any) => ({ lever: l.lever, baseline: l.baseline, scenario: l.scenario, note: l.note }));
+        const delta = sim.delta_revenue_percent;
+        await this.auditRepo.save({
+          eventType: 'SIMULATION_RUN',
+          actorId: userId,
+          actorEmail: email,
+          payload: {
+            source: 'question',
+            question: q,
+            inputs: data.scenario.scenario_params,
+            baseline: data.scenario.baseline_params,
+            levers,
+            deltaRevenuePercent: delta,
+            utilization: sim.rep_capacity_utilization_percent,
+            simulationId: sim.simulation_id,
+            message: `What-if question: ${(data.scenario.levers || []).map((l: any) => `${l.label} ${l.baseline} -> ${l.scenario}`).join(', ')} `
+              + `(expected value ${delta >= 0 ? '+' : ''}${delta}% vs baseline)`,
+          },
+        });
+      }
       return { ...data, query_log_id: log.id };
     } catch (err: any) {
       if (err instanceof HttpException) throw err;
@@ -392,6 +549,7 @@ export class DecisionForgeService {
   async fetchExternalContext(opportunityId: string, userId: string, email: string) {
     try {
       const res = await this.ai(userId).post(`/opportunities/${encodeURIComponent(opportunityId)}/fetch-context`);
+      if (res.data?.status === 'fetched') await this.recordFetched(userId, opportunityId, res.data);
 
       await this.auditRepo.save({
         eventType: 'EXTERNAL_CONTEXT_FETCHED',

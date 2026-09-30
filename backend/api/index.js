@@ -13,11 +13,13 @@
  */
 const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../dist/app.module');
+const { configureBodyLimits } = require('../dist/common/body-limits');
 
 let cachedApp;
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger: ['error', 'warn'] });
+  configureBodyLimits(app);
   app.enableCors({ origin: '*' });
   app.setGlobalPrefix('api');
   await app.init();
