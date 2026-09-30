@@ -39,7 +39,7 @@ npm install
 
 # Create environment configuration (verify values match)
 # Copy example or create manual .env
-# The backend will automatically generate 'finsight.db' on startup and seed data
+# The backend will automatically generate an EMPTY 'finsight.db' on startup (no accounts are seeded; sign up at /register)
 npm run start:dev
 ```
 * **Host Address**: `http://localhost:3001`
@@ -207,11 +207,11 @@ graph TD
 * **`nest-cli.json`** — Controls build paths, source roots, and Nest compilation commands.
 * **`eslint.config.mjs`** / **`.prettierrc`** — Styles, guidelines, and linting rules.
 * **`src/main.ts`** — Application entry point. Configures global CORS, sets the API route prefix to `/api`, and starts the server on port `3001`.
-* **`src/app.module.ts`** — Main system module. Configures the TypeORM database connection (pointing directly to the SQLite `finsight.db` file) and triggers the auto-seeding routine.
+* **`src/app.module.ts`** — Main system module. Configures the TypeORM database connection (pointing directly to the SQLite `finsight.db` file) (nothing is seeded any more).
 
 #### Shared Services & Guards (`/src/common`)
 * **`src/common/guards/jwt-auth.guard.ts`** — Global NestJS guard that protects controller routes, validating request headers for a valid JWT.
-* **`src/common/services/seed.service.ts`** — Automatic data seeder. Triggers `onModuleInit` to check if databases are populated; if not, it inserts default demo accounts (`admin@bizpulse.com`, `demo@bizpulse.com`), 10 clients, 24 invoices, and 20 expenses.
+* ~~`src/common/services/seed.service.ts`~~ — **removed.** It used to insert public demo accounts (`admin@bizpulse.com`, `demo@bizpulse.com`, password `demo123`) with sample clients, invoices and expenses on every start. A fresh install now has no users; see `docs/AUTHENTICATION.md`.
 
 #### Feature Modules (`/src/*`)
 * **`src/auth/`** (Module, Controller, Service, JWT Strategy) — Handles user login, sign up, bcrypt security checks, and issues signed JWT bearer tokens.

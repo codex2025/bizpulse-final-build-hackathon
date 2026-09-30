@@ -1,5 +1,9 @@
+# Render Blueprint for the two backend services (the React frontend is deployed separately, e.g. on Vercel).
+#
+# NOT verified on a live Render account. What was checked locally (production build, shared service token,
+# scheme-less AI_SERVICE_URL, smoke test) and what still has to be confirmed on the platform is in docs/DEPLOYMENT.md.
 services:
-  # 1. Backend API Gateway (NestJS)
+  # 1. Backend API gateway (NestJS). Needs Node >= 20 (NestJS 11, better-sqlite3); Render's default LTS is fine.
   - type: web
     name: bizpulse-backend
     env: node
@@ -12,15 +16,29 @@ services:
         value: 3001
       - key: JWT_SECRET
         generateValue: true
+      # "name:port" on Render's private network. Deliberately hostport, not host: the ai-service listens on
+      # $PORT, and a bare hostname would silently target port 80. The gateway adds the missing http://.
       - key: AI_SERVICE_URL
         fromService:
           type: web
           name: bizpulse-ai-service
-          property: host
+          property: hostport
+      # Shared secret: the ai-service rejects requests that do not carry it. Set the SAME value on both
+      # services (for example `openssl rand -hex 32`); Render asks for it when the Blueprint is created.
+      - key: AI_SERVICE_TOKEN
+        sync: false
+      # Google sign-in: the Firebase project id (no secret needed). Must equal VITE_FIREBASE_PROJECT_ID at the frontend
+      # build. Leave it empty to turn Google sign-in off; email + password sign-in still works.
+      - key: FIREBASE_PROJECT_ID
+        sync: false
       - key: NODE_ENV
         value: production
+      # SQLite lives on the instance disk, which the free plan wipes on every deploy and restart. To keep
+      # runs, approvals and each user's workspace state, attach a persistent disk and point DATABASE_PATH at it:
+      # - key: DATABASE_PATH
+      #   value: /var/data/finsight.db
 
-  # 2. AI Engine & RAG Service (FastAPI + ChromaDB)
+  # 2. AI engine (FastAPI): planner, analytics, RAG, decision engine, Decision Twin.
   - type: web
     name: bizpulse-ai-service
     env: python
@@ -29,8 +47,16 @@ services:
     startCommand: cd ai-service && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      # Developed and tested on Python 3.12; the pinned PyMuPDF has no wheel for newer default interpreters.
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: AI_SERVICE_TOKEN
+        sync: false
+      # Optional: enables the LLM question classifier. The system works without it (deterministic planner).
       - key: OPENAI_API_KEY
         sync: false
+      - key: DECISION_PLANNER_MODEL
+        value: gpt-4o-mini
       - key: CHROMA_PERSIST_DIR
         value: /tmp/chroma_data
       - key: MODEL_NAME

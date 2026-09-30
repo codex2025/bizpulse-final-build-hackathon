@@ -49,9 +49,11 @@ Planted synthetic cases (used by tests, evals and the demo):
 | Question + plan + trail | `decision_query_logs` | IMPLEMENTED | question, plan, answer, analytics, RAG evidence, step trace, confidence |
 | Decision evidence | embedded in `recommendations[].evidence_pack` and frozen again in `decision_approvals.evidence_snapshot` | PARTIAL | Reproducible, but not a separate `decision_evidence` table |
 | Decision approval | `decision_approvals` | IMPLEMENTED | status machine, `status_history`, `policy_version`, `snapshot_id`, `priority_score`, `confidence`, `evidence_snapshot`, reviewer notes |
-| Decision scenario | audit log `SIMULATION_RUN` payload (inputs, delta, utilization, simulation id) | PARTIAL | Full results are recomputable (deterministic id) but not stored as rows |
+| Decision scenario | audit log `SIMULATION_RUN` payload (inputs, delta, utilization, simulation id; for a what-if asked in words also the question, the levers read from it and the baseline) | PARTIAL | Full results are recomputable (deterministic id) but not stored as rows. A what-if's full result is also in `decision_query_logs.analytics` |
 | Policy | `decision_policy_configs` | IMPLEMENTED | per user, versioned, one active |
+| Workspace state (recovery) | `decision_workspace_states` | IMPLEMENTED | one row per user: `dataset_key` (real / synthetic / legacy / custom), `records` (the uploaded records, custom only), `fetched_opportunity_ids`, `snapshot_id`, `state_fingerprint`. What the gateway needs to rebuild a user's workspace on any ai-service instance; see the architecture doc |
 | Audit | `decision_audit_logs` | IMPLEMENTED | append-only from the application's point of view; the demo reset never deletes it |
 | Client (action) | existing `clients` table | IMPLEMENTED | created only from an approved recommendation |
+| User / account | existing `users` table, extended | IMPLEMENTED | now also `firebase_uid` (unique; set only from a verified Firebase token), `auth_provider` (`password` or `google`), `email_verified`, `avatar_url`. `password` holds the hash of a random value for a Google-only account, so a password sign-in can never succeed for it. Nothing is seeded: a fresh database has no users |
 
 Multi-tenancy is by `user_id` on every row and every query; there is no shared table without it.

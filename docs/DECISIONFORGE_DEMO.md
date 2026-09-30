@@ -5,13 +5,21 @@ after a reset. If you see different numbers, press **Reset Demo Dataset** (it al
 
 ## Setup (once)
 
+Prerequisites: Python 3.11+ (3.12 tested) and **Node 20.19+ or 22.12+** (NestJS 11 and Vite 8 need it; 24 tested).
+
 ```bash
 cd ai-service && pip install -r requirements-dev.txt && uvicorn app.main:app --port 8000
 cd backend    && npm install && npm run start:dev          # http://localhost:3001/api
 cd frontend   && npm install && npm run dev                # http://localhost:5173
 ```
 
-Login: **demo@bizpulse.com / demo123** (seeded automatically). Open **DecisionForge AI** in the sidebar.
+Sign up at `/register` with Google (or email and password): there are no built-in accounts, so the first person to use a fresh install creates one.
+A new account starts empty on the finance pages, but DecisionForge gives every user their own workspace with the real dataset loaded. Open
+**DecisionForge AI** in the sidebar. (Setting up Google sign-in: `docs/AUTHENTICATION.md`.)
+
+To check the whole path without a browser: `python scripts/smoke_demo.py` walks this script over HTTP (login, reset, question,
+evidence, what-if, Twin, review and approve, replay, audit, injection, token checks) and exits non-zero if any step fails.
+Point it at a deployed stack with `--gateway https://.../api`.
 
 ## Path A: real accounts (default dataset) — credibility and the human loop
 
@@ -44,6 +52,27 @@ Open **Data Quality** and click **Load synthetic 500+ dataset** (the page shows 
 | 8 | Now also drag **contacts/day** to 5 | Only **50 of 77** covered, utilization 154%, expected value **$22.7M → $17.2M (−24.0%)**, expected closes 48 → 34, capacity warning. This is the capacity effect |
 | 9 | Point at the assumptions list | The response-window and focus multipliers are stated assumptions; the panel shows the covered value without them ($14.7M in step 8) and how much they move the result |
 
+### What-if questions in plain words (same Twin, no sliders)
+
+Back in **Decision Center** type a what-if (or click the last suggested chip). The numbers are read from your sentence by
+deterministic code, applied to the stated baseline (4 reps, 20 contacts/day, $50,000 minimum, 3-day response, cutoff 60) and run
+through the same model as the sliders. The card shows an **Applied** chip for every lever it read, a **Baseline vs scenario**
+table labelled *Scenario estimate, not a forecast*, and **Assumptions and limits**.
+
+| # | Ask | You should see |
+|---|---|---|
+| 10 | *What happens if we only pursue deals above $500,000?* | Expected value **$22,679,599 → $12,022,747 (−47.0%)** in red; deals in scope **77 → 29**; utilization 19.2% → 7.2%; expected closes 48 → 18. Applied: minimum deal value $50,000 → $500,000 |
+| 11 | *What if we only have 1 rep and 5 calls per day?* | Capacity bites: only **25 of 77** covered, utilization **308%**, expected value **$22.7M → $11.1M (−51.1%)**, with the capacity warning |
+| 12 | *What if we lower the priority cutoff to 20 and the minimum deal value to 10,000?* | Scope grows 77 → 476 but the team can cover only 400: **+133.9%**, utilization 119%, capacity warning. More scope is not more coverage |
+| 13 | *What happens if we add two sales reps?* | An honest flat result: **+0.0%**, "The baseline team already covers every in-scope opportunity, so extra capacity adds no coverage" |
+| 14 | *What if we add 2 reps and only pursue deals above $100k?* | +7.3%, and the answer says "The whole change comes from the Twin's stated assumptions ... the same opportunities are covered": a modelled effect, not a measured one |
+| 15 | *What if we add 50 reps?* and *What if we increase outreach capacity?* | It refuses: "outside the supported range (1-20)" and "No amount was given". Confidence 0%, human review flagged, nothing simulated and nothing clamped to a "nearest" value |
+
+Also understood: *only have 2 reps* (a stated team size), *hire 3 more reps*, *lose one rep*, *double the team*, *30 calls a day*,
+*increase outreach by 25%*, *follow up within 48 hours* (converted to 2 days and said so), *priority cutoff of 70*, amounts such as
+`$1.5m`, `100k` or `5 lakh`. A currency other than USD (for example ₹500,000) is applied as the same number in USD, and the answer says
+no conversion was done. On the 12-account dataset the same question about $500,000 gives $4,987,211 → $4,492,498 (−9.9%), 11 → 8 in scope.
+
 Nothing in the Twin changes your records: it runs on a copy of the snapshot.
 
 **On the 12-account dataset** the Twin shows almost nothing to trade off: every account is covered even by one rep at 5 contacts/day
@@ -57,9 +86,16 @@ gives −3.9%). Use the synthetic dataset for the capacity story and say so.
 - Questions the system cannot support get "I can't map that question" with human review flagged, not a guess.
 - Nothing is executed by an approval. Approved deals can be converted to clients as a separate, explicit step.
 - Estimates are labelled as estimates; the scenario tab is labelled "Scenario estimate", never a forecast.
+- What-if numbers are read from the sentence by regex and validated against the Twin's own limits; a value the Twin cannot take is
+  refused, not rounded to something it can. A model, if configured, may classify the question but never supplies a number.
 
 ## Repeatability
 
 `Reset Demo Dataset` reloads the dataset, clears the workspace's RAG index and fetched-context state, deletes your
 decision runs, approvals, query logs and saved policy versions, and keeps the audit log (the reset is itself logged).
 Tests assert that two resets produce an identical snapshot id and identical rankings for both datasets.
+
+**Restart resilience.** The gateway remembers each user's chosen dataset, uploaded CSV records and fetched-context choices. If the
+ai-service restarts mid-demo (or a serverless instance goes cold), the next request rebuilds that workspace deterministically instead
+of silently falling back to the default dataset; the audit log then shows a `WORKSPACE_RESTORED` event. Verified by killing and
+restarting the ai-service against the running stack: same snapshot id, same rankings, same fetched score.

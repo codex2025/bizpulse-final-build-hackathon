@@ -42,13 +42,16 @@ python -m uvicorn app.main:app --reload
 ---
 
 ## 🔑 Login Credentials
-The system is pre-populated with **10 clients** and **30+ invoices**. Use these accounts to explore:
+There are **no built-in accounts** any more (the old shared `demo123` logins were removed). Create one at `/register`: sign up with Google once
+Firebase is configured, or with email and password. A new account starts empty. Details: `docs/AUTHENTICATION.md`.
+
+~~Use these accounts to explore~~ (removed):
 
 | Role | Email | Password |
 | :--- | :--- | :--- |
-| **Admin** | `admin@bizpulse.com` | `demo123` |
-| **Standard User** | `user@bizpulse.com` | `demo123` |
-| **Demo / Global** | `demo@bizpulse.com` | `demo123` |
+| ~~Admin~~ | ~~`admin@bizpulse.com`~~ | removed |
+| ~~Standard User~~ | ~~`user@bizpulse.com`~~ | removed |
+| ~~Demo / Global~~ | ~~`demo@bizpulse.com`~~ | removed |
 
 > [!TIP]
 > **Pro Tip**: If you don't see the login page immediately, open the app in an **Incognito/Private window** or use the **Logout** button in the sidebar.

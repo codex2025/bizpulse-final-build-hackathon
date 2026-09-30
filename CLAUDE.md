@@ -6,31 +6,40 @@ This section records what has actually been built, verified and decided, and wha
 standing target architecture and execution policy. **Where they differ, the repository and this section win.**
 Update this section at the end of every work session (date, commits, test counts, backlog).
 
-- **Last updated:** 2026-09-30
+- **Last updated:** 2026-09-30 (third work session)
 - **Branch / remote:** `praveen` → `hackathon` (`github.com/codex2025/bizpulse-final-build-hackathon`)
-- **Verified at:** `e934ae8` (AI service) · `6f26e0f` (gateway) · `fc31656` (frontend) · `3a1acb9` (docs); earlier baseline `a973ea8`
-- **Overall:** every phase in §40 is implemented and verified locally. **Not verified: deployment** (see backlog P0).
+- **Verified at:** committed and pushed to `hackathon/praveen` at the end of the session (`git log --oneline -14`). Baseline `bc2efcf`; after it, session 2 (workspace recovery, what-if in words, CSV body-limit fix, deployment groundwork) and session 3 (sign-in: no seeded accounts, Google sign-in through Firebase, `e2e/`, this file renamed from `CLAUDE(1).md`).
+- **Overall:** every phase in §40 is implemented and verified locally. Sign-in is now real: Google through Firebase (verified server-side) or email + password, and **no built-in accounts**. **Not verified: any real deployment, Docker, and Google sign-in with a real Firebase project and a real Google account** (it was verified end to end against the Firebase Auth emulator).
 
 ### Verification snapshot (re-run before trusting this file)
 
 | Check | Command (from repo root) | Last result |
 |---|---|---|
-| AI service tests | `cd ai-service && python -m pytest tests -q` | 145 passed |
-| Workflow evaluation | `cd ai-service && python evals/run_eval.py` | 26 cases: success 1.00, hallucination 0.00, determinism 1.00, data accuracy 1.00, recovery 1.00 |
-| Gateway tests / build | `cd backend && npx jest && npx tsc --noEmit -p tsconfig.json && npx nest build` | 22 passed, builds |
+| AI service tests | `cd ai-service && python -m pytest tests -q` | 284 passed |
+| Workflow evaluation | `cd ai-service && python evals/run_eval.py` | 40 cases (25 representative, 15 adversarial; 14 of them what-if): success 1.00, hallucination 0.00, determinism 1.00, data accuracy 1.00, recovery 1.00 |
+| Gateway tests / build | `cd backend && npx jest && npx tsc --noEmit -p tsconfig.json && npx nest build` | 199 passed (9 suites; 21 boot the whole gateway over HTTP with an in-memory database), builds |
 | Frontend | `cd frontend && npx tsc -b && npx vite build` | typechecks and builds (there are no UI tests) |
-| Browser (Chrome, local stack) | manual, script in `docs/DECISIONFORGE_DEMO.md` | main flow clicked through, no console errors |
+| HTTP smoke test of the demo | `python scripts/smoke_demo.py [--gateway URL/api --ai URL --ai-token T]` | 34/34 on the dev stack (empty database; it signs up its own account); 36/36 against the compiled gateway in production mode with the service token enforced |
+| Google sign-in, API level (Firebase Auth emulator) | `cd e2e && python google-signin.emulator.api.py` (needs the emulator and an emulator-mode gateway, see `e2e/README.md`) | 20/20 |
+| Google sign-in, real browser (Playwright + emulator popup) | `cd e2e && node google-signin.emulator.js` | 21/21, three runs in a row |
+| Production startup guards | run `node backend/dist/main` with `NODE_ENV=production` and no/placeholder/fallback `JWT_SECRET`, or `FIREBASE_AUTH_EMULATOR_HOST` set | refuses to start in all 4 cases |
+| Restart resilience (kills and restarts the ai-service) | throwaway script, not in the repo | 18/18 on the dev stack and in production mode: chosen dataset, a 600-row upload and fetched context all survive |
+| Clean install | copy of the working tree, fresh venv from the pinned `requirements-dev.txt`, `npm ci` | ai-service 271 tests + the eval pass; gateway 46 tests + build; frontend typecheck + build (Windows, Python 3.12.10, Node 24.18) |
+| Browser (Chrome, local stack) | manual, script in `docs/DECISIONFORGE_DEMO.md` | main flow clicked through; the what-if card (table, chips, refusal) checked on both datasets; login page (no demo box, Google button state) checked; no console errors |
 
 ### Run the stack
 
 ```bash
 cd ai-service && python -m uvicorn app.main:app --port 8000   # no --reload: restart after editing Python
-cd backend    && npm run start:dev                              # http://localhost:3001/api (SQLite, seeded demo user)
+cd backend    && npm run start:dev                              # http://localhost:3001/api (SQLite, created empty: no accounts)
 cd frontend   && npm run dev                                    # http://localhost:5173
 ```
 
-Demo login and the exact demo script: `README.md` and `docs/DECISIONFORGE_DEMO.md`. Always click **Reset Demo Dataset**
-first (it reloads the dataset and clears that user's runs, approvals, query logs and saved policy; the audit log is kept).
+**There is no demo login.** Sign up at `http://localhost:5173/register` (Google once Firebase is configured, or email + password). Setup of Google
+sign-in with your own Firebase project: `docs/AUTHENTICATION.md`. `backend/.env` (git-ignored; copy `backend/.env.example`) should hold a `JWT_SECRET`
+so restarts do not sign everyone out, and `FIREBASE_PROJECT_ID`; `frontend/.env` holds the `VITE_FIREBASE_*` web config (restart Vite after editing).
+The exact demo script: `README.md` and `docs/DECISIONFORGE_DEMO.md`. Always click **Reset Demo Dataset** first (it reloads the dataset and clears that
+user's runs, approvals, query logs and saved policy; the audit log is kept).
 
 ### What exists (map)
 
@@ -38,17 +47,21 @@ Python modules below live in `ai-service/app/decision_forge/` unless a full path
 
 | Area | Where | Notes |
 |---|---|---|
-| Per-user workspace state | `ai-service/app/decision_forge/workspace.py` | workspace = JWT user id via `X-Workspace-Id`; dataset, engine, RAG index, fetch state; **in memory** |
+| Per-user workspace state | `ai-service/app/decision_forge/workspace.py` | workspace = JWT user id via `X-Workspace-Id`; dataset, engine, RAG index, fetch state; in memory but **recoverable**: `state_fingerprint()`, `restore()`, 409 `WORKSPACE_RESTORE_REQUIRED` (router `_ws`), `POST /workspace/restore`; the gateway saves the inputs in `decision_workspace_states` and retries once |
 | Datasets | `ai-service/data/real_industrial_crm.json`, `ai-service/app/decision_forge/synthetic.py` | real: 12 cited accounts (SOURCED vs ESTIMATED); synthetic: 520 opportunities, seed 20260929, planted cases A–H |
 | Data quality | `quality_engine.py`, `schema_mapper.py` | missing/invalid/conflicting probability, invalid value, duplicate, stale; a blank CSV cell is *missing*, not 0 |
 | Analytics | `analytics.py` | 8 tools; each returns source, snapshot time and formula |
-| Planner / pipeline | `planner.py`, `query_pipeline.py` | rules planner; optional LLM planner (fixed enum, question text only, one retry, fallback) |
+| Planner / pipeline | `planner.py`, `query_pipeline.py` | rules planner (14 intents incl. `unknown`); optional LLM planner (fixed enum, question text only, one retry, fallback); explicit what-if cues are routed before the model; `PLANNABLE_TOOLS` = analytics tools + `run_decision_twin` |
+| What-if in words | `scenario_parser.py`, branch in `query_pipeline.py` | regex + arithmetic; bounds read from `ScenarioParams`; never clamps; blocking problems vs disclosed "not applied"; answer says when a change is only the stated assumptions; gateway audits `SIMULATION_RUN` |
 | RAG | `rag_service.py`, `intent.py` | chunking, metadata filter, hybrid rerank, relevance floor, "Insufficient evidence." |
 | Decision engine | `decision_engine.py`, `policies.py`, `schemas.py` | 5-factor policy (+ optional buying intent), quality penalty, confidence, evidence labels |
 | Decision Twin | `decision_twin.py` | baseline and scenario through one model; capacity-limited coverage; stated assumptions |
-| Gateway | `backend/src/decision-forge/` | approval state machine, ownership checks, replay, query trail, summary, rate limit |
-| Frontend | `frontend/src/components/decision-forge/`, `services/decisionForgeService.ts`, dashboard banner | tabs: Decision Center, Decision Twin, Data Quality, Evidence & Audit |
-| Docs | `docs/*.md`, `README.md`, `ai-service/data/README-data-provenance.md` | audit (with remediation log), architecture, data model, evaluation, demo |
+| Gateway | `backend/src/decision-forge/`, `backend/src/common/body-limits.ts` | approval state machine, ownership checks, replay, query trail, summary, rate limit, workspace-state persistence and restore-and-retry (axios interceptors in `ai()`), `normalizeServiceUrl`, 6 MB JSON limit on `ingest/apply-mapping` only |
+| Frontend | `frontend/src/components/decision-forge/`, `services/decisionForgeService.ts`, dashboard banner | tabs: Decision Center (answer card renders the what-if comparison), Decision Twin, Data Quality, Evidence & Audit |
+| Sign-in | `backend/src/auth/` (`auth.service.ts`, `firebase-token.verifier.ts`, `jwt-secret.ts`), `backend/src/users/profile-fields.ts`, `frontend/src/services/authService.ts`, `frontend/src/firebase/firebaseConfig.ts`, `frontend/src/components/auth/AuthPage.tsx` | `POST /auth/google` verifies a Firebase ID token with `jose` against Google's keys (no server secret); `/auth/register` + `/auth/login` for email accounts; explicit profile-field whitelist; JWT secret fail-closed in production; nothing seeded |
+| Docs | `docs/*.md`, `README.md`, `ai-service/data/README-data-provenance.md` | audit (with three remediation logs), architecture, data model, evaluation, demo, deployment, **authentication** |
+| Ops | `scripts/smoke_demo.py`, `render.yaml`, `backend/vercel.json`, `.env.example` (root, backend, frontend) | smoke test is the acceptance test after any deployment |
+| E2E | `e2e/` (own `package.json`, Playwright) | Google sign-in against the Firebase Auth emulator; no real Google account needed; `e2e/README.md` has the four-terminal recipe |
 | Tests / evals | `ai-service/tests/`, `ai-service/evals/`, `backend/src/decision-forge/*.spec.ts` | `evals/last_report.json` is generated and gitignored |
 
 ### Decisions already taken (do not relitigate without a reason)
@@ -59,49 +72,73 @@ Python modules below live in `ai-service/app/decision_forge/` unless a full path
 4. **Twin semantics.** Baseline and scenario are parameter sets run through the same model; default baseline = 4 reps × 20 contacts/day, $50,000 minimum, 3-day response, priority cutoff 60. The response-time and focus multipliers are labelled assumptions.
 5. **Currency is `$` (USD)** in the demo data and UI (this document's examples use ₹).
 6. **The data model differs from §7 naming.** See `docs/DATA_MODEL.md` for the real mapping (no Company/Product/Contact tables; data-quality issues are computed, not persisted).
+7. **What-if numbers are read by deterministic code, and refused rather than adjusted.** The LLM may classify a question as a scenario but never supplies a value. Out-of-range or conflicting values block the simulation; ambiguous wording is disclosed and only blocks when nothing is clear. Relative wording ("add two reps") is applied to the stated baseline. A non-USD currency is applied as the same number with a note.
+8. **Workspace recovery lives at the gateway.** The ai-service stays a cache that can be rebuilt; the gateway is the durable record (dataset key, uploaded records, fetched ids). An instance that does not hold the expected state says so (409) instead of answering from a default. Recovery is only as durable as the gateway's SQLite file.
+9. **Docker rewrite is deferred** until Docker Desktop is running (it was not) and the owner agrees to start it; the README says plainly that `docker compose` does not work today.
+10. **Google sign-in = Firebase ID token, verified on the gateway with `jose`.** No `firebase-admin`, no service-account key, no server secret: only the project id. Identity (uid, email, name, picture) comes solely from the verified token; the body may add profile *choices* for a new account only. Only the `google.com` provider and only verified emails are accepted. Email + password stays as a second method.
+11. **No built-in accounts, ever.** The seed service and its public `demo123` accounts are gone (the old local database is backed up at `backend/finsight.seeded-backup.db`, git-ignored). Consequence: an ephemeral disk loses all accounts on restart.
+12. **Linking retires the password.** A Google sign-in whose verified email matches an email + password account links to it (data kept) and replaces its password with an unusable hash, because the password sign-up was never verified (pre-hijacking defence).
+13. **Tokens from the Firebase emulator are unsigned**, so the gateway asks the emulator (dev only, `FIREBASE_AUTH_EMULATOR_HOST`); the process refuses to start with that variable set in production. Do not add any other way to accept unsigned tokens.
 
 ### Gotchas
 
 - **Do not `git stash` or switch branches while `nest start --watch` is running.** `synchronize: true` rebuilds tables and nulls newly added columns on existing rows (this happened once; demo rows only).
-- The ai-service has no auto-reload; the gateway (watch mode) and Vite do.
-- Large heredocs can fail in this harness's shell: write patch scripts to a file and run them.
-- Browser automation: stub `window.confirm = () => true` before clicking Reset Demo; screenshots can time out on the blurred layout (retry); range sliders need the native value setter plus an `input` event.
+- The ai-service has no auto-reload; the gateway (watch mode) and Vite do. Restarting the ai-service is now safe mid-session: the gateway restores each user's workspace on the next request.
+- Large heredocs fail in this harness's shell **and mangle backslashes** (`\b` became a backspace character in a regex once, and the what-if cue silently never fired). Write files and patch scripts with the Write/Edit tools, then run them; after patching, scan for control characters.
+- **Nest skips its own JSON body parser if it finds a middleware named `jsonParser`** (body-parser's `json()` is named that). A scoped parser must be wrapped in a differently named function (`body-limits.ts`); the test that guards this bootstraps a real Nest app.
+- Windows MAX_PATH: `python -m venv` inside the very long scratchpad path fails in `ensurepip`; use a short temp path (for example under `%TEMP%`) and delete it afterwards. PowerShell 5.1 cannot delete `node_modules` under long paths; the `robocopy` empty-directory mirror trick works.
+- **The old `firebase-login` route trusted a client-supplied email** and is gone; never reintroduce a sign-in path that takes identity from a request body. The frontend must send the ID token (`authService.loginWithGoogle`), then sign out of Firebase.
+- `JWT_SECRET`: production refuses to start without a strong, non-placeholder value; in development an empty one means a random key per start, so every gateway restart signs people out (put a real one in `backend/.env`).
+- The Firebase **web** config is public by design (it ships in the bundle); do not treat `VITE_FIREBASE_*` as secrets and do not commit real `.env` files. The root `.gitignore` deliberately ignores `*firebase*.json` (service-account keys); `e2e/firebase.json` is a harmless exception.
+- Vite reads `frontend/.env` only at start-up: restart `npm run dev` after editing it. Two `nest start --watch` processes fight over `backend/dist`; run a second gateway from the compiled build (`node dist/main`).
+- Playwright: Firebase opens the Google popup detached from the page, so it arrives as a **new page in the context** (`context.waitForEvent('page')`), not a `popup` event. The emulator's popup wires its buttons a moment after showing them, so clicks must be retried. Firebase notices a closed popup only on a slow poll (about 10 s).
+- The finance dashboard shows **invented figures for an account with no data** (assumed baseline income ₹2,20,000 / ₹1,50,000 in `analytics.service.ts`). Pre-existing, was hidden by the seeded user, left unchanged (out of scope).
+- The onboarding flag (`bizpulse_onboarded`) lives only in the browser; only new accounts (`is_new_user`) are sent through mode selection.
+- Browser automation: stub `window.confirm = () => true` before clicking Reset Demo; screenshots often time out right after a scroll (wait a few seconds and retry; the DOM is fine, so read it with JavaScript in the meantime); range sliders need the native value setter plus an `input` event; JavaScript output that is long or looks like cookie/query data gets blocked, so return short structured fields.
 - Twin sliders: contacts/day 5–50 (step 5), reps 1–10, minimum deal 0–250k, response 1–14 days, cutoff 0–100.
 - A saved gateway policy overrides the code default and changes scores; Reset Demo deletes it.
 - In the real dataset the deal value, win probability, engagement and contact dates are *our estimates*, not sourced facts.
-- This file is named `CLAUDE(1).md`; Claude Code only auto-loads a file named `CLAUDE.md`, so rename it if it should be picked up automatically.
+- This file is `CLAUDE.md` (the owner renamed it from `CLAUDE(1).md`), so Claude Code loads it automatically.
 
 ### Follow-up backlog (prioritised; tick or delete items as they land)
 
 **P0 — before a public demo / deployment**
 
-- [ ] **Recoverable workspace state on serverless.** In-memory workspaces vanish on a cold start and silently revert to the `real` dataset. Have the gateway persist the chosen dataset key (and any uploaded records) per user and send them, so any ai-service instance can rebuild the workspace deterministically.
-- [ ] **Verify deployment** (`vercel.json`, `render.yaml`): set `JWT_SECRET`, `AI_SERVICE_TOKEN` (both services), optional `OPENAI_API_KEY`; confirm the SQLite `/tmp` expectations; smoke-test `docs/DECISIONFORGE_DEMO.md`.
-- [ ] **Natural-language what-if.** Add a `SCENARIO_SIMULATION` intent so "What if we only have 2 sales reps?" extracts validated parameters and runs the Twin (baseline vs scenario in the answer). The Twin is slider-only today.
-- [ ] **Evaluate the LLM planner with a real key** on paraphrased questions and record intent accuracy in `docs/AI_EVALUATION.md`. LLM-written explanations remain deferred.
+- [x] **Recoverable workspace state.** Done and verified (see `docs/DECISIONFORGE_ARCHITECTURE.md`): killing and restarting the ai-service under the running stack, also in production mode with the token, keeps the dataset choice, a 600-row upload and fetched context. It is exactly as durable as the gateway's SQLite file.
+- [ ] **Try Google sign-in with your real Firebase project and Google account** (owner): follow `docs/AUTHENTICATION.md` (enable Google, add a Web app, fill `frontend/.env` and `backend/.env`, restart both), then sign up at `/register`. Everything else about sign-in is verified against the emulator; this is the one step only the owner can do.
+- [~] **Verify deployment.** Done locally: production build of the gateway, scheme-less `AI_SERVICE_URL`, token enforced between services, separate `DATABASE_PATH`, `scripts/smoke_demo.py` 36/36 in production mode, the production startup guards, clean installs with the pinned requirements. `render.yaml` fixed (`hostport`, token, `PYTHON_VERSION`, `FIREBASE_PROJECT_ID`). **Still needs a real host** (Render Blueprint, Vercel functions, HTTPS/CORS from a deployed frontend, the deployed domain in Firebase *Authorized domains*): follow `docs/DEPLOYMENT.md` and finish with the smoke test. Needs the owner's accounts.
+- [ ] **Shared database for serverless.** SQLite in `/tmp` is per function instance on Vercel, so two instances are two databases (approvals made on one are invisible on another). Fine for one viewer on a warm instance, wrong for anything shared. Either deploy the gateway as a long-running service (Render) or move it to Postgres (`pg` is installed; the code uses better-sqlite3).
+- [x] **Natural-language what-if.** Done: `scenario_simulation` intent, `scenario_parser.py`, UI card, 105 tests, eval cases Q18-Q25 and A10-A15 checked against an independent Twin recomputation.
+- [ ] **Evaluate the LLM planner with a real key** on paraphrased questions (including what-if paraphrases the rules do not catch) and record intent accuracy in `docs/AI_EVALUATION.md`. Blocked: needs an API key. LLM-written explanations remain deferred.
+- [ ] **Docker.** `ai-service/Dockerfile` is empty, the gateway and frontend have none, `docker-compose.yml` starts an unused Postgres and Redis and needs env files that do not exist. Write the Dockerfiles, drop the unused services, and test with Docker Desktop running (ask the owner before starting it).
+- [x] Session 2 and 3 committed and pushed to `hackathon/praveen` (only that branch).
 
 **P1 — gaps against this document**
 
+- [ ] **Sign-in hardening:** rate limiting / lockout on `/auth/login` and `/auth/google`; email verification and password reset for email accounts; session revocation or a short-lived token with refresh; consider an HttpOnly cookie instead of `localStorage`; an invite list or approval step if sign-up should not be open to everyone.
+- [ ] **Finance dashboard empty states:** stop inventing a baseline income for accounts with no data (`backend/src/analytics/analytics.service.ts`, lines with `220000` / `150000`), and show honest empty states; then a check that no finance page shows numbers the person never entered.
 - [ ] Conflict detection between CRM fields and recent notes (§10, §17): negative phrases only lower the intent score today; no conflict is surfaced.
 - [ ] Missing close date / missing owner checks (§10); persist data-quality issues with a resolve workflow.
 - [ ] Analytics tools `get_recent_engagement` and `get_data_quality_summary`; intents `CUSTOMER_ANALYSIS` and `DATA_QUALITY` (§11, §18).
 - [ ] Real embeddings: install `sentence-transformers` and re-run the RAG checks with paraphrased queries (today: hashed bag-of-words plus lexical rerank).
 - [ ] Expose policy presets, the buying-intent weight and penalties in the Policy modal and persist them at the gateway (`decision_policy_configs` stores only 5 weights and 2 thresholds).
-- [ ] Frontend tests (Vitest/RTL) and a Playwright run of the demo path; UI-verify modify/reject, CSV upload through the file picker, mobile layout and accessibility.
+- [ ] Frontend unit tests (Vitest/RTL; `authService` first) and a Playwright run of the DecisionForge demo path (`e2e/` already has the Playwright plumbing for sign-in); UI-verify modify/reject, CSV upload through the file picker, mobile layout and accessibility.
 - [ ] Structured logs keyed by `decision_run_id` (§36) and a human-approval-rate metric computed from `decision_approvals`.
 - [ ] A workspace/company entity, multi-user workspaces, relational Company/Contact/Product tables, persisted DecisionScenario and DecisionEvidence rows.
 
 **P2 — hygiene**
 
-- [ ] Migrations instead of `synchronize: true`; tighten CORS (`*` on both services); rate-limit beyond questions; change the `.env.example` JWT default.
-- [ ] `.env.example` mismatch: the root file says `VITE_API_BASE_URL`, the code reads `VITE_API_URL`.
-- [ ] ESLint `no-explicit-any` debt; XLSX ingestion; remove the legacy duplicate `data/demo_industrial_crm.*` at the repo root; exercise `docker compose`; test Python 3.11.
+- [ ] Migrations instead of `synchronize: true` (the `users` table gained columns this session and was simply recreated on an empty database); tighten CORS (`*` on both services); rate-limit beyond questions.
+- [x] `.env.example` mismatch (`VITE_API_BASE_URL` vs `VITE_API_URL`) fixed; `DATABASE_PATH` is now honoured by the gateway.
+- [x] Seeded accounts: removed entirely rather than made switchable. (CORS `*` per environment is still open, above.)
+- [ ] More what-if levers (a maximum deal size, a close-date window, per-rep capacity) and a frontend test for the what-if card; scenario paraphrases beyond the parser's table are refused, not guessed.
+- [ ] ESLint `no-explicit-any` debt; XLSX ingestion; remove the legacy duplicate `data/demo_industrial_crm.*` at the repo root; test Python 3.11 and Node 20/22.
 - [ ] Real dataset: some records cite a rolling topic page (`/topic/openings-expansions/`); replace with fixed article URLs when refreshing, and keep `sales_notes` derived only from cited facts.
 
 ### How to continue a session
 
 1. `git log --oneline -6` and `git status`; read this section and `docs/CODEBASE_AUDIT.md` §9 (remediation log).
-2. Start the three servers; run the commands in the verification table; run `python evals/run_eval.py`.
+2. Start the three servers; run the commands in the verification table; run `python evals/run_eval.py` and `python scripts/smoke_demo.py`.
 3. Work the backlog top-down using the execution loop in §44. After each change re-run tests and evals, and update every doc that states numbers (`README.md`, `docs/DECISIONFORGE_DEMO.md`, `docs/AI_EVALUATION.md`).
 4. Update this section before finishing (date, commits, counts, backlog). Do not tick a box unless it was verified.
 
@@ -1746,14 +1783,14 @@ The LLM is a component, not the system.
 ## Product
 
 - [x] DecisionForge is usable. *(clicked through in Chrome on the local stack)*
-- [x] User can ask a business question. *(12 supported intents; unsupported questions get a controlled answer)*
+- [x] User can ask a business question. *(13 supported intents plus `unknown`; unsupported questions get a controlled answer)*
 - [x] Structured business data is analyzed.
 - [x] Unstructured evidence is retrieved. *(keyword-level unless `sentence-transformers` is installed)*
 - [x] Ranked recommendations are generated.
 - [x] Recommendations explain why.
 - [x] Recommendations trace to source records. *(evidence pack; provenance URLs for the real dataset)*
 - [x] Data quality warnings are visible.
-- [x] Decision Twin works. *(slider-driven; natural-language what-if is a P0 backlog item)*
+- [x] Decision Twin works. *(sliders, and what-if questions in words such as "what happens if we add two sales reps?")*
 - [x] Human review works.
 - [x] Approve/modify/reject works. *(approve verified in the browser; modify/reject covered by gateway unit tests only)*
 - [x] Audit replay works. *(10-step replay verified in the browser)*
@@ -1766,15 +1803,15 @@ The LLM is a component, not the system.
 - [x] RAG tested.
 - [x] Decision logic tested.
 - [x] Scenario simulation tested. *(against an independent re-implementation)*
-- [x] Authentication works.
+- [x] Authentication works. *(Google through Firebase, verified server-side, plus email + password; no built-in accounts. Google was verified against the Firebase Auth emulator in a real browser, not with a real Google account)*
 - [x] Authorization works. *(per-user ownership; no roles)*
 - [x] Tenant/workspace isolation works. *(workspace = user; tested for dataset, RAG, fetch state, API and gateway)*
 - [x] Error handling exists.
-- [~] Secrets protected. *(no keys in the frontend; the `.env.example` JWT default must be changed for any real deployment)*
+- [x] Secrets protected. *(no keys in the frontend; the JWT secret is fail-closed in production and no example value is accepted; Google sign-in needs no server secret; the Firebase web config is public by design; `.env` files are git-ignored)*
 
 ## AI
 
-- [x] Tool calling is structured. *(typed analytics tools chosen by a fixed intent-to-tool table; the LLM never selects tools)*
+- [x] Tool calling is structured. *(typed analytics tools and the Decision Twin, chosen by a fixed intent-to-tool table; the LLM never selects tools or supplies a what-if value)*
 - [x] LLM output is validated. *(planner output only; tested with a fake client, never against a real model)*
 - [x] RAG evidence is grounded.
 - [x] Unsupported claims are rejected or qualified.
@@ -1786,9 +1823,9 @@ The LLM is a component, not the system.
 - [x] Deterministic demo data.
 - [x] Demo reset works.
 - [x] Demo flow is repeatable.
-- [x] Core demo works without Internet. *(no network call is needed; "fetch context" reads a cached, cited snapshot)*
-- [ ] Deployment works. *(not verified)*
-- [~] README is usable. *(commands verified locally; a fresh-clone install was not tested)*
+- [x] Core demo works without Internet. *(after sign-in no network call is needed and "fetch context" reads a cached, cited snapshot; email + password sign-in works offline, Google sign-in needs the internet)*
+- [ ] Deployment works. *(no real host tried; production-mode local run and the smoke test pass, see `docs/DEPLOYMENT.md`; `docker compose` is known to be broken)*
+- [~] README is usable. *(commands verified from a clean copy of the working tree with the pinned requirements and `npm ci`; not tried on Node 20/22, Python 3.11, macOS/Linux or from a real `git clone`; the Node version claim was wrong and is corrected)*
 
 ---
 
