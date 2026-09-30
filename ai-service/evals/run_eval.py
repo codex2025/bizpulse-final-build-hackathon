@@ -34,6 +34,7 @@ if ROOT not in sys.path:
 
 from app.decision_forge.planner import plan_query  # noqa: E402
 from app.decision_forge.query_pipeline import run_query  # noqa: E402
+from app.decision_forge.scenario_parser import SUPPORTED_LEVERS_HELP  # noqa: E402
 from app.decision_forge.workspace import WorkspaceState  # noqa: E402
 
 CASES_PATH = os.path.join(ROOT, "evals", "cases.json")
@@ -73,6 +74,24 @@ def raw_metrics(ws: WorkspaceState) -> Dict[str, Any]:
     }
 
 
+def independent_twin(opps: List[Dict[str, Any]], p: Dict[str, Any]) -> Dict[str, Any]:
+    """The Decision Twin's documented arithmetic re-implemented from the raw records (does not import decision_twin):
+    scope = valid deals >= minimum value with priority proxy >= cutoff; capacity = reps x contacts/day x 20 working days;
+    reachable = capacity // 4 touchpoints per deal; coverage = highest expected value first; value applies the stated
+    response-window and focus multipliers, capped at 0.95."""
+    valid = [o for o in opps if isinstance(o.get("win_probability"), (int, float)) and 0 <= o["win_probability"] <= 1
+             and isinstance(o.get("deal_value"), (int, float)) and o["deal_value"] >= 0]
+    proxy = lambda o: 0.5 * min(100, o["deal_value"] / 500000 * 100) + 0.5 * min(100, max(0, o["win_probability"] * 100))
+    scope = [o for o in valid if o["deal_value"] >= p["min_deal_value"] and proxy(o) >= p["priority_threshold"]]
+    scope.sort(key=lambda o: (-o["deal_value"] * o["win_probability"], o["opportunity_id"]))
+    covered = scope[: p["sales_reps_count"] * p["contacts_per_day"] * 20 // 4]
+    days = p["followup_window_days"]
+    speed = 1.18 if days <= 3 else 1.05 if days <= 7 else 0.85 if days > 14 else 1.0
+    focus = 1.08 if p["min_deal_value"] >= 100000 else 1.0
+    return {"in_scope": len(scope), "covered": len(covered),
+            "value": round(sum(o["deal_value"] * min(0.95, o["win_probability"] * speed * focus) for o in covered), 2)}
+
+
 NUM_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?")
 
 
@@ -94,7 +113,9 @@ def _allowed_numbers(res: Dict[str, Any]) -> set:
         if isinstance(x, bool):
             return
         if isinstance(x, (int, float)):
-            allowed.update({round(float(x), 0), round(float(x), 1), float(x)})
+            # The number extractor reads magnitudes ("-51.1%" -> 51.1), so compare magnitudes.
+            v = abs(float(x))
+            allowed.update({round(v, 0), round(v, 1), v})
         elif isinstance(x, dict):
             for v in x.values():
                 walk(v)
@@ -104,16 +125,26 @@ def _allowed_numbers(res: Dict[str, Any]) -> set:
 
     for key in ("matched", "analytics", "recommendations", "run_summary", "plan", "stats"):
         walk(res.get(key))
+    # Numbers the user typed themselves and the answer echoes back ("2 reps", "$500,000") are not claims about the data.
+    for n in _numbers(res.get("question", "")):
+        allowed.update({round(n, 0), round(n, 1), n})
     # A count word in the answer ("2 opportunities ...") is the length of a list in the structured result.
     allowed.update({float(len(res.get("matched", []))), float(len(res.get("matched_ids", [])))})
     return allowed
 
 
+def _claims_text(answer: str) -> str:
+    """The part of an answer that can make numeric claims about the data. Record ids (SYN-0071, OPP-R03) contain
+    digits that are labels, and the static 'what I can simulate' guidance contains illustrative example numbers;
+    neither is a claim about the business data."""
+    text = answer.replace(SUPPORTED_LEVERS_HELP, "")
+    return re.sub(r"\b(?:SYN|OPP|REC|DR)-[A-Za-z0-9-]+\b", "", text)
+
+
 def numbers_ungrounded(res: Dict[str, Any], ws: WorkspaceState) -> List[float]:
     allowed = _allowed_numbers(res)
     allowed.update(float(len(ws.opportunities)) for _ in [0])
-    # ids such as SYN-0071 / OPP-R03 contain digits that are labels, not claims
-    text = re.sub(r"\b(?:SYN|OPP|REC|DR)-[A-Za-z0-9-]+\b", "", res["answer"])
+    text = _claims_text(res["answer"])
     bad = []
     for n in _numbers(text):
         if not any(abs(n - a) <= max(1.0, abs(a) * 0.001) for a in allowed):
@@ -160,6 +191,22 @@ def evaluate_case(case: Dict[str, Any], ws: WorkspaceState) -> Dict[str, Any]:
     elif named == "injection_not_top":
         run = ws.run()
         checks["check"] = [r.opportunity_id for r in run.recommendations].index(case["opportunity_id"]) > 100
+    elif named == "scenario_independent":
+        sc = res.get("scenario") or {}
+        sim, sp = sc.get("simulation"), sc.get("scenario_params")
+        if sim and sp:
+            base, scen = independent_twin(ws.opportunities, sc["baseline_params"]), independent_twin(ws.opportunities, sp)
+            checks["check"] = ((sim["opportunities_in_scope"], sim["opportunities_covered"]) == (scen["in_scope"], scen["covered"])
+                               and abs(sim["scenario_expected_value"] - scen["value"]) <= 0.01
+                               and abs(sim["baseline_expected_value"] - base["value"]) <= 0.01)
+        else:
+            checks["check"] = False
+    if "expect_params" in case:      # the levers read from the question, checked against what the case says they must be
+        sp = (res.get("scenario") or {}).get("scenario_params") or {}
+        checks["scenario_params"] = all(sp.get(k) == v for k, v in case["expect_params"].items())
+    if case.get("expect_no_simulation"):
+        checks["no_simulation"] = (res.get("scenario") or {}).get("simulation") is None and not any(
+            a["tool"] == "run_decision_twin" for a in res["analytics"])
     out["checks"] = checks
     out["task_success"] = all(checks.values())
 
@@ -181,7 +228,7 @@ def evaluate_case(case: Dict[str, Any], ws: WorkspaceState) -> Dict[str, Any]:
         out["evidence_grounding"] = out["citation_correctness"] = None
 
     bad_numbers = numbers_ungrounded(res, ws)
-    out["numbers_total"] = len(_numbers(re.sub(r"\b(?:SYN|OPP|REC|DR)-[A-Za-z0-9-]+\b", "", answer)))
+    out["numbers_total"] = len(_numbers(_claims_text(answer)))
     out["numbers_ungrounded"] = bad_numbers
     out["deterministic"] = res["answer"] == res2["answer"] and res["matched_ids"] == res2["matched_ids"]
     return out

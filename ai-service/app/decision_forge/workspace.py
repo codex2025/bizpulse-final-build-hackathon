@@ -95,6 +95,41 @@ class WorkspaceState:
             loaded = load_dataset(records)
             self._activate(loaded["opportunities"], loaded["meta"], "custom")
 
+    # ---- recoverable state ---------------------------------------------------------------
+    def state_fingerprint(self) -> str:
+        """Identity of everything in this workspace that changes an answer: which dataset, the exact
+        records (snapshot id) and which companies had external context fetched. The gateway stores
+        the fingerprint it last saw and sends it back; a mismatch means this instance lost or never
+        had that state (cold start, restart, another serverless instance) and it must be restored."""
+        if not self.opportunities:
+            return "ws-empty"
+        canon = json.dumps(
+            {"dataset": self.dataset_key, "snapshot": self.snapshot_id, "fetched": self.engine.ext_gateway.fetched_keys()},
+            sort_keys=True, separators=(",", ":"),
+        )
+        return "ws-" + hashlib.sha256(canon.encode("utf-8")).hexdigest()[:16]
+
+    def restore(self, dataset_key: str, records: Optional[List[Dict[str, Any]]] = None,
+                fetched_opportunity_ids: Optional[List[str]] = None) -> None:
+        """Rebuilds this workspace from what the gateway persisted: a deterministic dataset key, or
+        the user's uploaded records, plus the opportunities whose external context was fetched.
+        Everything else (scores, RAG index, quality report) is recomputed from those inputs."""
+        if dataset_key not in DATASET_KEYS:
+            raise ValueError(f"Unknown dataset '{dataset_key}'")
+        with self.lock:
+            if dataset_key == "custom":
+                if not records:
+                    raise ValueError("Records are required to restore an uploaded dataset.")
+                self.apply_records(records)
+            else:
+                self.load(dataset_key)
+            wanted = set(fetched_opportunity_ids or [])
+            gateway = self.engine.ext_gateway
+            for opp in self.opportunities:
+                name = opp.get("company_name") or ""
+                if opp.get("opportunity_id") in wanted and gateway.has_signal(name, embedded=opp.get("external_signal")):
+                    gateway.mark_fetched(name)
+
     def _activate(self, opportunities, meta, dataset_key, activities=None, customers=None, reps=None) -> None:
         for opp in opportunities:
             if not opp.get("external_signal"):
@@ -169,7 +204,9 @@ class WorkspaceRegistry:
         self._workspaces: Dict[str, WorkspaceState] = {}
         self._lock = threading.Lock()
 
-    def get(self, workspace_id: Optional[str]) -> WorkspaceState:
+    def get(self, workspace_id: Optional[str], autoload: bool = True) -> WorkspaceState:
+        """The workspace, created on first use. `autoload=False` leaves a brand-new workspace empty so
+        the caller can restore a specific state instead of paying for the default dataset first."""
         wid = (workspace_id or "default").strip() or "default"
         if not WORKSPACE_ID_RE.match(wid):
             raise InvalidWorkspaceId("Workspace id must be 1-64 characters: letters, digits, '-' or '_'.")
@@ -180,11 +217,17 @@ class WorkspaceRegistry:
                     raise InvalidWorkspaceId("Too many active workspaces; try again later.")
                 ws = WorkspaceState(wid)
                 self._workspaces[wid] = ws
-        ws.ensure_loaded()
+        if autoload:
+            ws.ensure_loaded()
         return ws
 
     def exists(self, workspace_id: str) -> bool:
         return workspace_id in self._workspaces
+
+    def evict(self, workspace_id: str) -> bool:
+        """Drops one workspace's in-memory state (what a cold start does to it). Other workspaces are untouched."""
+        with self._lock:
+            return self._workspaces.pop(workspace_id, None) is not None
 
     def clear(self) -> None:
         with self._lock:

@@ -11,9 +11,11 @@ import time
 from typing import Any, Dict, List, Optional
 
 from app.decision_forge import analytics, intent as intent_lexicon
+from app.decision_forge.decision_twin import DecisionTwinSimulator
 from app.decision_forge.planner import LLMClient, QueryPlan, plan_query
 from app.decision_forge.qa import region_of
-from app.decision_forge.schemas import PolicyWeights
+from app.decision_forge.scenario_parser import SUPPORTED_LEVERS_HELP, describe_params, parse_scenario
+from app.decision_forge.schemas import PolicyWeights, SimulationInput
 from app.decision_forge.workspace import WorkspaceState
 
 BASIS = ("Computed from the active workspace's business records. Values labelled ESTIMATE/PREDICTION are analyst "
@@ -22,6 +24,16 @@ UNSUPPORTED = ("I can't map that question to a supported analysis of this busine
                "opportunities to prioritize, which are stale or cold, highest expected value, weakest region, "
                "buying intent, or why a specific opportunity (e.g. SYN-A01) ranks where it does.")
 BUYING_INTENT_QUERY = "budget approved formal quote ready to sign purchase order signing this month"
+SCENARIO_CONFIDENCE = 0.8   # capped below the 0.9 analytics default: a scenario rests on the Twin's stated assumptions
+TWIN_DEFINITION = (
+    "Decision Twin: baseline and scenario parameter sets run through the same capacity-limited model on a copy of the snapshot "
+    "(coverage = highest expected value first, up to reps x contacts/day x 20 working days / 4 touchpoints per deal); the "
+    "response-window and focus multipliers are stated assumptions, not measurements."
+)
+_twin = DecisionTwinSimulator()
+# Every tool a QueryPlan may name: the read-only analytics tools plus the Decision Twin. The pipeline executes
+# these and nothing else, whatever a planner (rules or LLM) says.
+PLANNABLE_TOOLS = frozenset(analytics.TOOLS) | {"run_decision_twin"}
 
 
 def _fmt(n: Optional[float]) -> str:
@@ -66,6 +78,7 @@ def run_query(ws: WorkspaceState, question: str, llm: Optional[LLMClient] = None
     confidence = 0.9
     matched: List[Dict[str, Any]] = []
     stats: Dict[str, Any] = {"stale_threshold_days": 30}
+    scenario: Optional[Dict[str, Any]] = None
 
     # ---- decision run (only when the plan needs ranked recommendations) ----------------------
     if plan.decision_run_required:
@@ -223,6 +236,56 @@ def run_query(ws: WorkspaceState, question: str, llm: Optional[LLMClient] = None
         answer = (f"{len(rows)} reps analysed; {len(over)} above 100% of monthly touchpoint capacity"
                   + (": " + ", ".join(f"{r['rep']} ({r['utilization_percent']}%)" for r in over[:5]) if over else "") + ".")
 
+    elif intent == "scenario_simulation":
+        # The numbers come from scenario_parser (regex + arithmetic on the question text), never from a model.
+        t0 = time.perf_counter()
+        req = parse_scenario(question)
+        trace.step("scenario_parse", t0, req.to_dict())
+        stats["scenario_levers"] = [lv.to_dict() for lv in req.levers]
+        stats["scenario_problems"] = req.problem_details      # the numbers behind any blocking message
+        scenario = {**req.to_dict(), "recognized": bool(req.levers), "baseline_params": req.baseline.model_dump(),
+                    "scenario_params": None, "simulation": None}
+        warnings += [f"Not applied: {u}" for u in req.unsupported] + req.notes
+        if not req.runnable:
+            confidence = 0.0
+            if req.problems:
+                answer = "I can't run that scenario as asked. " + " ".join(req.problems) + " " + SUPPORTED_LEVERS_HELP
+            else:
+                answer = ("This looks like a what-if question, but I couldn't find a lever I can simulate in it. "
+                          + " ".join(req.unsupported + [SUPPORTED_LEVERS_HELP]))
+            warnings.append("Scenario not simulated.")
+        elif not opps:
+            confidence = 0.0
+            answer = "No opportunities are loaded, so there is nothing to simulate."
+        else:
+            scenario_p = req.scenario_params()
+            t0 = time.perf_counter()
+            # The Twin works on its own copy of the records: the workspace snapshot is never mutated.
+            sim = _twin.simulate([dict(o) for o in opps], SimulationInput(**scenario_p.model_dump(), baseline=req.baseline))
+            trace.step("analytics:run_decision_twin", t0, {"records": len(opps), "simulation_id": sim.simulation_id})
+            analytics_out.append(analytics._envelope("run_decision_twin", sim.model_dump(), ref, ds, len(opps), TWIN_DEFINITION))
+            base_s = sim.baseline_summary
+            applied = "; ".join(lv.describe() for lv in req.levers)
+            answer = (f"Scenario estimate (not a forecast): {applied}; every other setting stays at baseline "
+                      f"({describe_params(req.baseline)}). Expected value of the opportunities the team can cover: "
+                      f"{_fmt(sim.scenario_expected_value)} vs {_fmt(sim.baseline_expected_value)} at baseline "
+                      f"({sim.delta_revenue_percent:+.1f}%). Coverage: {sim.opportunities_covered} of {sim.opportunities_in_scope} "
+                      f"in-scope opportunities (baseline {base_s['covered']} of {base_s['in_scope']}); capacity utilization "
+                      f"{sim.rep_capacity_utilization_percent}% (baseline {base_s['utilization_percent']}%)."
+                      + (f" {sim.capacity_warning}" if sim.capacity_warning else ""))
+            if sim.scenario_expected_value == sim.baseline_expected_value:
+                # A flat result is a finding, not an error: say why so it does not look like a broken feature.
+                answer += (" Expected value is unchanged: under the Twin's assumptions these settings do not change which "
+                           "opportunities the team can cover or their modelled win probability.")
+                if base_s["covered"] == base_s["in_scope"] and {lv.lever for lv in req.levers} & {"sales_reps_count", "contacts_per_day"}:
+                    answer += " The baseline team already covers every in-scope opportunity, so extra capacity adds no coverage."
+            elif abs(sim.scenario_expected_value_no_assumptions - base_s["expected_value_no_assumptions"]) < 0.005:
+                # Same covered value before the multipliers, different value after: the change is the assumptions, not the data.
+                answer += (" The whole change comes from the Twin's stated assumptions (response-window and focus multipliers): "
+                           "the same opportunities are covered, so it is a modelled effect, not a measured one.")
+            confidence = SCENARIO_CONFIDENCE
+            scenario.update({"scenario_params": scenario_p.model_dump(), "simulation": sim.model_dump()})
+
     else:  # unknown
         confidence = 0.0
         warnings.append("Question could not be mapped to a supported analysis.")
@@ -243,6 +306,7 @@ def run_query(ws: WorkspaceState, question: str, llm: Optional[LLMClient] = None
         "matched_ids": [m.get("opportunity_id") for m in matched if isinstance(m, dict) and m.get("opportunity_id")],
         "matched_companies": [m.get("company_name") for m in matched if isinstance(m, dict) and m.get("company_name")],
         "stats": stats,
+        "scenario": scenario,
         "analytics": analytics_out,
         "rag": rag,
         "recommendations": [r.model_dump() for r in recs[:10]] if recs else [],

@@ -59,10 +59,11 @@ def test_plan_selects_only_needed_tools():
 
 
 def test_every_intent_has_a_plan_and_planned_tools_exist():
-    from app.decision_forge.analytics import TOOLS
+    from app.decision_forge.query_pipeline import PLANNABLE_TOOLS
     assert set(INTENTS) == set(INTENT_PLANS)
     for spec in INTENT_PLANS.values():
-        assert set(spec["tools"]) <= set(TOOLS)
+        assert set(spec["tools"]) <= PLANNABLE_TOOLS
+    assert "run_decision_twin" in PLANNABLE_TOOLS and "get_pipeline_summary" in PLANNABLE_TOOLS
 
 
 # ---- LLM planner: validation, single retry, fallback ---------------------------------------

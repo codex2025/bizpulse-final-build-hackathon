@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 Intent = Literal[
     "prioritize_opportunities", "cold_customers", "stale_opportunities", "highest_expected_value",
     "region_performance", "high_value_low_probability", "buying_intent", "immediate_attention",
-    "insufficient_data", "explain_opportunity", "pipeline_summary", "rep_capacity", "unknown",
+    "insufficient_data", "explain_opportunity", "pipeline_summary", "rep_capacity", "scenario_simulation", "unknown",
 ]
 INTENTS: List[str] = list(Intent.__args__)  # type: ignore[attr-defined]
 
@@ -51,6 +51,9 @@ INTENT_PLANS: Dict[str, Dict[str, Any]] = {
                              decision_run=False, rag=False, external=False),
     "rep_capacity": dict(required_data=["opportunity", "sales_rep"], tools=["get_sales_rep_capacity"],
                          decision_run=False, rag=False, external=False),
+    # What-if: the Decision Twin runs baseline vs scenario on a copy of the snapshot (see scenario_parser.py).
+    "scenario_simulation": dict(required_data=["opportunity"], tools=["run_decision_twin"],
+                                decision_run=False, rag=False, external=False),
     "unknown": dict(required_data=[], tools=[], decision_run=False, rag=False, external=False),
 }
 
@@ -87,8 +90,22 @@ def _plan_for(intent: str, opportunity_id: Optional[str], planner: str, error: O
 
 _ID_RE = re.compile(r"\b((?:SYN|OPP)-[A-Za-z0-9]+)\b", re.IGNORECASE)
 
+# What-if wording. Deliberately explicit and checked FIRST: "what if we add two reps" also contains
+# "reps"/"prioriti..." words that other rules would claim, and a what-if must never be answered as a
+# plain rep-capacity or ranking question.
+_SCENARIO_CUES = (
+    r"\bwhat\s+(?:if|happens?\s+if|would\s+happen|will\s+happen|would\s+it\s+look\s+like)\b"
+    r"|\b(?:simulate|simulation|scenario|hypothetical(?:ly)?)\b"
+    r"|\bsuppose\s+(?:we|that|our)\b|\bimagine\s+(?:we|if|that)\b"
+    r"|\bif\s+we\s+(?:were\s+to\s+)?(?:add|hire|lose|had|have|only|drop|cut|increase|reduce|raise|lower|double|halve|"
+    r"pursue|chase|target|follow|respond|focus)\b"
+    r"|\b(?:adding|hiring|losing|removing|increasing|reducing|doubling|halving)\s+(?:\w+\s+){0,3}"
+    r"(?:reps?|representatives?|salespeople|outreach|capacity|contacts)\b"
+)
+
 # Order matters: the first matching rule wins.
 _RULES = [
+    ("scenario_simulation", _SCENARIO_CUES),
     ("explain_opportunity", r"\bwhy\b.*\b(rank|score|priorit|recommend)|\bexplain\b"),
     ("insufficient_data", r"lack.*data|insufficient|missing (data|probab)|incomplete|unreliable|data quality"),
     ("buying_intent", r"buying intent|intent to buy|ready to (buy|sign)|purchase intent|strong intent"),
@@ -172,6 +189,10 @@ def plan_query(question: str, known_ids: Optional[List[str]] = None, llm: Option
     known_ids = known_ids or []
     fallback = rules_plan(question, known_ids)
     if llm is None:
+        return fallback
+    if fallback.intent == "scenario_simulation":
+        # Explicit what-if wording is routed by the deterministic cues, so a model can never turn a
+        # simulation request into a ranking or capacity question (and no call is spent on it).
         return fallback
     user = question
     error: Optional[str] = None

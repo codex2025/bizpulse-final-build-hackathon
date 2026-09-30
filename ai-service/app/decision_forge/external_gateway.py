@@ -85,6 +85,10 @@ class ExternalContextGateway:
     def reset(self) -> None:
         self._fetched.clear()
 
+    def fetched_keys(self) -> list:
+        """Sorted identities of the companies fetched so far (part of a workspace's state fingerprint)."""
+        return sorted(self._fetched)
+
     def _fetch_key(self, company_name: str) -> str:
         """The identity used to track fetch-state, whether the signal comes from the
         built-in cache (matched key) or is embedded on the opportunity itself (raw name)."""
