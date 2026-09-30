@@ -6,6 +6,7 @@ import {
   BarChart3, FileText
 } from 'lucide-react';
 import { authService } from '../../services/authService';
+import { isFirebaseConfigured } from '../../firebase/firebaseConfig';
 
 interface AuthPageProps {
   mode: 'login' | 'register';
@@ -32,17 +33,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
   const update = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
+  // Mode selection is for NEW accounts only. Whether an account has been through it is not stored anywhere but this
+  // browser (and is cleared on logout), so a returning person is never sent back through it, and a brand-new account
+  // always is, even if an earlier person on this browser had finished it.
+  const goAfterSignIn = (isNewAccount: boolean) => {
+    if (isNewAccount) localStorage.removeItem('bizpulse_onboarded');
+    else localStorage.setItem('bizpulse_onboarded', 'true');
+    navigate(isNewAccount ? '/onboarding' : '/');
+  };
+
   const handleGoogleSignIn = async () => {
     setError('');
     setGoogleLoading(true);
     try {
-      await authService.loginWithGoogle();
-      const isOnboarded = localStorage.getItem('bizpulse_onboarded');
-      if (isOnboarded) {
-        navigate('/');
-      } else {
-        navigate('/onboarding');
-      }
+      const session = await authService.loginWithGoogle();
+      goAfterSignIn(session.is_new_user === true);
     } catch (err: any) {
       setError(err.message || 'Google Sign-In failed. Please try again.');
     } finally {
@@ -57,15 +62,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
     try {
       if (mode === 'login') {
         await authService.login(form.email, form.password);
-        const isOnboarded = localStorage.getItem('bizpulse_onboarded');
-        navigate(isOnboarded ? '/' : '/onboarding');
+        goAfterSignIn(false);
       } else {
         await authService.register({
           email: form.email,
           password: form.password,
           full_name: form.full_name,
         });
-        navigate('/onboarding');
+        goAfterSignIn(true);
       }
     } catch (err: any) {
       setError(err.message || err.response?.data?.message || 'Something went wrong. Please try again.');
@@ -192,8 +196,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
             whileTap={{ scale: 0.98 }}
             type="button"
             onClick={handleGoogleSignIn}
-            disabled={googleLoading || loading}
-            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 shadow-xs transition-all cursor-pointer disabled:opacity-50 mb-4"
+            disabled={googleLoading || loading || !isFirebaseConfigured}
+            data-testid="google-sign-in"
+            title={isFirebaseConfigured ? undefined : 'Google sign-in is not configured on this build'}
+            className={`w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-3 shadow-xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${isFirebaseConfigured ? 'mb-4' : 'mb-2'}`}
           >
             {googleLoading ? (
               <motion.span
@@ -223,6 +229,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
             )}
             <span>{mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}</span>
           </motion.button>
+          {!isFirebaseConfigured && (
+            <p className="text-[11px] text-slate-400 font-medium mb-4 text-center" data-testid="google-not-configured">
+              Google sign-in isn't set up on this build yet.
+              {import.meta.env.DEV ? ' Add your Firebase web config to frontend/.env (see the README).' : ''}
+            </p>
+          )}
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-4">
@@ -262,8 +274,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
               <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type={showPass ? 'text' : 'password'}
-                placeholder="Password"
+                placeholder={mode === 'register' ? 'Password (at least 8 characters)' : 'Password'}
                 required
+                minLength={mode === 'register' ? 8 : undefined}
+                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                 className="input-field pl-9 pr-10 text-xs font-semibold"
                 value={form.password}
                 onChange={e => update('password', e.target.value)}
@@ -276,17 +290,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                 {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
-
-            {mode === 'login' && (
-              <div className="bg-slate-100/70 border border-slate-200 rounded-xl p-3 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0">
-                  <Zap size={12} className="text-brand-600" />
-                </div>
-                <p className="text-xs text-slate-600 font-medium">
-                  Try demo: <span className="text-brand-700 font-bold">demo@bizpulse.com</span> / <span className="text-brand-700 font-bold">demo123</span>
-                </p>
-              </div>
-            )}
 
             <motion.button
               whileHover={{ scale: 1.01 }}

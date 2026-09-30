@@ -9,6 +9,7 @@ import { Topbar } from '../common/Topbar';
 import { analyticsService } from '../../services/analyticsService';
 import { decisionForgeService } from '../../services/decisionForgeService';
 import { invoiceService, expenseService } from '../../services/invoiceService';
+import { userService } from '../../services/userService';
 import { AntigravityInsights } from './AntigravityInsights';
 import { ForecastWidget } from './ForecastWidget';
 import { usePersona } from '../../context/PersonaContext';
@@ -141,6 +142,10 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { persona, config } = usePersona();
 
+  // The greeting uses the signed-in person's own first name (it used to say "Sam" to everyone).
+  const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: userService.getProfile, staleTime: 60_000 });
+  const firstName = String(profile?.full_name || '').trim().split(/\s+/)[0];
+
   // Live DecisionForge counts. If the decision service is down the banner simply says so;
   // it never shows placeholder numbers.
   const { data: dfSummary, isError: dfError } = useQuery({
@@ -187,7 +192,7 @@ export const DashboardPage: React.FC = () => {
       animate="visible"
       className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto"
     >
-      <Topbar title={`Good Day, Sam`} subtitle={config.tagline} />
+      <Topbar title={firstName ? `Good Day, ${firstName}` : 'Good Day'} subtitle={config.tagline} />
 
       {/* Metrics Row Adapted by Persona */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
