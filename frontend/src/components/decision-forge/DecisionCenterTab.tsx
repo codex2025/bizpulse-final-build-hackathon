@@ -37,7 +37,18 @@ const SUGGESTED_QUESTIONS = [
   'Which customers have gone cold?',
   'Which opportunities generated the highest expected value?',
   'Which regions are underperforming?',
+  'What happens if we only pursue deals above $500,000?',
 ];
+
+/** Colour by the backend's impact flag (sign- and direction-aware), never by the sign of the number alone. */
+const IMPACT_STYLE: Record<string, string> = {
+  positive: 'text-emerald-700',
+  negative: 'text-rose-700',
+  neutral: 'text-slate-500',
+};
+
+const leverValue = (lever: string, value: number) =>
+  lever === 'min_deal_value' ? `$${Math.round(value).toLocaleString()}` : String(value);
 
 const signed = (n: number) => `${n >= 0 ? '+' : '−'}${Math.abs(n)}`;
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
@@ -209,6 +220,61 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
                 <span className="px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-amber-800">Human review required</span>
               )}
             </div>
+
+            {answer.scenario?.levers && answer.scenario.levers.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold" data-testid="scenario-levers">
+                <span className="text-slate-500 uppercase tracking-wider">Applied</span>
+                {answer.scenario.levers.map((lv) => (
+                  <span key={lv.lever} className="px-2 py-0.5 rounded-full bg-rose-100 border border-rose-200 text-rose-800" title={lv.note}>
+                    {lv.label}: {leverValue(lv.lever, lv.baseline)} → {leverValue(lv.lever, lv.scenario)}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {answer.scenario?.simulation && (
+              <div className="bg-white/80 border border-slate-200 rounded-lg overflow-hidden" data-testid="scenario-comparison">
+                <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-slate-700">Baseline vs scenario</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                    {answer.scenario.simulation.label || 'Scenario estimate'} · not a forecast
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr className="text-left text-slate-500">
+                        <th className="px-3 py-1.5 font-semibold">Metric</th>
+                        <th className="px-3 py-1.5 font-semibold">Baseline</th>
+                        <th className="px-3 py-1.5 font-semibold">Scenario</th>
+                        <th className="px-3 py-1.5 font-semibold">Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {answer.scenario.simulation.comparisons.map((c) => (
+                        <tr key={c.parameter} className="border-t border-slate-100">
+                          <td className="px-3 py-1.5 text-slate-700">{c.parameter}</td>
+                          <td className="px-3 py-1.5 font-mono text-slate-600 whitespace-nowrap">{String(c.baseline)}</td>
+                          <td className="px-3 py-1.5 font-mono text-slate-900 font-semibold whitespace-nowrap">{String(c.scenario)}</td>
+                          <td className={`px-3 py-1.5 font-mono font-semibold whitespace-nowrap ${IMPACT_STYLE[c.impact] || IMPACT_STYLE.neutral}`}>
+                            {String(c.delta)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <details className="px-3 py-2 border-t border-slate-100 text-[11px] text-slate-600">
+                  <summary className="cursor-pointer font-semibold">Assumptions and limits</summary>
+                  <ul className="mt-1 space-y-1 list-disc pl-4">
+                    {(answer.scenario.simulation.assumptions || []).map((a, i) => (
+                      <li key={i}>{a}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-slate-500">{answer.scenario.simulation.disclaimer}</p>
+                </details>
+              </div>
+            )}
 
             {answer.rag.status === 'insufficient_evidence' && (
               <p className="text-[11px] text-amber-800">Insufficient evidence from rep notes for this question.</p>

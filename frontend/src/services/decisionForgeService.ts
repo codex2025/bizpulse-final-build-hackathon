@@ -126,6 +126,30 @@ export interface SimulationResult {
   full_pipeline_expected_value?: number;
 }
 
+/** One lever a what-if question changed, with the arithmetic that produced it ("4 baseline + 2"). */
+export interface ScenarioLever {
+  lever: string;
+  label: string;
+  mode: string;
+  requested: number;
+  unit: string;
+  baseline: number;
+  scenario: number;
+  note: string;
+}
+
+/** Present only for what-if questions (intent scenario_simulation). `simulation` is null when nothing was run. */
+export interface ScenarioPayload {
+  recognized: boolean;
+  levers: ScenarioLever[];
+  problems: string[];
+  unsupported: string[];
+  notes: string[];
+  baseline_params: Record<string, number>;
+  scenario_params: Record<string, number> | null;
+  simulation: SimulationResult | null;
+}
+
 export interface QueryResult {
   question: string;
   answer: string;
@@ -144,6 +168,7 @@ export interface QueryResult {
   decision_run_id?: string | null;
   policy_version?: string | null;
   basis: string;
+  scenario?: ScenarioPayload | null;
 }
 
 export interface DecisionSummary {
