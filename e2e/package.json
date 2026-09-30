@@ -1,0 +1,12 @@
+{
+  "name": "bizpulse-e2e",
+  "private": true,
+  "description": "End-to-end checks for Google sign-in against the Firebase Auth emulator. Kept separate so the app's own dependencies are untouched.",
+  "scripts": {
+    "google": "node google-signin.emulator.js",
+    "google:api": "python google-signin.emulator.api.py"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}

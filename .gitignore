@@ -33,6 +33,8 @@ build/
 *.key
 *.cert
 *firebase*.json
+# ...except the emulator config used by e2e/ (it contains no credentials)
+!e2e/firebase.json
 serviceAccountKey*.json
 
 # Local SQLite databases & vector store
