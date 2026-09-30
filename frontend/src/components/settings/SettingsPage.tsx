@@ -3,12 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Laptop, Wallet, Save, LogOut,
   User, Briefcase, DollarSign,
-  TrendingDown, Settings as SettingsIcon, Lock, ArrowRightLeft, CheckCircle2
+  TrendingDown, Settings as SettingsIcon, Lock, ArrowRightLeft, CheckCircle2, Compass,
+  Eye, EyeOff, Key
 } from 'lucide-react';
 import { Topbar } from '../common/Topbar';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { usePersona, PERSONA_CONFIGS, type PersonaType } from '../../context/PersonaContext';
+import { useTour } from '../../context/TourContext';
 
 interface ProfileData {
   id?: string;
@@ -50,9 +52,6 @@ const SettingsFormInner: React.FC<{
       qc.invalidateQueries({ queryKey: ['visualizations'] });
       onSaved();
     },
-    onError: () => {
-      alert('Failed to update settings. Please try again.');
-    }
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -113,9 +112,10 @@ const SettingsFormInner: React.FC<{
             <DollarSign size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="number"
+              min="0"
               className="input-field pl-10 text-xs font-semibold font-mono"
               value={form.monthly_income}
-              onChange={(e) => setForm({ ...form, monthly_income: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setForm({ ...form, monthly_income: Math.max(0, parseFloat(e.target.value) || 0) })}
             />
           </div>
         </div>
@@ -128,13 +128,20 @@ const SettingsFormInner: React.FC<{
             <TrendingDown size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="number"
+              min="0"
               className="input-field pl-10 text-xs font-semibold font-mono"
               value={form.monthly_expense}
-              onChange={(e) => setForm({ ...form, monthly_expense: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => setForm({ ...form, monthly_expense: Math.max(0, parseFloat(e.target.value) || 0) })}
             />
           </div>
         </div>
       </div>
+
+      {profileMutation.isError && (
+        <div className="p-3 rounded-xl bg-vermilion-50 border border-vermilion-200 text-vermilion-700 text-xs font-bold">
+          Failed to save settings. Please check your inputs and try again.
+        </div>
+      )}
 
       <div className="flex justify-end pt-3 border-t border-slate-100">
         <button
@@ -152,6 +159,7 @@ const SettingsFormInner: React.FC<{
 
 export const SettingsPage: React.FC = () => {
   const { persona, accountPersona, toggleWorkPersonal, canSwitchToPersonal } = usePersona();
+  const { restartTour } = useTour();
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const { data: profile, isLoading } = useQuery<ProfileData>({
@@ -249,6 +257,27 @@ export const SettingsPage: React.FC = () => {
         }}
       />
 
+      {/* Change Password Card */}
+      <ChangePasswordCard />
+
+      {/* Onboarding & Guided Product Tour Card */}
+      <div className="card p-6 border border-slate-200/90 rounded-3xl bg-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h4 className="text-xs font-extrabold text-slate-900">Guided Product Tour</h4>
+          <p className="text-xs text-slate-500 font-medium mt-0.5 max-w-xl">
+            Relaunch the interactive 8-step walkthrough covering the Dashboard hierarchy, Contract Intelligence, DecisionForge AI, and Analytics lenses.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={restartTour}
+          className="px-4 py-2.5 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 via-fuchsia-50/50 to-rose-50 hover:from-violet-100 hover:to-rose-100 text-violet-700 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer self-start sm:self-auto shadow-2xs hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <Compass size={14} className="text-violet-600" />
+          <span>Launch Product Tour</span>
+        </button>
+      </div>
+
       {/* Danger Zone / Logout */}
       <div className="card p-6 border border-slate-200 rounded-3xl bg-white shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -265,5 +294,139 @@ export const SettingsPage: React.FC = () => {
         </button>
       </div>
     </div>
+  );
+};
+
+// Change Password Component
+const ChangePasswordCard: React.FC = () => {
+  const [form, setForm] = useState({ current: '', next: '', confirm: '' });
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (form.next !== form.confirm) {
+      setError('New password and confirmation do not match.');
+      return;
+    }
+    if (form.next.length < 8) {
+      setError('New password must be at least 8 characters.');
+      return;
+    }
+    setLoading(true);
+    try {
+      // Call the auth service if changePassword is available
+      const svc = authService as unknown as { changePassword?: (c: string, n: string) => Promise<void> };
+      if (typeof svc.changePassword === 'function') {
+        await svc.changePassword(form.current, form.next);
+      } else {
+        throw new Error('Password change endpoint not yet configured.');
+      }
+      setSuccess(true);
+      setForm({ current: '', next: '', confirm: '' });
+      setTimeout(() => setSuccess(false), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to change password.';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="card p-6 border border-slate-200 rounded-3xl space-y-5 bg-white shadow-xs">
+      <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+        <div className="w-10 h-10 bg-amber-50 text-amber-600 border border-amber-100 rounded-xl flex items-center justify-center">
+          <Key size={18} />
+        </div>
+        <div>
+          <h2 className="text-base font-extrabold text-ink-900">Change Password</h2>
+          <p className="text-xs text-slate-500 font-medium">Update your account password</p>
+        </div>
+      </div>
+
+      {success && (
+        <div className="p-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 text-xs font-bold flex items-center gap-2">
+          <CheckCircle2 size={14} /> Password changed successfully.
+        </div>
+      )}
+      {error && (
+        <div className="p-3 rounded-xl bg-vermilion-50 border border-vermilion-200 text-vermilion-700 text-xs font-bold">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1.5 block">Current Password</label>
+          <div className="relative">
+            <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type={showCurrent ? 'text' : 'password'}
+              required
+              value={form.current}
+              onChange={(e) => setForm({ ...form, current: e.target.value })}
+              className="input-field pl-10 pr-10 text-xs font-semibold"
+              placeholder="Current password"
+            />
+            <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+              {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1.5 block">New Password</label>
+            <div className="relative">
+              <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type={showNew ? 'text' : 'password'}
+                required
+                minLength={8}
+                value={form.next}
+                onChange={(e) => setForm({ ...form, next: e.target.value })}
+                className="input-field pl-10 pr-10 text-xs font-semibold"
+                placeholder="Min. 8 characters"
+              />
+              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+                {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1.5 block">Confirm New Password</label>
+            <div className="relative">
+              <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="password"
+                required
+                value={form.confirm}
+                onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+                className={`input-field pl-10 text-xs font-semibold ${
+                  form.confirm && form.next !== form.confirm ? 'border-vermilion-400 ring-1 ring-vermilion-300' : ''
+                }`}
+                placeholder="Repeat new password"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={loading || !form.current || !form.next || !form.confirm}
+          className="btn-primary flex items-center gap-2 text-xs font-extrabold px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-50"
+        >
+          <Key size={14} />
+          {loading ? 'Updating...' : 'Update Password'}
+        </button>
+      </div>
+    </form>
   );
 };

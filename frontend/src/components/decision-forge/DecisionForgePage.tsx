@@ -144,24 +144,30 @@ export const DecisionForgePage: React.FC = () => {
       )}
 
       {/* Flagship Header & Action Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-card space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div
+        data-tour="decision-progression"
+        className="relative overflow-hidden bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/90 p-6 shadow-[0_4px_24px_-4px_rgba(16,24,47,0.06)] space-y-5"
+      >
+        <div className="absolute top-0 right-1/4 w-72 h-72 bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative">
           <div>
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase bg-cobalt-50 text-cobalt-700 border border-cobalt-200">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wider uppercase bg-gradient-to-r from-rose-50 to-violet-50 text-violet-700 border border-violet-200 shadow-2xs">
                 Commercial Decision Engine
               </span>
-              <span className="text-xs text-slate-500 font-medium">B2B Financial Allocation</span>
+              <span className="text-xs text-slate-500 font-semibold">B2B Financial Allocation</span>
               {decisionData && (
-                <span className="text-[11px] text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                <span className="text-[11px] text-slate-500 font-mono bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-200 font-semibold">
                   Run: {decisionData.decision_run_id} • Policy {decisionData.policy_version}
                 </span>
               )}
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-slate-900 via-violet-950 to-rose-700 bg-clip-text text-transparent tracking-tight">
               Evidence-Backed Decisions & Simulation Twin
             </h1>
-            <p className="text-xs text-slate-600 mt-1 max-w-2xl">
+            <p className="text-xs text-slate-600 mt-1.5 max-w-2xl font-medium leading-relaxed">
               Evaluates business decisions across financial parameters, transparent formulas, identified risks, and multi-source evidence with human governance.
             </p>
           </div>
@@ -169,25 +175,25 @@ export const DecisionForgePage: React.FC = () => {
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={() => setPolicyOpen(true)}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-200"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-200 shadow-2xs hover:border-slate-300"
               title="Configure scoring weights and priority thresholds"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
               <span>Policy Weights</span>
             </button>
             <button
               onClick={handleResetDemo}
               disabled={isLoading}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-200"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-200 shadow-2xs hover:border-slate-300"
               title="Reset to verified demo CRM benchmark"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
               <span>Reset Benchmark</span>
             </button>
             <button
               onClick={fetchDecisions}
               disabled={isLoading}
-              className="px-4 py-2 bg-cobalt-600 hover:bg-cobalt-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition cursor-pointer"
+              className="px-4 py-2 bg-gradient-to-r from-rose-600 via-fuchsia-600 to-violet-600 hover:from-rose-500 hover:via-fuchsia-500 hover:to-violet-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-fuchsia-500/25 flex items-center gap-1.5 transition cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
             >
               <Play className="w-3.5 h-3.5 fill-white" />
               <span>{isLoading ? 'Computing…' : 'Run Decision Engine'}</span>
@@ -197,9 +203,9 @@ export const DecisionForgePage: React.FC = () => {
 
         {/* Opportunity Quick Selector Bar (Visible when in evaluator tab) */}
         {decisionData && decisionData.recommendations.length > 0 && activeTab === 'evaluator' && (
-          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="pt-3.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
             <div className="flex items-center gap-2">
-              <Building size={14} className="text-slate-400" />
+              <Building size={14} className="text-violet-500" />
               <span className="text-xs font-bold text-slate-700">Evaluating Opportunity:</span>
             </div>
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-2xl">
@@ -209,22 +215,24 @@ export const DecisionForgePage: React.FC = () => {
                   <button
                     key={rec.opportunity_id}
                     onClick={() => setSelectedOpportunityId(rec.opportunity_id)}
-                    className={`relative px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                    className={`relative px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                       isSelected
-                        ? 'text-white font-bold'
-                        : 'text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200'
+                        ? 'text-white'
+                        : 'text-slate-600 hover:text-slate-900 bg-slate-100/80 hover:bg-slate-200/80'
                     }`}
                   >
                     {isSelected && (
                       <motion.div
                         layoutId={!prefersReducedMotion ? 'activeOpportunityPill' : undefined}
-                        className="absolute inset-0 bg-slate-900 rounded-lg shadow-2xs -z-10"
+                        className="absolute inset-0 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl shadow-xs -z-10"
                         transition={{ type: 'spring', stiffness: 450, damping: 32 }}
                       />
                     )}
-                    <span className="relative z-10">
+                    <span className="relative z-10 flex items-center gap-1.5">
                       <span>{rec.company_name}</span>
-                      <span className="ml-1.5 font-mono text-[10px] opacity-75">({rec.priority_score})</span>
+                      <span className="font-mono text-[10.5px] px-1 rounded bg-black/20 text-white font-extrabold">
+                        {rec.priority_score}
+                      </span>
                     </span>
                   </button>
                 );
@@ -234,11 +242,11 @@ export const DecisionForgePage: React.FC = () => {
         )}
 
         {/* Tab Switcher */}
-        <div className="flex border-b border-slate-200 pt-2 overflow-x-auto gap-2">
+        <div className="flex border-b border-slate-200 pt-2 overflow-x-auto gap-2 relative">
           {[
-            { id: 'evaluator', label: 'Decision Progression (7-Step Evaluator)', icon: Compass, badge: 'Flagship', badgeColor: 'bg-cobalt-600 text-white' },
-            { id: 'center', label: 'Pipeline Decision Center', icon: Layers, badge: decisionData?.high_priority_count ? `${decisionData.high_priority_count} Deals` : undefined, badgeColor: 'bg-teal-50 text-teal-700 border border-teal-200' },
-            { id: 'twin', label: 'Decision Twin Simulator', icon: Sliders, badge: 'What-If', badgeColor: 'bg-slate-100 text-slate-700 border border-slate-200' },
+            { id: 'evaluator', label: 'Decision Progression (7-Step Evaluator)', icon: Compass, badge: 'Flagship', badgeColor: 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white' },
+            { id: 'center', label: 'Pipeline Decision Center', icon: Layers, badge: decisionData?.high_priority_count ? `${decisionData.high_priority_count} Deals` : undefined, badgeColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold' },
+            { id: 'twin', label: 'Decision Twin Simulator', icon: Sliders, badge: 'What-If', badgeColor: 'bg-rose-50 text-rose-700 border border-rose-200 font-bold' },
             { id: 'ingestion', label: 'Data Ingestion & Quality', icon: UploadCloud },
             { id: 'audit', label: 'Governance & Audit Trail', icon: History },
           ].map((tab) => {
@@ -248,21 +256,21 @@ export const DecisionForgePage: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`relative py-2.5 px-3.5 text-xs font-bold flex items-center gap-2 transition whitespace-nowrap cursor-pointer ${
-                  isActive ? 'text-cobalt-600' : 'text-slate-600 hover:text-slate-900'
+                className={`relative py-3 px-4 text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+                  isActive ? 'text-violet-700' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-violet-600' : 'text-slate-400'}`} />
                 <span>{tab.label}</span>
                 {tab.badge && (
-                  <span className={`px-1.5 py-0.2 text-[9px] uppercase tracking-wider rounded font-extrabold ${tab.badgeColor}`}>
+                  <span className={`px-2 py-0.5 text-[9px] uppercase tracking-wider rounded-full font-extrabold ${tab.badgeColor}`}>
                     {tab.badge}
                   </span>
                 )}
                 {isActive && (
                   <motion.div
                     layoutId={!prefersReducedMotion ? 'decisionForgeTabIndicator' : undefined}
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-cobalt-600"
+                    className="absolute bottom-0 left-0 right-0 h-0.75 bg-gradient-to-r from-rose-500 via-fuchsia-600 to-violet-600 rounded-t"
                     transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   />
                 )}

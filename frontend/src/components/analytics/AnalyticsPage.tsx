@@ -30,7 +30,7 @@ import { AnomalyAlertCard } from './visualizations/AnomalyAlertCard';
 import { ContractExposureChart } from './visualizations/ContractExposureChart';
 import { DecisionPipelineChart } from './visualizations/DecisionPipelineChart';
 
-const BIZPULSE_COLORS = ['#2457FF', '#F04438', '#00A88F', '#F5B700', '#64748B', '#111827'];
+const BIZPULSE_COLORS = ['#E11D48', '#7C3AED', '#059669', '#2457FF', '#F5B700', '#111827'];
 
 const TIMEFRAME_PRESETS = [
   { id: '1m', label: '1 Month' },
@@ -149,21 +149,22 @@ export const AnalyticsPage: React.FC = () => {
       {/* High-Level Financial Executive Ribbon */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <motion.div
-          whileHover={!prefersReducedMotion ? { y: -2 } : undefined}
-          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
-          className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs transition-shadow hover:shadow-md"
+          whileHover={!prefersReducedMotion ? { y: -3 } : undefined}
+          transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
+          className="relative overflow-hidden p-5 border border-slate-200/90 rounded-2xl bg-white/95 backdrop-blur-xl space-y-2 shadow-[0_4px_20px_-2px_rgba(16,24,47,0.04)] hover:shadow-[0_12px_28px_-6px_rgba(16,24,47,0.08)] transition-all"
         >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500/30 to-transparent" />
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Inflow / Gross</span>
-            <div className="w-8 h-8 rounded-xl bg-cobalt-50 text-cobalt-600 border border-cobalt-100 flex items-center justify-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Inflow / Gross</span>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
               <DollarSign size={16} />
             </div>
           </div>
           <div>
-            <span className="text-2xl font-black text-ink-900 font-mono tabular-nums">
+            <span className="text-2xl font-black text-slate-900 font-mono tabular-nums">
               <AnimatedNumber value={grossIncome} formatFn={(v) => '₹' + Math.round(v).toLocaleString('en-IN')} />
             </span>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-600 mt-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 mt-1">
               <TrendingUp size={13} />
               <span>Inflow pacing benchmark</span>
             </div>
@@ -171,60 +172,63 @@ export const AnalyticsPage: React.FC = () => {
         </motion.div>
 
         <motion.div
-          whileHover={!prefersReducedMotion ? { y: -2 } : undefined}
-          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
-          className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs transition-shadow hover:shadow-md"
+          whileHover={!prefersReducedMotion ? { y: -3 } : undefined}
+          transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
+          className="relative overflow-hidden p-5 border border-slate-200/90 rounded-2xl bg-white/95 backdrop-blur-xl space-y-2 shadow-[0_4px_20px_-2px_rgba(16,24,47,0.04)] hover:shadow-[0_12px_28px_-6px_rgba(16,24,47,0.08)] transition-all"
         >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500/30 to-transparent" />
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Operating Outflows</span>
-            <div className="w-8 h-8 rounded-xl bg-vermilion-50 text-vermilion-600 border border-vermilion-100 flex items-center justify-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Operating Outflows</span>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 text-white flex items-center justify-center shadow-md shadow-rose-500/20">
               <TrendingDown size={16} />
             </div>
           </div>
           <div>
-            <span className="text-2xl font-black text-ink-900 font-mono tabular-nums">
+            <span className="text-2xl font-black text-slate-900 font-mono tabular-nums">
               <AnimatedNumber value={totalExpenses} formatFn={(v) => '₹' + Math.round(v).toLocaleString('en-IN')} />
             </span>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 mt-1 font-mono tabular-nums">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-700 mt-1 font-mono tabular-nums">
               <span>{Math.round((totalExpenses / grossIncome) * 100)}% of gross revenue</span>
             </div>
           </div>
         </motion.div>
 
         <motion.div
-          whileHover={!prefersReducedMotion ? { y: -2 } : undefined}
-          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
-          className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs transition-shadow hover:shadow-md"
+          whileHover={!prefersReducedMotion ? { y: -3 } : undefined}
+          transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
+          className="relative overflow-hidden p-5 border border-slate-200/90 rounded-2xl bg-white/95 backdrop-blur-xl space-y-2 shadow-[0_4px_20px_-2px_rgba(16,24,47,0.04)] hover:shadow-[0_12px_28px_-6px_rgba(16,24,47,0.08)] transition-all"
         >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500/30 to-transparent" />
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Net Retained Margin</span>
-            <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Net Retained Margin</span>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-white flex items-center justify-center shadow-md shadow-violet-500/20">
               <CheckCircle2 size={16} />
             </div>
           </div>
           <div>
-            <span className="text-2xl font-black text-teal-600 font-mono tabular-nums">
+            <span className="text-2xl font-black text-violet-700 font-mono tabular-nums">
               <AnimatedNumber value={retainedSavings} formatFn={(v) => '₹' + Math.round(v).toLocaleString('en-IN')} />
             </span>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-700 mt-1 font-mono tabular-nums">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-violet-700 mt-1 font-mono tabular-nums">
               <span>{savingsPct}% retained working capital</span>
             </div>
           </div>
         </motion.div>
 
         <motion.div
-          whileHover={!prefersReducedMotion ? { y: -2 } : undefined}
-          transition={{ duration: 0.15, ease: EASE_FINANCIAL }}
-          className="card p-5 border border-slate-200 rounded-3xl bg-white space-y-2 shadow-xs transition-shadow hover:shadow-md"
+          whileHover={!prefersReducedMotion ? { y: -3 } : undefined}
+          transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
+          className="relative overflow-hidden p-5 border border-slate-200/90 rounded-2xl bg-white/95 backdrop-blur-xl space-y-2 shadow-[0_4px_20px_-2px_rgba(16,24,47,0.04)] hover:shadow-[0_12px_28px_-6px_rgba(16,24,47,0.08)] transition-all"
         >
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500/30 to-transparent" />
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Contract Obligations</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Contract Obligations</span>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
               <ShieldAlert size={16} />
             </div>
           </div>
           <div>
-            <span className="text-2xl font-black text-ink-900 font-mono tabular-nums">
+            <span className="text-2xl font-black text-slate-900 font-mono tabular-nums">
               ₹1.69L<span className="text-xs font-semibold text-slate-400">/mo</span>
             </span>
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700 mt-1">
@@ -235,7 +239,10 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* Control Bar: Timeframe Preset & Lens Selector */}
-      <div className="card p-4 border border-slate-200 rounded-3xl bg-white space-y-3 shadow-xs">
+      <div
+        data-tour="analytics-lenses"
+        className="card p-4 border border-slate-200 rounded-3xl bg-white space-y-3 shadow-xs"
+      >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Analytical Lenses */}
           <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">

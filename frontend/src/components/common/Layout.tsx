@@ -13,9 +13,9 @@ const LayoutContent: React.FC<LayoutContentProps> = ({ children }) => {
   const { mobileMenuOpen, setMobileMenuOpen } = useLayout();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 text-ink-900">
+    <div className="flex h-screen overflow-hidden bg-[#F8FAFC] text-ink-900">
       {/* Desktop Sidebar (Persistent) */}
-      <div className="hidden lg:flex h-full flex-shrink-0">
+      <div className="hidden lg:flex h-full flex-shrink-0 z-20">
         <Sidebar />
       </div>
 
@@ -41,7 +41,7 @@ const LayoutContent: React.FC<LayoutContentProps> = ({ children }) => {
                 initial="hidden"
                 animate="visible"
                 exit="exit"
-                className="w-72 max-w-xs bg-white h-full shadow-dialog z-10"
+                className="w-72 max-w-xs bg-white/95 backdrop-blur-xl h-full shadow-dialog z-10"
               >
                 <Sidebar
                   isMobileDrawer={true}
@@ -54,7 +54,7 @@ const LayoutContent: React.FC<LayoutContentProps> = ({ children }) => {
       </AnimatePresence>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden relative">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden relative z-10">
         {children}
       </main>
     </div>

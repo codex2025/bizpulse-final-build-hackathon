@@ -29,6 +29,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
 
   const update = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
@@ -157,12 +161,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           transition={{ duration: 0.5, ease: 'easeOut' }}
           className="w-full max-w-sm space-y-6"
         >
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-2 lg:hidden">
-            <div className="w-8 h-8 bg-cobalt-600 rounded-lg flex items-center justify-center">
-              <Zap size={16} className="text-white" />
+          {/* Mobile logo + tagline */}
+          <div className="mb-4 lg:hidden">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 bg-cobalt-600 rounded-lg flex items-center justify-center">
+                <Zap size={16} className="text-white" />
+              </div>
+              <span className="text-xl font-black text-ink-900">Bizpulse</span>
             </div>
-            <span className="text-xl font-black text-ink-900">Bizpulse</span>
+            <p className="text-xs text-slate-500 font-medium">Financial intelligence for modern business</p>
           </div>
 
           <div>
@@ -254,10 +261,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
                 type="email"
                 placeholder="Work email address"
                 required
-                className="input-field pl-9 text-xs font-semibold"
+                autoFocus
+                className={`input-field pl-9 text-xs font-semibold ${
+                  emailError ? 'border-vermilion-400 ring-1 ring-vermilion-300' : ''
+                }`}
                 value={form.email}
-                onChange={e => update('email', e.target.value)}
+                onChange={e => { update('email', e.target.value); setEmailError(''); }}
+                onBlur={e => {
+                  const v = e.target.value;
+                  if (v && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) {
+                    setEmailError('Please enter a valid email address.');
+                  }
+                }}
               />
+              {emailError && <p className="text-[10.5px] text-vermilion-600 font-semibold mt-1">{emailError}</p>}
             </div>
 
             <div className="relative">
@@ -310,11 +327,64 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
 
           <p className="text-center text-xs text-slate-500 font-medium">
             {mode === 'login' ? (
-              <>Don't have an account? <Link to="/register" className="text-cobalt-600 hover:text-cobalt-700 font-bold">Sign up free</Link></>
+              <>
+                Don't have an account? <Link to="/register" className="text-cobalt-600 hover:text-cobalt-700 font-bold">Sign up free</Link>
+                <span className="mx-2 text-slate-300">•</span>
+                <button type="button" onClick={() => setShowForgot(true)} className="text-cobalt-600 hover:text-cobalt-700 font-bold cursor-pointer">Forgot password?</button>
+              </>
             ) : (
               <>Already have an account? <Link to="/login" className="text-cobalt-600 hover:text-cobalt-700 font-bold">Sign in</Link></>
             )}
           </p>
+
+          {/* Forgot Password Modal */}
+          {showForgot && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-sm space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-ink-900">Reset Password</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">We'll send a reset link to your email</p>
+                  </div>
+                  <button type="button" onClick={() => { setShowForgot(false); setForgotSent(false); setForgotEmail(''); }} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer">
+                    ×
+                  </button>
+                </div>
+
+                {forgotSent ? (
+                  <div className="p-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 text-xs font-bold">
+                    ✓ If an account exists for <strong>{forgotEmail}</strong>, a reset link has been sent.
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="email"
+                        autoFocus
+                        placeholder="Account email address"
+                        value={forgotEmail}
+                        onChange={e => setForgotEmail(e.target.value)}
+                        className="input-field pl-9 text-xs font-semibold w-full"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!forgotEmail}
+                      onClick={() => setForgotSent(true)}
+                      className="w-full btn-primary py-2.5 text-xs font-extrabold rounded-xl cursor-pointer disabled:opacity-50"
+                    >
+                      Send Reset Link
+                    </button>
+                  </>
+                )}
+              </motion.div>
+            </div>
+          )}
         </motion.div>
       </div>
     </div>

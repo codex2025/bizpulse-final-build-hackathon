@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import { Topbar } from '../common/Topbar';
 import { wealthService } from '../../services/analyticsService';
+import { AnimatedNumber } from '../common/AnimatedNumber';
 
 export interface WealthItem {
   id: string;
@@ -55,8 +56,15 @@ const LIABILITY_CATEGORIES = [
   { id: 'other', label: 'Other Legal Liabilities', icon: '📋' },
 ];
 
-const ASSET_CHART_COLORS = ['#2457FF', '#00A88F', '#111827', '#F5B700', '#64748B'];
-const LIABILITY_CHART_COLORS = ['#F04438', '#F5B700', '#64748B', '#94A3B8'];
+// Larger distinct color palettes to avoid repeat
+const ASSET_CHART_COLORS = [
+  '#2457FF', '#00A88F', '#111827', '#F5B700', '#64748B',
+  '#7C3AED', '#E11D48', '#059669', '#D97706', '#0EA5E9',
+];
+const LIABILITY_CHART_COLORS = [
+  '#F04438', '#F5B700', '#64748B', '#94A3B8',
+  '#7C3AED', '#E11D48', '#D97706', '#0EA5E9',
+];
 
 const fmt = (n: number) =>
   '₹' + (n >= 10000000 ? (n / 10000000).toFixed(2) + 'Cr' : n >= 100000 ? (n / 100000).toFixed(2) + 'L' : n.toLocaleString('en-IN'));
@@ -213,7 +221,7 @@ export const WealthPage: React.FC = () => {
           </span>
         </div>
         <p className={`text-5xl font-black tracking-tight font-mono tabular-nums ${isPositive ? 'text-white' : 'text-vermilion-400'}`}>
-          {isPositive ? '' : '-'}{fmt(Math.abs(netWorth))}
+          {isPositive ? '' : '-'}<AnimatedNumber value={Math.abs(netWorth)} formatFn={(n) => fmt(n)} />
         </p>
 
         <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
@@ -291,6 +299,9 @@ export const WealthPage: React.FC = () => {
                     <div>
                       <p className="text-xs font-bold text-ink-900">{item.name}</p>
                       <p className="text-[10px] text-slate-400 font-medium">{cat?.label || item.category}</p>
+                      {item.as_of_date && (
+                        <p className="text-[10px] text-slate-300 font-mono">As of {new Date(item.as_of_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -355,6 +366,9 @@ export const WealthPage: React.FC = () => {
                     <div>
                       <p className="text-xs font-bold text-ink-900">{item.name}</p>
                       <p className="text-[10px] text-slate-400 font-medium">{cat?.label || item.category}</p>
+                      {item.as_of_date && (
+                        <p className="text-[10px] text-slate-300 font-mono">As of {new Date(item.as_of_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

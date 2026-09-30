@@ -33,29 +33,29 @@ import {
 import { SAMPLE_CONTRACT_UJJIVAN } from './sampleContracts';
 
 // --- SEMANTIC RISK BADGE ---
-// Vermilion -> critical, Amber -> caution, Teal -> positive/low concern, Cobalt -> neutral
+// Rose -> critical, Amber -> caution, Emerald -> positive/low concern
 const RiskBadge: React.FC<{ level: string; isRedFlag?: boolean }> = ({ level, isRedFlag }) => {
   const normalized = (level || 'Low').toLowerCase();
   
   if (isRedFlag || normalized === 'high' || normalized === 'critical') {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-vermilion-50 text-vermilion-700 border border-vermilion-200">
-        <AlertTriangle size={12} className="text-vermilion-600" />
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold px-3 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+        <AlertTriangle size={12} className="text-rose-600 stroke-[2.5]" />
         Critical Risk
       </span>
     );
   }
   if (normalized === 'medium' || normalized === 'moderate' || normalized === 'caution') {
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-        <AlertOctagon size={12} className="text-amber-600" />
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold px-3 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+        <AlertOctagon size={12} className="text-amber-600 stroke-[2.5]" />
         Caution
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
-      <CheckCircle size={12} className="text-teal-600" />
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold px-3 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+      <CheckCircle size={12} className="text-emerald-600 stroke-[2.5]" />
       Low Concern
     </span>
   );
@@ -1013,6 +1013,7 @@ export const ContractsPage: React.FC = () => {
 
       {/* Upload Drag & Drop Interaction with purposeful motion */}
       <div
+        data-tour="contracts-workflow"
         {...getRootProps()}
         className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 ${
           isDragActive

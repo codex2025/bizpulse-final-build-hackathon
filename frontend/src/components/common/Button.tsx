@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { usePrefersReducedMotion } from '../../utils/motion';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success' | 'amber';
+export type ButtonVariant = 'primary' | 'gradient' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success' | 'amber';
 export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -35,7 +35,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const prefersReducedMotion = usePrefersReducedMotion();
 
     const baseStyles =
-      'inline-flex items-center justify-center font-semibold rounded-lg transition-colors cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-cobalt-500/30 disabled:opacity-50 disabled:pointer-events-none';
+      'inline-flex items-center justify-center font-bold rounded-xl transition-all cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 disabled:opacity-50 disabled:pointer-events-none';
 
     const sizeStyles: Record<ButtonSize, string> = {
       xs: 'text-[11px] px-2.5 py-1 gap-1.5 h-7',
@@ -46,19 +46,21 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles: Record<ButtonVariant, string> = {
       primary:
-        'bg-cobalt-500 hover:bg-cobalt-600 active:bg-cobalt-700 text-white shadow-xs border border-cobalt-600/40',
+        'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-xs shadow-indigo-500/20 border border-violet-600/30',
+      gradient:
+        'bg-gradient-to-r from-rose-600 via-fuchsia-600 to-violet-600 hover:from-rose-500 hover:via-fuchsia-500 hover:to-violet-500 text-white shadow-md shadow-fuchsia-500/25 border border-fuchsia-500/40 hover:scale-[1.01] active:scale-[0.98]',
       secondary:
-        'bg-white hover:bg-slate-50 active:bg-slate-100 text-ink-900 border border-slate-200 shadow-2xs hover:border-slate-300',
+        'bg-white/90 hover:bg-slate-50 text-slate-800 border border-slate-200/90 shadow-2xs hover:border-slate-300',
       outline:
-        'bg-transparent hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300',
+        'bg-transparent hover:bg-slate-50 text-slate-700 border border-slate-200/90 hover:border-slate-300',
       ghost:
-        'bg-transparent hover:bg-slate-100/70 active:bg-slate-100 text-slate-600 hover:text-ink-900',
+        'bg-transparent hover:bg-slate-100/70 text-slate-600 hover:text-slate-900',
       danger:
-        'bg-vermilion-500 hover:bg-vermilion-600 active:bg-vermilion-700 text-white shadow-xs border border-vermilion-600/30',
+        'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-xs shadow-rose-500/20 border border-rose-600/30',
       success:
-        'bg-teal-500 hover:bg-teal-600 active:bg-teal-700 text-white shadow-xs border border-teal-600/30',
+        'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-xs shadow-emerald-500/20 border border-emerald-600/30',
       amber:
-        'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-ink-900 shadow-xs border border-amber-600/30 font-bold',
+        'bg-gradient-to-r from-amber-500 to-orange-400 hover:from-amber-400 hover:to-orange-300 text-slate-950 shadow-xs shadow-amber-500/20 border border-amber-500/30 font-bold',
     };
 
     const widthStyle = fullWidth ? 'w-full' : '';

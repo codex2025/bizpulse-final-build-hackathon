@@ -65,7 +65,9 @@ const GoalCard: React.FC<GoalCardProps> = ({
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`card border ${theme.border} bg-white p-5 rounded-3xl space-y-4 relative overflow-hidden group shadow-xs`}
+      className={`card border ${theme.border} bg-white p-5 rounded-3xl space-y-4 relative overflow-hidden group shadow-xs ${
+        isCompleted ? 'opacity-70 grayscale-[20%]' : ''
+      }`}
     >
       {isCompleted && (
         <div className="absolute top-3 right-3">
@@ -320,6 +322,7 @@ export const GoalsPage: React.FC = () => {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [contributeGoal, setContributeGoal] = useState<{ id: string; title: string } | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Compute reference timestamp once per session/mount to satisfy react-compiler purity rules
   const todayMs = useMemo(() => new Date().setHours(0, 0, 0, 0), []);
@@ -331,7 +334,10 @@ export const GoalsPage: React.FC = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => goalsService.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['goals-summary'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['goals-summary'] });
+      setConfirmDeleteId(null);
+    },
   });
 
   const onCreated = () => qc.invalidateQueries({ queryKey: ['goals-summary'] });
@@ -402,7 +408,7 @@ export const GoalsPage: React.FC = () => {
                 goal={goal}
                 todayMs={todayMs}
                 onContribute={(id) => setContributeGoal({ id, title: goal.title })}
-                onDelete={(id) => deleteMutation.mutate(id)}
+                onDelete={(id) => setConfirmDeleteId(id)}
               />
             ))}
           </AnimatePresence>
@@ -414,6 +420,7 @@ export const GoalsPage: React.FC = () => {
         <div className="space-y-3 pt-4 border-t border-slate-100">
           <h3 className="font-extrabold text-sm text-ink-900 flex items-center gap-2">
             <CheckCircle2 size={16} className="text-teal-600" /> Fully Funded Milestones
+            <span className="text-xs font-medium text-slate-400">(de-prioritised)</span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {completedGoals.map((goal) => (
@@ -422,7 +429,7 @@ export const GoalsPage: React.FC = () => {
                 goal={goal}
                 todayMs={todayMs}
                 onContribute={() => {}}
-                onDelete={(id) => deleteMutation.mutate(id)}
+                onDelete={(id) => setConfirmDeleteId(id)}
               />
             ))}
           </div>
@@ -455,6 +462,40 @@ export const GoalsPage: React.FC = () => {
           onClose={() => setContributeGoal(null)}
           onDone={onContributed}
         />
+      )}
+
+      {/* Goal Delete Confirmation */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-sm space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-vermilion-50 border border-vermilion-200 flex items-center justify-center text-vermilion-600">
+                <Trash2 size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-ink-900">Delete Goal?</h3>
+                <p className="text-xs text-slate-500 font-medium">This will remove all progress and contribution history.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
+              >
+                Keep Goal
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteMutation.mutate(confirmDeleteId)}
+                disabled={deleteMutation.isPending}
+                className="flex-1 py-2.5 rounded-xl bg-vermilion-600 hover:bg-vermilion-700 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-60"
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

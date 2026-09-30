@@ -4,6 +4,19 @@
 @tailwind utilities;
 
 :root {
+  /* Vibrant Three-Color Core Contrast (Rose, Violet, Emerald) */
+  --biz-rose: #E11D48;
+  --biz-rose-hover: #BE123C;
+  --biz-rose-subtle: rgba(225, 29, 72, 0.08);
+
+  --biz-violet: #7C3AED;
+  --biz-violet-hover: #6D28D9;
+  --biz-violet-subtle: rgba(124, 58, 237, 0.08);
+
+  --biz-emerald: #059669;
+  --biz-emerald-hover: #047857;
+  --biz-emerald-subtle: rgba(5, 150, 105, 0.08);
+
   /* Core Bizpulse Colors */
   --biz-cobalt: #2457FF;
   --biz-cobalt-hover: #1743E5;
@@ -28,7 +41,7 @@
 
   /* Surfaces & Borders */
   --biz-surface: #FFFFFF;
-  --biz-surface-subtle: #F8FAFC;
+  --biz-surface-subtle: #FAFAFD;
   --biz-surface-muted: #F1F5F9;
   --biz-border: #E2E8F0;
   --biz-border-strong: #CBD5E1;
@@ -84,14 +97,14 @@
 }
 
 @layer components {
-  /* Capitalio Crisp Financial Surfaces */
+  /* Crisp & Vibrant Financial Surfaces */
   .card {
     background-color: #FFFFFF;
     border: 1px solid #E2E8F0;
-    border-radius: 0.625rem; /* 10px */
+    border-radius: 1rem; /* 16px */
     padding: 1.25rem;
     box-shadow: 0 1px 3px 0 rgba(17, 24, 39, 0.04), 0 1px 2px -1px rgba(17, 24, 39, 0.02);
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
 
   .card-interactive {
@@ -99,85 +112,114 @@
   }
   .card-interactive:hover {
     border-color: #CBD5E1;
-    box-shadow: 0 4px 6px -1px rgba(17, 24, 39, 0.05), 0 2px 4px -2px rgba(17, 24, 39, 0.04);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -4px rgba(17, 24, 39, 0.08);
   }
 
-  /* Replaced glassmorphism with crisp financial solid surface */
+  /* Modern Glassmorphic Surface inspired by Landing page */
   .glass {
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    box-shadow: 0 1px 3px 0 rgba(17, 24, 39, 0.04);
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 20px -2px rgba(16, 24, 47, 0.05);
   }
 
   .glass-hover {
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .glass-hover:hover {
-    background: #FFFFFF;
-    border-color: #CBD5E1;
-    box-shadow: 0 4px 6px -1px rgba(17, 24, 39, 0.05);
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(124, 58, 237, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 16px 36px -6px rgba(124, 58, 237, 0.12);
   }
 
-  /* Solid, precise brand typography (removed purple-blue gradient) */
-  .gradient-text {
-    color: #111827;
+  /* Vibrant Gradient Typography from Landing Page */
+  .gradient-brand-text {
+    background-image: linear-gradient(100deg, #E11D48 0%, #C026D3 50%, #7C3AED 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
     font-weight: 800;
     letter-spacing: -0.02em;
   }
 
-  /* Semantic Buttons */
+  .gradient-text {
+    background-image: linear-gradient(100deg, #E11D48 0%, #7C3AED 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .gradient-emerald-text {
+    background-image: linear-gradient(100deg, #059669 0%, #00A88F 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* Vibrant Gradient Buttons & Badges */
+  .btn-gradient-primary {
+    @apply bg-gradient-to-r from-rose-600 via-purple-600 to-indigo-600 hover:from-rose-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-md shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+  }
+
   .btn-primary {
-    @apply bg-cobalt-500 hover:bg-cobalt-600 active:bg-cobalt-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-colors shadow-xs active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+    @apply bg-gradient-to-r from-cobalt-600 to-indigo-600 hover:from-cobalt-500 hover:to-indigo-500 active:from-cobalt-700 active:to-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
   }
 
   .btn-secondary {
-    @apply bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-ink-900 font-semibold px-3.5 py-2 rounded-lg text-xs transition-colors shadow-2xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+    @apply bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-ink-900 font-bold px-3.5 py-2 rounded-xl text-xs transition-all shadow-2xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
   }
 
   .btn-danger {
-    @apply bg-vermilion-500 hover:bg-vermilion-600 active:bg-vermilion-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-colors shadow-xs active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+    @apply bg-gradient-to-r from-rose-600 to-vermilion-600 hover:from-rose-500 hover:to-vermilion-500 active:from-rose-700 active:to-vermilion-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
   }
 
   .btn-ghost {
-    @apply bg-transparent hover:bg-slate-100 text-slate-700 hover:text-ink-900 font-medium px-3 py-1.5 rounded-lg text-xs transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+    @apply bg-transparent hover:bg-slate-100/80 text-slate-700 hover:text-ink-900 font-semibold px-3 py-1.5 rounded-xl text-xs transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
   }
 
   /* Precision Financial Input */
   .input-field {
-    @apply w-full bg-white hover:border-slate-300 focus:bg-white border border-slate-200 focus:border-cobalt-500 focus:ring-2 focus:ring-cobalt-500/15 rounded-lg px-3 py-2 text-xs text-ink-900 placeholder-slate-400 focus:outline-none transition-all font-medium;
+    @apply w-full bg-white hover:border-slate-300 focus:bg-white border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/15 rounded-xl px-3 py-2 text-xs text-ink-900 placeholder-slate-400 focus:outline-none transition-all font-medium;
   }
 
-  /* Semantic Status Badges */
+  /* Semantic Status Badges with Rich Vibrancy */
   .badge-low {
-    @apply bg-teal-50 text-teal-700 border border-teal-200/80 text-[11px] font-semibold px-2 py-0.5 rounded;
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full;
   }
 
   .badge-medium {
-    @apply bg-amber-50 text-amber-800 border border-amber-200/80 text-[11px] font-semibold px-2 py-0.5 rounded;
+    @apply bg-amber-50 text-amber-800 border border-amber-200/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full;
   }
 
   .badge-high {
-    @apply bg-vermilion-50 text-vermilion-700 border border-vermilion-200/80 text-[11px] font-semibold px-2 py-0.5 rounded;
+    @apply bg-rose-50 text-rose-700 border border-rose-200/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full;
   }
 
   /* Financial Typography Utilities */
   .financial-val {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: -0.01em;
     color: #111827;
   }
 
   .financial-label {
     font-size: 0.75rem; /* 12px */
-    font-weight: 500;
+    font-weight: 600;
     color: #64748B;
   }
 
   .financial-heading {
     font-size: 1.25rem; /* 20px */
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: -0.02em;
     color: #111827;
   }

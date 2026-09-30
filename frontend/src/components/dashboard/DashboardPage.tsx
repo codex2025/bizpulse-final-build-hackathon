@@ -11,7 +11,6 @@ import {
   FileText,
   BrainCircuit,
   Plus,
-  ArrowUpRight,
   Clock,
   ShieldCheck,
   ChevronRight,
@@ -189,9 +188,9 @@ export const DashboardPage: React.FC = () => {
   const rawOpps = (decisionDataset?.opportunities as OpportunityRecord[]) || [];
   const opportunities = rawOpps.slice(0, 3);
 
-  // Health score from real Bizpulse calculation
-  const healthScore = metrics?.financialHealthScore || metrics?.healthScore || 78;
-  const healthStatus = metrics?.healthStatus || 'Balanced Operating Position';
+  // Health score from real Bizpulse calculation — null when data unavailable
+  const healthScore: number | null = metrics?.financialHealthScore ?? metrics?.healthScore ?? null;
+  const healthStatus = metrics?.healthStatus || 'Calculating...';
 
   if (metricsError) {
     return (
@@ -234,80 +233,66 @@ export const DashboardPage: React.FC = () => {
       />
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto w-full">
-        {/* Quick Operational Actions Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <button
             type="button"
             onClick={() => navigate('/billing')}
-            className="flex items-center justify-between p-3 rounded-financial bg-white border border-slate-200 hover:border-cobalt-300 hover:shadow-2xs transition-all text-left cursor-pointer group"
+            className="group flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30 hover:-translate-y-0.5 transition-all text-left cursor-pointer"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-md bg-cobalt-50 text-cobalt-600 flex items-center justify-center flex-shrink-0 group-hover:bg-cobalt-500 group-hover:text-white transition-colors">
-                <Receipt size={14} />
-              </div>
-              <div className="truncate">
-                <p className="text-xs font-bold text-ink-900 truncate">
-                  {persona === 'personal' || persona === 'employee' ? 'Income Entry' : 'Client Invoicing'}
-                </p>
-                <p className="text-[10px] text-slate-400 font-medium">Record payment</p>
-              </div>
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <Receipt size={14} />
             </div>
-            <ArrowUpRight size={13} className="text-slate-400 group-hover:text-cobalt-600 transition-colors flex-shrink-0" />
+            <div className="truncate">
+              <p className="text-xs font-semibold text-slate-800 truncate">
+                {persona === 'personal' || persona === 'employee' ? 'Income' : 'Invoicing'}
+              </p>
+              <p className="text-[10.5px] text-slate-400">Record inflow</p>
+            </div>
           </button>
 
           <button
             type="button"
             onClick={() => navigate('/expenses')}
-            className="flex items-center justify-between p-3 rounded-financial bg-white border border-slate-200 hover:border-vermilion-300 hover:shadow-2xs transition-all text-left cursor-pointer group"
+            className="group flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 hover:border-rose-300 hover:bg-rose-50/30 hover:-translate-y-0.5 transition-all text-left cursor-pointer"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-md bg-vermilion-50 text-vermilion-600 flex items-center justify-center flex-shrink-0 group-hover:bg-vermilion-500 group-hover:text-white transition-colors">
-                <CreditCard size={14} />
-              </div>
-              <div className="truncate">
-                <p className="text-xs font-bold text-ink-900 truncate">
-                  {persona === 'personal' || persona === 'employee' ? 'Daily Expense' : 'Corporate Outflow'}
-                </p>
-                <p className="text-[10px] text-slate-400 font-medium">Log disbursement</p>
-              </div>
+            <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+              <CreditCard size={14} />
             </div>
-            <ArrowUpRight size={13} className="text-slate-400 group-hover:text-vermilion-600 transition-colors flex-shrink-0" />
+            <div className="truncate">
+              <p className="text-xs font-semibold text-slate-800 truncate">
+                {persona === 'personal' || persona === 'employee' ? 'Expense' : 'Outflow'}
+              </p>
+              <p className="text-[10.5px] text-slate-400">Log disbursement</p>
+            </div>
           </button>
 
           <button
             type="button"
             onClick={() => navigate('/contracts')}
-            className="flex items-center justify-between p-3 rounded-financial bg-white border border-slate-200 hover:border-amber-300 hover:shadow-2xs transition-all text-left cursor-pointer group"
+            className="group flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 hover:border-amber-300 hover:bg-amber-50/30 hover:-translate-y-0.5 transition-all text-left cursor-pointer"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-500 group-hover:text-ink-900 transition-colors">
-                <FileText size={14} />
-              </div>
-              <div className="truncate">
-                <p className="text-xs font-bold text-ink-900 truncate">
-                  {persona === 'personal' || persona === 'employee' ? 'Loan / Lease Audit' : 'Contract Intelligence'}
-                </p>
-                <p className="text-[10px] text-slate-400 font-medium">Verify covenants</p>
-              </div>
+            <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+              <FileText size={14} />
             </div>
-            <ArrowUpRight size={13} className="text-slate-400 group-hover:text-amber-600 transition-colors flex-shrink-0" />
+            <div className="truncate">
+              <p className="text-xs font-semibold text-slate-800 truncate">Contracts</p>
+              <p className="text-[10.5px] text-slate-400">Audit clauses</p>
+            </div>
           </button>
 
           <button
             type="button"
             onClick={() => navigate('/decision-forge')}
-            className="flex items-center justify-between p-3 rounded-financial bg-white border border-slate-200 hover:border-cobalt-300 hover:shadow-2xs transition-all text-left cursor-pointer group"
+            className="group flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-200 hover:border-violet-300 hover:bg-violet-50/30 hover:-translate-y-0.5 transition-all text-left cursor-pointer"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-md bg-cobalt-50 text-cobalt-600 flex items-center justify-center flex-shrink-0 group-hover:bg-cobalt-500 group-hover:text-white transition-colors">
-                <BrainCircuit size={14} />
-              </div>
-              <div className="truncate">
-                <p className="text-xs font-bold text-ink-900 truncate">DecisionForge AI</p>
-                <p className="text-[10px] text-slate-400 font-medium">Prioritize trade-offs</p>
-              </div>
+            <div className="w-7 h-7 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600 group-hover:text-white transition-colors">
+              <BrainCircuit size={14} />
             </div>
-            <ArrowUpRight size={13} className="text-slate-400 group-hover:text-cobalt-600 transition-colors flex-shrink-0" />
+            <div className="truncate">
+              <p className="text-xs font-semibold text-slate-800 truncate">DecisionForge</p>
+              <p className="text-[10.5px] text-slate-400">AI trade-offs</p>
+            </div>
           </button>
         </div>
 
@@ -316,6 +301,7 @@ export const DashboardPage: React.FC = () => {
           <MetricSkeleton count={4} />
         ) : (
           <motion.div
+            data-tour="dashboard-overview"
             variants={staggerContainer}
             initial="hidden"
             animate="visible"
@@ -325,12 +311,11 @@ export const DashboardPage: React.FC = () => {
               <MetricCard
                 label={config.inflowLabel}
                 value={<AnimatedNumber value={metrics?.totalRevenue || 0} formatFn={fmt} />}
-                change="+12.4%"
                 trend="up"
                 sentiment="positive"
-                period="vs prior month"
+                period="This month"
                 subtitle="Verified inflows"
-                icon={<TrendingUp size={14} className="text-teal-600" />}
+                icon={<TrendingUp size={14} className="text-emerald-600" />}
               />
             </motion.div>
 
@@ -338,12 +323,11 @@ export const DashboardPage: React.FC = () => {
               <MetricCard
                 label={config.outflowLabel}
                 value={<AnimatedNumber value={metrics?.totalExpenses || 0} formatFn={fmt} />}
-                change="-4.2%"
                 trend="down"
                 sentiment="positive"
-                period="Operational burn"
+                period="This month"
                 subtitle={persona === 'personal' || persona === 'employee' ? 'Rent & utilities' : 'Direct operating cost'}
-                icon={<TrendingDown size={14} className="text-vermilion-600" />}
+                icon={<TrendingDown size={14} className="text-rose-600" />}
               />
             </motion.div>
 
@@ -351,12 +335,12 @@ export const DashboardPage: React.FC = () => {
               <MetricCard
                 label={config.surplusLabel}
                 value={<AnimatedNumber value={metrics?.netProfit || 0} formatFn={fmt} />}
-                change={metrics?.totalRevenue ? `${Math.round(((metrics.netProfit || 0) / metrics.totalRevenue) * 100)}% margin` : '+18%'}
+                change={metrics?.totalRevenue && metrics.totalRevenue > 0 ? `${Math.round(((metrics.netProfit || 0) / metrics.totalRevenue) * 100)}% margin` : undefined}
                 trend={(metrics?.netProfit || 0) >= 0 ? 'up' : 'down'}
                 sentiment={(metrics?.netProfit || 0) >= 0 ? 'positive' : 'negative'}
                 period="Net cash spread"
                 subtitle="Retained liquidity"
-                icon={<DollarSign size={14} className="text-cobalt-600" />}
+                icon={<DollarSign size={14} className="text-violet-600" />}
               />
             </motion.div>
 
@@ -420,16 +404,16 @@ export const DashboardPage: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-100">
                       <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1.5 font-semibold text-ink-900">
-                          <span className="w-2.5 h-2.5 rounded-sm bg-cobalt-500" />
+                        <span className="flex items-center gap-1.5 font-bold text-slate-900">
+                          <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-emerald-500 to-teal-400" />
                           Inflow (Revenue)
                         </span>
-                        <span className="flex items-center gap-1.5 font-semibold text-ink-900">
-                          <span className="w-2.5 h-2.5 rounded-sm bg-vermilion-500" />
+                        <span className="flex items-center gap-1.5 font-bold text-slate-900">
+                          <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-rose-500 to-pink-500" />
                           Outflow (Expenses)
                         </span>
                       </div>
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-semibold text-slate-400">
                         Historical Ledger Months
                       </span>
                     </div>
@@ -444,6 +428,16 @@ export const DashboardPage: React.FC = () => {
                       <div className="h-64 sm:h-72 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={cashFlowChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="barInflow" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#059669" stopOpacity={0.9} />
+                                <stop offset="100%" stopColor="#10B981" stopOpacity={0.65} />
+                              </linearGradient>
+                              <linearGradient id="barOutflow" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#E11D48" stopOpacity={0.9} />
+                                <stop offset="100%" stopColor="#F43F5E" stopOpacity={0.65} />
+                              </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                             <XAxis
                               dataKey="month"
@@ -469,16 +463,16 @@ export const DashboardPage: React.FC = () => {
                             <Bar
                               dataKey="revenue"
                               name="Inflow (Revenue)"
-                              fill="#2457FF"
-                              radius={[4, 4, 0, 0]}
+                              fill="url(#barInflow)"
+                              radius={[5, 5, 0, 0]}
                               isAnimationActive={true}
                               animationDuration={500}
                             />
                             <Bar
                               dataKey="expenses"
                               name="Outflow (Expenses)"
-                              fill="#F04438"
-                              radius={[4, 4, 0, 0]}
+                              fill="url(#barOutflow)"
+                              radius={[5, 5, 0, 0]}
                               isAnimationActive={true}
                               animationDuration={500}
                             />
@@ -492,11 +486,11 @@ export const DashboardPage: React.FC = () => {
                 {activeChartTab === 'net' && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between text-xs text-slate-500 pb-2 border-b border-slate-100">
-                      <span className="flex items-center gap-1.5 font-semibold text-ink-900">
-                        <span className="w-2.5 h-2.5 rounded-sm bg-teal-500" />
+                      <span className="flex items-center gap-1.5 font-bold text-slate-900">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-violet-600 to-indigo-500" />
                         Retained Net Cash Flow
                       </span>
-                      <span className="text-[11px] font-medium text-slate-400">
+                      <span className="text-[11px] font-semibold text-slate-400">
                         Positive surplus represents reserve growth
                       </span>
                     </div>
@@ -506,8 +500,8 @@ export const DashboardPage: React.FC = () => {
                         <AreaChart data={cashFlowChartData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                           <defs>
                             <linearGradient id="netGradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#00A88F" stopOpacity={0.25} />
-                              <stop offset="95%" stopColor="#00A88F" stopOpacity={0.0} />
+                              <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.35} />
+                              <stop offset="95%" stopColor="#7C3AED" stopOpacity={0.0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
@@ -536,8 +530,8 @@ export const DashboardPage: React.FC = () => {
                             type="monotone"
                             dataKey="netCashFlow"
                             name="Net Margin"
-                            stroke="#00A88F"
-                            strokeWidth={2}
+                            stroke="#7C3AED"
+                            strokeWidth={2.5}
                             fillOpacity={1}
                             fill="url(#netGradient)"
                             isAnimationActive={true}
@@ -717,43 +711,53 @@ export const DashboardPage: React.FC = () => {
                   <ShieldCheck size={16} className="text-teal-600" />
                   <CardTitle>Financial Health Index</CardTitle>
                 </div>
-                <Badge
-                  variant={healthScore >= 75 ? 'teal' : healthScore >= 50 ? 'amber' : 'vermilion'}
-                  size="xs"
-                >
-                  {healthScore >= 75 ? 'Optimal' : healthScore >= 50 ? 'Moderate' : 'Caution'}
-                </Badge>
+                {healthScore !== null && (
+                  <Badge
+                    variant={healthScore >= 75 ? 'teal' : healthScore >= 50 ? 'amber' : 'vermilion'}
+                    size="xs"
+                  >
+                    {healthScore >= 75 ? 'Optimal' : healthScore >= 50 ? 'Moderate' : 'Caution'}
+                  </Badge>
+                )}
               </div>
 
               <div className="flex flex-col items-center justify-center py-2">
                 <div className="relative w-32 h-32 flex items-center justify-center">
                   <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                    <defs>
+                      <linearGradient id="healthGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor="#059669" />
+                        <stop offset="100%" stopColor="#10B981" />
+                      </linearGradient>
+                    </defs>
                     <circle cx="50" cy="50" r="40" fill="transparent" stroke="#F1F5F9" strokeWidth="8" />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="transparent"
-                      stroke={healthScore >= 75 ? '#00A88F' : healthScore >= 50 ? '#F5B700' : '#F04438'}
-                      strokeWidth="8"
-                      strokeDasharray={251}
-                      strokeDashoffset={251 - (healthScore / 100) * 251}
-                      strokeLinecap="round"
-                      className="transition-all duration-700 ease-out"
-                    />
+                    {healthScore !== null && (
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke={healthScore >= 75 ? 'url(#healthGrad)' : healthScore >= 50 ? '#F5B700' : '#E11D48'}
+                        strokeWidth="8"
+                        strokeDasharray={251}
+                        strokeDashoffset={251 - (healthScore / 100) * 251}
+                        strokeLinecap="round"
+                        className="transition-all duration-700 ease-out"
+                      />
+                    )}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-black font-mono tabular-nums text-ink-900">
-                      {healthScore}
+                    <span className="text-2xl font-black font-mono tabular-nums text-slate-900">
+                      {healthScore !== null ? healthScore : '—'}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      / 100
+                      {healthScore !== null ? '/ 100' : 'No data'}
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-3 text-center">
-                  <p className="text-xs font-bold text-ink-900">{healthStatus}</p>
+                  <p className="text-xs font-bold text-slate-900">{healthStatus}</p>
                   <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                     {persona === 'personal' || persona === 'employee'
                       ? 'Personal budget discipline & emergency buffer'
@@ -765,26 +769,29 @@ export const DashboardPage: React.FC = () => {
               </div>
 
               {metrics?.healthAssessment?.biggestOpportunity && (
-                <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
-                  <span className="font-bold text-ink-900 block mb-0.5">Focus Strategy:</span>
+                <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                  <span className="font-bold text-slate-900 block mb-0.5">Focus Strategy:</span>
                   {metrics.healthAssessment.biggestOpportunity}
                 </div>
               )}
             </Card>
 
             {/* DecisionForge Pipeline Insights Banner */}
-            <Card>
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3.5">
+            <Card className="relative overflow-hidden border-violet-200/80 shadow-[0_8px_24px_-4px_rgba(124,58,237,0.1)]">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3.5 relative">
                 <div className="flex items-center gap-2">
-                  <BrainCircuit size={16} className="text-cobalt-600" />
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-violet-600 to-indigo-500 text-white flex items-center justify-center shadow-xs">
+                    <BrainCircuit size={13} />
+                  </div>
                   <CardTitle>DecisionForge Intelligence</CardTitle>
                 </div>
-                <Badge variant="cobalt" size="xs">
+                <Badge variant="violet" size="xs" dot>
                   Active Model
                 </Badge>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 relative">
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
                   Financial Data → Risk → Decision Engine connected. Automated trade-off simulations ready.
                 </p>
@@ -797,30 +804,30 @@ export const DashboardPage: React.FC = () => {
                     {opportunities.map((opp, idx) => (
                       <div
                         key={opp.id || idx}
-                        className="p-2.5 rounded-lg border border-slate-200/80 bg-slate-50/60 flex items-center justify-between text-xs"
+                        className="p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/60 flex items-center justify-between text-xs"
                       >
                         <div className="truncate min-w-0 mr-2">
-                          <p className="font-bold text-ink-900 truncate">
+                          <p className="font-bold text-slate-900 truncate">
                             {opp.company_name || opp.name || `Opportunity #${idx + 1}`}
                           </p>
                           <p className="text-[10.5px] text-slate-400 font-mono tabular-nums">
                             {fmt(opp.deal_value || 500000)} • Win: {opp.win_probability ? Math.round(opp.win_probability * 100) : 75}%
                           </p>
                         </div>
-                        <Badge variant="cobalt" size="xs">
+                        <Badge variant="violet" size="xs">
                           Score: {opp.priority_score || 82}
                         </Badge>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/60 text-xs text-slate-500">
+                  <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/60 text-xs text-slate-500">
                     B2B opportunity pipeline synchronized with revenue forecast.
                   </div>
                 )}
 
                 <Button
-                  variant="primary"
+                  variant="gradient"
                   size="sm"
                   fullWidth
                   rightIcon={<ExternalLink size={12} />}
@@ -835,7 +842,9 @@ export const DashboardPage: React.FC = () => {
             <ForecastWidget />
 
             {/* AI Actionable Insights */}
-            <AntigravityInsights metrics={metrics} />
+            <div data-tour="dashboard-insights">
+              <AntigravityInsights metrics={metrics} />
+            </div>
           </div>
         </div>
       </div>

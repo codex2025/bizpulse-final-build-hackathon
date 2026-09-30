@@ -10,6 +10,7 @@ import { expenseService } from '../../services/invoiceService';
 import { CustomDropdown } from '../common/CustomDropdown';
 import { useToast } from '../../context/ToastContext';
 import { StatementImportModal } from './StatementImportModal';
+import { AnimatedNumber } from '../common/AnimatedNumber';
 
 interface ExpenseItem {
   id: string;
@@ -86,7 +87,44 @@ export const ExpensesPage: React.FC = () => {
     return matchFilter && matchSearch;
   });
 
+  const [expenseToDelete, setExpenseToDelete] = useState<ExpenseItem | null>(null);
+
+  const categoryTotals = expenses.reduce((acc, curr) => {
+    const cat = curr.category || 'other';
+    acc[cat] = (acc[cat] || 0) + Number(curr.amount || 0);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const topCategoryEntry = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+  const topCategory = topCategoryEntry ? topCategoryEntry[0] : 'None';
+  const topCategoryAmount = topCategoryEntry ? topCategoryEntry[1] : 0;
+
   const totalThisMonth = expenses.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+  const exportToCSV = () => {
+    if (expenses.length === 0) {
+      toast.info('No Data', 'No expenses available to export.');
+      return;
+    }
+    const headers = ['ID', 'Category', 'Description', 'Amount (INR)', 'Date'];
+    const rows = expenses.map(e => [
+      `"${e.id}"`,
+      `"${e.category}"`,
+      `"${(e.description || '').replace(/"/g, '""')}"`,
+      e.amount,
+      `"${e.expense_date}"`
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bizpulse_expenses_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Export Successful', 'Expenses exported as CSV');
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -102,7 +140,7 @@ export const ExpensesPage: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider">Total Logged Outflows</span>
           </div>
           <p className="text-2xl font-black text-ink-900 font-mono tabular-nums pt-1">
-            ₹{totalThisMonth.toLocaleString('en-IN')}
+            <AnimatedNumber value={totalThisMonth} prefix="₹" />
           </p>
           <p className="text-xs text-slate-400 font-medium">Cumulative across {expenses.length} ledger entries</p>
         </div>
@@ -115,9 +153,11 @@ export const ExpensesPage: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider">Primary Outflow Category</span>
           </div>
           <p className="text-2xl font-black text-ink-900 capitalize pt-1">
-            {expenses.length > 0 ? expenses[0].category : 'Software & SaaS'}
+            {CATEGORIES.find(c => c.value === topCategory)?.label || topCategory}
           </p>
-          <p className="text-xs text-cobalt-700/80 font-medium">Largest operational line item</p>
+          <p className="text-xs text-cobalt-700/80 font-medium font-mono">
+            {topCategoryAmount > 0 ? `₹${topCategoryAmount.toLocaleString('en-IN')} total spent` : 'Largest operational line item'}
+          </p>
         </div>
 
         <div className="card p-5 border border-slate-200 rounded-3xl bg-white shadow-xs space-y-1">
@@ -128,7 +168,9 @@ export const ExpensesPage: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider">Recent Disbursement</span>
           </div>
           <p className="text-2xl font-black text-ink-900 font-mono tabular-nums pt-1">
-            {expenses.length > 0 ? `₹${Number(expenses[0].amount).toLocaleString('en-IN')}` : '₹0'}
+            {expenses.length > 0 ? (
+              <AnimatedNumber value={Number(expenses[0].amount)} prefix="₹" />
+            ) : '₹0'}
           </p>
           <p className="text-xs text-slate-400 font-medium capitalize truncate">
             {expenses.length > 0 ? (expenses[0].description || expenses[0].category) : 'No transactions recorded'}
@@ -160,6 +202,15 @@ export const ExpensesPage: React.FC = () => {
             />
           </div>
           <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={exportToCSV}
+              className="flex items-center justify-center gap-1.5 cursor-pointer text-xs font-bold px-3 py-2.5 rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all shadow-xs"
+              title="Export CSV"
+            >
+              <Download size={14} />
+              <span>Export</span>
+            </button>
             <button
               type="button"
               onClick={() => setShowImport(true)}
@@ -210,7 +261,7 @@ export const ExpensesPage: React.FC = () => {
                   <td className="px-4 py-3.5">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
                       <Tag size={10} className="text-cobalt-600" />
-                      {exp.category}
+                      {CATEGORIES.find(c => c.value === exp.category)?.label || exp.category}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-xs font-bold text-ink-900">
@@ -230,8 +281,8 @@ export const ExpensesPage: React.FC = () => {
                   <td className="px-4 py-3.5 text-right">
                     <button 
                       type="button"
-                      onClick={() => deleteMutation.mutate(exp.id)}
-                      className="p-1.5 text-slate-300 hover:text-vermilion-600 opacity-0 group-hover:opacity-100 transition-all hover:bg-vermilion-50 rounded-lg cursor-pointer"
+                      onClick={() => setExpenseToDelete(exp)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 opacity-80 group-hover:opacity-100 transition-all hover:bg-rose-50 rounded-lg cursor-pointer"
                       title="Delete Entry"
                     >
                       <Trash2 size={14} />
@@ -338,6 +389,48 @@ export const ExpensesPage: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Delete Expense Confirmation Modal */}
+        {expenseToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="card w-full max-w-sm shadow-2xl border border-slate-200 bg-white p-6 rounded-3xl space-y-4 text-center"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-ink-900">Delete Ledger Record?</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Are you sure you want to remove <span className="font-bold text-ink-900">"{expenseToDelete.description || expenseToDelete.category}"</span> (₹{Number(expenseToDelete.amount).toLocaleString('en-IN')})? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setExpenseToDelete(null)}
+                  className="btn-secondary flex-1 text-xs cursor-pointer py-2.5 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    deleteMutation.mutate(expenseToDelete.id);
+                    setExpenseToDelete(null);
+                  }}
+                  disabled={deleteMutation.isPending}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition cursor-pointer shadow-xs"
+                >
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

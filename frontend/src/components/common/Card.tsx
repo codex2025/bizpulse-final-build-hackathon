@@ -23,16 +23,16 @@ export const Card: React.FC<CardProps> = ({
   };
 
   const variantStyles: Record<CardVariant, string> = {
-    default: 'bg-white border border-slate-200 shadow-card',
-    subtle: 'bg-slate-50/70 border border-slate-200/80',
+    default: 'bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_4px_20px_-2px_rgba(16,24,47,0.04)]',
+    subtle: 'bg-slate-50/80 backdrop-blur-md border border-slate-200/80',
     interactive:
-      'bg-white border border-slate-200 shadow-card hover:border-slate-300 hover:shadow-elevated transition-all cursor-pointer',
-    bordered: 'bg-transparent border border-slate-200',
+      'bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_4px_20px_-2px_rgba(16,24,47,0.04)] hover:border-violet-300 hover:shadow-[0_12px_28px_-6px_rgba(124,58,237,0.12)] hover:-translate-y-0.5 transition-all cursor-pointer',
+    bordered: 'bg-transparent border border-slate-200/90',
   };
 
   return (
     <div
-      className={`rounded-financial overflow-hidden ${variantStyles[variant]} ${paddingStyles[padding]} ${className}`}
+      className={`rounded-2xl overflow-hidden ${variantStyles[variant]} ${paddingStyles[padding]} ${className}`}
       {...props}
     >
       {children}

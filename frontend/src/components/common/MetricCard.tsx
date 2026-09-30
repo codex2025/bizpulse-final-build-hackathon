@@ -39,21 +39,24 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   const resolvedSentiment =
     sentiment || (trend === 'up' ? 'positive' : trend === 'down' ? 'negative' : 'neutral');
 
-  const sentimentStyles: Record<TrendSentiment, { text: string; bg: string; icon: React.ReactNode }> = {
+  const sentimentStyles: Record<TrendSentiment, { text: string; bg: string; icon: React.ReactNode; glow: string }> = {
     positive: {
-      text: 'text-teal-700',
-      bg: 'bg-teal-50 border-teal-200/80',
+      text: 'text-emerald-700 font-extrabold',
+      bg: 'bg-emerald-50/90 border-emerald-200 text-emerald-700',
       icon: <TrendingUp size={12} className="stroke-[2.5]" />,
+      glow: 'from-emerald-500/20 to-transparent',
     },
     negative: {
-      text: 'text-vermilion-700',
-      bg: 'bg-vermilion-50 border-vermilion-200/80',
+      text: 'text-rose-700 font-extrabold',
+      bg: 'bg-rose-50/90 border-rose-200 text-rose-700',
       icon: <TrendingDown size={12} className="stroke-[2.5]" />,
+      glow: 'from-rose-500/20 to-transparent',
     },
     neutral: {
-      text: 'text-slate-600',
-      bg: 'bg-slate-50 border-slate-200/80',
+      text: 'text-violet-700 font-extrabold',
+      bg: 'bg-violet-50/90 border-violet-200 text-violet-700',
       icon: <Minus size={12} className="stroke-[2.5]" />,
+      glow: 'from-violet-500/20 to-transparent',
     },
   };
 
@@ -61,28 +64,35 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
   return (
     <motion.div
-      whileHover={!prefersReducedMotion ? { y: -2, transition: { duration: 0.18, ease: EASE_FINANCIAL } } : undefined}
-      className={`bg-white border border-slate-200 rounded-financial p-4 sm:p-5 shadow-card hover:border-slate-300 transition-colors ${className}`}
+      whileHover={!prefersReducedMotion ? { y: -3, transition: { duration: 0.2, ease: EASE_FINANCIAL } } : undefined}
+      className={`relative overflow-hidden bg-white/90 backdrop-blur-xl border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-[0_4px_20px_-2px_rgba(16,24,47,0.04)] hover:shadow-[0_12px_28px_-6px_rgba(16,24,47,0.08)] hover:border-slate-300 transition-all ${className}`}
     >
-      <div className="flex items-center justify-between gap-2 mb-2.5">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider truncate">
+      {/* Top subtle ambient glow strip */}
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${currentSentiment.glow}`} />
+
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider truncate">
           {label}
         </span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {badge}
-          {icon && <div className="text-slate-400 p-1 rounded-md bg-slate-50">{icon}</div>}
+          {icon && (
+            <div className="p-1.5 rounded-xl bg-slate-50/90 border border-slate-100 text-slate-600 shadow-2xs">
+              {icon}
+            </div>
+          )}
           {action}
         </div>
       </div>
 
       <div className="flex items-baseline justify-between gap-3 mt-1">
-        <div className="text-2xl sm:text-3xl font-extrabold text-ink-900 tracking-tight font-mono tabular-nums truncate">
+        <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-mono tabular-nums truncate">
           {value}
         </div>
 
         {change !== undefined && (
           <div
-            className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border ${currentSentiment.bg} ${currentSentiment.text} flex-shrink-0 font-mono tabular-nums`}
+            className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${currentSentiment.bg} ${currentSentiment.text} flex-shrink-0 font-mono tabular-nums`}
           >
             {currentSentiment.icon}
             <span>{change}</span>
@@ -91,9 +101,9 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       </div>
 
       {(period || subtitle) && (
-        <div className="mt-2 text-[11px] text-slate-400 font-medium flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+        <div className="mt-3 text-[11px] text-slate-400 font-medium flex items-center justify-between gap-2 border-t border-slate-100/80 pt-2.5">
           {period && <span className="truncate">{period}</span>}
-          {subtitle && <span className="text-slate-500 font-semibold truncate">{subtitle}</span>}
+          {subtitle && <span className="text-slate-600 font-bold truncate">{subtitle}</span>}
         </div>
       )}
     </motion.div>

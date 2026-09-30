@@ -176,7 +176,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
 
   return (
     <aside
-      className={`relative flex flex-col h-full bg-white border-r border-slate-200 transition-all duration-200 select-none z-30 ${
+      className={`relative flex flex-col h-full bg-white/95 backdrop-blur-xl border-r border-slate-200/90 transition-all duration-200 select-none z-30 shadow-[4px_0_24px_-10px_rgba(16,24,47,0.05)] ${
         collapsed ? 'w-18' : 'w-64'
       }`}
     >
@@ -188,17 +188,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
       >
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 bg-cobalt-500 rounded-lg flex items-center justify-center flex-shrink-0 shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-500 via-fuchsia-600 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-fuchsia-500/25">
               <Zap size={15} className="text-white fill-white" />
             </div>
             {!collapsed && (
               <div className="min-w-0">
-                <span className="font-extrabold text-[15px] text-ink-900 tracking-tight block leading-snug">
+                <span className="font-extrabold text-[15.5px] bg-gradient-to-r from-slate-900 via-indigo-950 to-rose-700 bg-clip-text text-transparent tracking-tight block leading-snug">
                   Bizpulse
                 </span>
-                <span className="text-[9.5px] font-bold text-slate-400 block -mt-0.5 tracking-wider uppercase">
-                  Financial Engine
-                </span>
+                <div className="flex items-center gap-1.5 -mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[9.5px] font-bold text-slate-400 block tracking-wider uppercase">
+                    AI Financial Engine
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -218,9 +221,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
 
         {/* Persona Mode Indicator */}
         {!collapsed && (
-          <div className="mt-3.5 flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] font-semibold text-slate-700">
+          <div className="mt-3.5 flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-slate-50 to-violet-50/30 border border-slate-200/80 text-[11px] font-semibold text-slate-700 shadow-2xs">
             <div className="flex items-center gap-2 truncate">
-              <div className="w-5 h-5 rounded flex items-center justify-center bg-white border border-slate-200/70 text-cobalt-600 flex-shrink-0 shadow-2xs">
+              <div className="w-5 h-5 rounded-md flex items-center justify-center bg-white border border-slate-200/70 text-violet-600 flex-shrink-0 shadow-2xs">
                 {renderPersonaIcon(persona, 11)}
               </div>
               <span className="truncate">{config.badge}</span>
@@ -230,7 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
                 type="button"
                 onClick={toggleWorkPersonal}
                 title="Switch Work / Personal View"
-                className="p-1 rounded hover:bg-white text-slate-400 hover:text-cobalt-600 border border-transparent hover:border-slate-200 transition-colors cursor-pointer flex-shrink-0"
+                className="p-1 rounded hover:bg-white text-slate-400 hover:text-violet-600 border border-transparent hover:border-slate-200 transition-colors cursor-pointer flex-shrink-0"
               >
                 <ArrowLeftRight size={11} />
               </button>
@@ -242,7 +245,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
       {/* Grouped Nav Links */}
       <nav className="flex-1 px-2.5 py-3 space-y-4 overflow-y-auto">
         {navGroups.map((group, groupIdx) => (
-          <div key={group.groupName || groupIdx} className="space-y-1">
+          <div
+            key={group.groupName || groupIdx}
+            data-tour={groupIdx === 1 ? 'sidebar-operations' : undefined}
+            className="space-y-1"
+          >
             {!collapsed ? (
               <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 {group.groupName}
@@ -259,10 +266,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
                   end={to === '/'}
                   onClick={handleLinkClick}
                   className={({ isActive }) =>
-                    `relative flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                    `relative flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
                       isActive
-                        ? 'text-cobalt-600 bg-cobalt-50/70'
-                        : 'text-slate-600 hover:text-ink-900 hover:bg-slate-50'
+                        ? 'text-slate-900 bg-gradient-to-r from-violet-50/90 via-fuchsia-50/50 to-rose-50/30 border border-violet-200/70 shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                     } ${collapsed ? 'justify-center px-0' : ''}`
                   }
                 >
@@ -272,13 +279,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
                         <motion.div
                           layoutId={prefersReducedMotion ? undefined : 'sidebarActivePill'}
                           transition={SPRING_SMOOTH}
-                          className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-cobalt-500 rounded-r"
+                          className="absolute left-0 top-1.5 bottom-1.5 w-1.25 bg-gradient-to-b from-rose-500 via-fuchsia-600 to-violet-600 rounded-r shadow-xs shadow-fuchsia-500/50"
                         />
                       )}
                       <Icon
                         size={15}
                         className={`flex-shrink-0 transition-colors ${
-                          isActive ? 'text-cobalt-600' : 'text-slate-400 group-hover:text-slate-600'
+                          isActive
+                            ? 'text-violet-600'
+                            : 'text-slate-400 group-hover:text-slate-600'
                         }`}
                       />
                       {!collapsed && <span className="truncate">{label}</span>}
@@ -300,19 +309,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
       </nav>
 
       {/* Footer Area: User Summary & Sign Out */}
-      <div className="px-2.5 py-3 border-t border-slate-100 mt-auto space-y-2 bg-slate-50/50">
+      <div className="px-2.5 py-3 border-t border-slate-100 mt-auto space-y-2 bg-gradient-to-b from-transparent to-slate-50/60">
         {!collapsed && (
-          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-white border border-slate-200/80">
-            <div className="w-7 h-7 rounded-md bg-cobalt-50 border border-cobalt-100 text-cobalt-600 flex items-center justify-center flex-shrink-0 font-bold text-xs">
+          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-rose-500 to-violet-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs shadow-xs">
               <User size={13} />
             </div>
             <div className="min-w-0 flex-1">
               <span className="text-xs font-bold text-ink-900 block truncate leading-tight">
-                Bizpulse User
+                Bizpulse Admin
               </span>
-              <span className="text-[10px] text-slate-400 block truncate font-medium">
-                Verified Account
-              </span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[10px] text-emerald-700 font-semibold truncate">
+                  AI Ready &bull; Connected
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -320,12 +332,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
         <button
           type="button"
           onClick={handleLogout}
-          className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-vermilion-600 hover:bg-vermilion-50/80 transition-colors cursor-pointer group ${
+          className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50/80 transition-colors cursor-pointer group ${
             collapsed ? 'justify-center px-0' : ''
           }`}
           title={collapsed ? 'Sign Out' : undefined}
         >
-          <LogOut size={14} className="flex-shrink-0 text-slate-400 group-hover:text-vermilion-600" />
+          <LogOut size={14} className="flex-shrink-0 text-slate-400 group-hover:text-rose-600" />
           {!collapsed && <span>Sign Out</span>}
         </button>
       </div>
