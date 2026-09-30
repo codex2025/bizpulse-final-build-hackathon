@@ -4,11 +4,22 @@ import {
   Plus, Search, Receipt, Calendar, Tag, 
   Trash2, TrendingUp, Wallet, X, PlusCircle, Download
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Topbar } from '../common/Topbar';
 import { expenseService } from '../../services/invoiceService';
 import { CustomDropdown } from '../common/CustomDropdown';
 import { useToast } from '../../context/ToastContext';
 import { StatementImportModal } from './StatementImportModal';
+import { AnimatedNumber } from '../common/AnimatedNumber';
+
+interface ExpenseItem {
+  id: string;
+  category: string;
+  description: string;
+  amount: number;
+  expense_date: string;
+  created_at?: string;
+}
 
 const CATEGORIES = [
   { value: 'software', label: 'Software & SaaS' },
@@ -31,13 +42,16 @@ export const ExpensesPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [modalCategory, setModalCategory] = useState('software');
 
-  const { data: expenses = [], isLoading } = useQuery({
+  const { data: rawExpenses = [], isLoading } = useQuery<ExpenseItem[]>({
     queryKey: ['expenses'],
     queryFn: expenseService.getAll,
   });
 
+  const expenses: ExpenseItem[] = Array.isArray(rawExpenses) ? rawExpenses : [];
+
   const createMutation = useMutation({
-    mutationFn: (data: any) => expenseService.create(data),
+    mutationFn: (data: { category: string; description: string; amount: number; expense_date: string }) =>
+      expenseService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -66,61 +80,115 @@ export const ExpensesPage: React.FC = () => {
     ...CATEGORIES,
   ];
 
-  const filteredExpenses = expenses.filter((e: any) => {
+  const filteredExpenses = expenses.filter((e) => {
     const matchFilter = filter === 'all' || e.category?.toLowerCase() === filter.toLowerCase();
-    const matchSearch = e.description?.toLowerCase().includes(search.toLowerCase()) || 
-                        e.category?.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = (e.description || '').toLowerCase().includes(search.toLowerCase()) || 
+                        (e.category || '').toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   });
 
-  const totalThisMonth = expenses.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0);
+  const [expenseToDelete, setExpenseToDelete] = useState<ExpenseItem | null>(null);
+
+  const categoryTotals = expenses.reduce((acc, curr) => {
+    const cat = curr.category || 'other';
+    acc[cat] = (acc[cat] || 0) + Number(curr.amount || 0);
+    return acc;
+  }, {} as Record<string, number>);
+
+  const topCategoryEntry = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+  const topCategory = topCategoryEntry ? topCategoryEntry[0] : 'None';
+  const topCategoryAmount = topCategoryEntry ? topCategoryEntry[1] : 0;
+
+  const totalThisMonth = expenses.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+  const exportToCSV = () => {
+    if (expenses.length === 0) {
+      toast.info('No Data', 'No expenses available to export.');
+      return;
+    }
+    const headers = ['ID', 'Category', 'Description', 'Amount (INR)', 'Date'];
+    const rows = expenses.map(e => [
+      `"${e.id}"`,
+      `"${e.category}"`,
+      `"${(e.description || '').replace(/"/g, '""')}"`,
+      e.amount,
+      `"${e.expense_date}"`
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bizpulse_expenses_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Export Successful', 'Expenses exported as CSV');
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <Topbar title="Expense Manager" subtitle="Track and manage all categorized outflows" />
+      <Topbar title="Operational Outflows & Expense Ledger" subtitle="Detailed transaction registry, category tracking & statement reconciliation" />
 
-      {/* Stats Cards */}
+      {/* 3 Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="card">
-          <div className="flex items-center gap-3 mb-2 text-slate-500">
-            <Wallet size={16} />
-            <span className="text-xs font-bold uppercase tracking-wider">Total Logged Outflows</span>
+        <div className="card p-5 border border-slate-200 rounded-3xl bg-white shadow-xs space-y-1">
+          <div className="flex items-center gap-2 text-slate-500">
+            <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+              <Wallet size={14} />
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Total Logged Outflows</span>
           </div>
-          <p className="text-2xl font-black text-slate-900">₹{totalThisMonth.toLocaleString('en-IN')}</p>
-          <p className="text-xs text-slate-400 font-medium mt-1">Across all categories</p>
-        </div>
-        <div className="card border-brand-100 bg-brand-50/50">
-          <div className="flex items-center gap-3 mb-2 text-brand-600">
-            <TrendingUp size={16} />
-            <span className="text-xs font-bold uppercase tracking-wider">Top Category</span>
-          </div>
-          <p className="text-2xl font-black text-slate-900 capitalize">
-            {expenses.length > 0 ? expenses[0].category : 'Software'}
+          <p className="text-2xl font-black text-ink-900 font-mono tabular-nums pt-1">
+            <AnimatedNumber value={totalThisMonth} prefix="₹" />
           </p>
-          <p className="text-xs text-brand-600/70 font-medium mt-1">Highest individual category</p>
+          <p className="text-xs text-slate-400 font-medium">Cumulative across {expenses.length} ledger entries</p>
         </div>
-        <div className="card">
-          <div className="flex items-center gap-3 mb-2 text-slate-500">
-            <Receipt size={16} />
-            <span className="text-xs font-bold uppercase tracking-wider">Recent Transaction</span>
+
+        <div className="card p-5 border border-cobalt-100 bg-cobalt-50/30 rounded-3xl shadow-xs space-y-1">
+          <div className="flex items-center gap-2 text-cobalt-600">
+            <div className="w-7 h-7 rounded-lg bg-cobalt-100 flex items-center justify-center text-cobalt-600">
+              <TrendingUp size={14} />
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Primary Outflow Category</span>
           </div>
-          <p className="text-2xl font-black text-slate-900">
-            {expenses.length > 0 ? `₹${Number(expenses[0].amount).toLocaleString('en-IN')}` : '₹0'}
+          <p className="text-2xl font-black text-ink-900 capitalize pt-1">
+            {CATEGORIES.find(c => c.value === topCategory)?.label || topCategory}
           </p>
-          <p className="text-xs text-slate-400 font-medium mt-1 capitalize">{expenses.length > 0 ? expenses[0].category : 'No entries yet'}</p>
+          <p className="text-xs text-cobalt-700/80 font-medium font-mono">
+            {topCategoryAmount > 0 ? `₹${topCategoryAmount.toLocaleString('en-IN')} total spent` : 'Largest operational line item'}
+          </p>
+        </div>
+
+        <div className="card p-5 border border-slate-200 rounded-3xl bg-white shadow-xs space-y-1">
+          <div className="flex items-center gap-2 text-slate-500">
+            <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+              <Receipt size={14} />
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider">Recent Disbursement</span>
+          </div>
+          <p className="text-2xl font-black text-ink-900 font-mono tabular-nums pt-1">
+            {expenses.length > 0 ? (
+              <AnimatedNumber value={Number(expenses[0].amount)} prefix="₹" />
+            ) : '₹0'}
+          </p>
+          <p className="text-xs text-slate-400 font-medium capitalize truncate">
+            {expenses.length > 0 ? (expenses[0].description || expenses[0].category) : 'No transactions recorded'}
+          </p>
         </div>
       </div>
 
-      <div className="card bg-white">
-        {/* Table Header / Actions */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      {/* Main Ledger Card */}
+      <div className="card p-6 border border-slate-200 rounded-3xl bg-white shadow-xs space-y-5">
+        {/* Table Header / Actions Toolbar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
               <input 
                 type="text" 
-                placeholder="Search expenses by keyword..." 
-                className="input-field pl-9 text-xs font-semibold"
+                placeholder="Search ledger by description, vendor, or category..." 
+                className="input-field pl-9 text-xs font-semibold w-full"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -133,20 +201,31 @@ export const ExpensesPage: React.FC = () => {
               className="w-full sm:w-48"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setShowImport(true)}
-              className="flex items-center justify-center gap-2 cursor-pointer text-xs font-extrabold px-3.5 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-all"
+              type="button"
+              onClick={exportToCSV}
+              className="flex items-center justify-center gap-1.5 cursor-pointer text-xs font-bold px-3 py-2.5 rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-all shadow-xs"
+              title="Export CSV"
             >
               <Download size={14} />
-              Import Statement
+              <span>Export</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowImport(true)}
+              className="flex items-center justify-center gap-2 cursor-pointer text-xs font-extrabold px-3.5 py-2.5 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200/70 transition-all"
+            >
+              <Download size={14} />
+              Reconcile Statement
             </button>
             <button 
+              type="button"
               onClick={() => setIsModalOpen(true)}
-              className="btn-primary flex items-center justify-center gap-2 cursor-pointer text-xs font-extrabold"
+              className="btn-primary flex items-center justify-center gap-2 cursor-pointer text-xs font-extrabold py-2.5 px-4 rounded-xl"
             >
-              <Plus size={16} />
-              Add Expense
+              <Plus size={15} />
+              Log Outflow
             </button>
           </div>
           {showImport && <StatementImportModal onClose={() => setShowImport(false)} />}
@@ -161,44 +240,49 @@ export const ExpensesPage: React.FC = () => {
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3 text-right">Amount</th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-slate-500 text-xs font-semibold">Loading expenses...</td>
+                  <td colSpan={5} className="text-center py-10 text-slate-400 text-xs font-semibold animate-pulse">
+                    Synchronizing ledger with database...
+                  </td>
                 </tr>
               ) : filteredExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-8 text-slate-400 text-xs font-semibold">No expenses found matching your criteria.</td>
+                  <td colSpan={5} className="text-center py-12 text-slate-400 text-xs font-medium">
+                    No transactions match your search filter criteria.
+                  </td>
                 </tr>
-              ) : filteredExpenses.map((exp: any) => (
-                <tr key={exp.id} className="group hover:bg-slate-50/80 transition-colors">
+              ) : filteredExpenses.map((exp) => (
+                <tr key={exp.id} className="group hover:bg-slate-50/70 transition-colors">
                   <td className="px-4 py-3.5">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
-                      <Tag size={10} />
-                      {exp.category}
+                      <Tag size={10} className="text-cobalt-600" />
+                      {CATEGORIES.find(c => c.value === exp.category)?.label || exp.category}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-xs font-bold text-slate-800">
-                    {exp.description || 'General Expense'}
+                  <td className="px-4 py-3.5 text-xs font-bold text-ink-900">
+                    {exp.description || 'General Disbursement'}
                   </td>
                   <td className="px-4 py-3.5 text-xs text-slate-500 font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar size={12} />
+                    <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                      <Calendar size={12} className="text-slate-400" />
                       {new Date(exp.expense_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </div>
                   </td>
                   <td className="px-4 py-3.5 text-right">
-                    <span className="bg-emerald-50 text-emerald-800 font-extrabold px-2.5 py-1 rounded-lg border border-emerald-200 text-xs">
+                    <span className="text-ink-900 font-black font-mono tabular-nums text-xs">
                       ₹{Number(exp.amount).toLocaleString('en-IN')}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-right">
                     <button 
-                      onClick={() => deleteMutation.mutate(exp.id)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50 rounded-lg cursor-pointer"
+                      type="button"
+                      onClick={() => setExpenseToDelete(exp)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 opacity-80 group-hover:opacity-100 transition-all hover:bg-rose-50 rounded-lg cursor-pointer"
                       title="Delete Entry"
                     >
                       <Trash2 size={14} />
@@ -211,76 +295,146 @@ export const ExpensesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Expense Modal with Custom Dropdown */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="card w-full max-w-md shadow-2xl border-slate-200 bg-white space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <PlusCircle className="text-brand-600" size={18} />
-                New Outflow Entry
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              createMutation.mutate({
-                category: modalCategory,
-                description: formData.get('description'),
-                amount: Number(formData.get('amount')),
-                expense_date: formData.get('date'),
-              });
-            }} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-600 mb-1.5 block">Category</label>
-                <CustomDropdown
-                  options={CATEGORIES}
-                  value={modalCategory}
-                  onChange={setModalCategory}
-                  className="w-full"
-                  buttonClassName="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-600 mb-1.5 block">Amount (₹)</label>
-                <input name="amount" type="number" step="0.01" className="input-field" placeholder="e.g. 4500" required />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-600 mb-1.5 block">Date</label>
-                <input name="date" type="date" className="input-field" defaultValue={new Date().toISOString().split('T')[0]} required />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-600 mb-1.5 block">Description</label>
-                <textarea name="description" className="input-field min-h-[70px]" placeholder="What was this outflow for?"></textarea>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button 
+      {/* Add Expense Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="card w-full max-w-md shadow-2xl border border-slate-200 bg-white p-6 rounded-3xl space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-base font-extrabold text-ink-900 flex items-center gap-2">
+                  <PlusCircle className="text-cobalt-600" size={18} />
+                  Record Operational Outflow
+                </h3>
+                <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="btn-secondary flex-1 text-xs cursor-pointer"
+                  className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                createMutation.mutate({
+                  category: modalCategory,
+                  description: String(formData.get('description') || ''),
+                  amount: Number(formData.get('amount')),
+                  expense_date: String(formData.get('date')),
+                });
+              }} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1.5 block">Category</label>
+                  <CustomDropdown
+                    options={CATEGORIES}
+                    value={modalCategory}
+                    onChange={setModalCategory}
+                    className="w-full"
+                    buttonClassName="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1.5 block">Disbursement Amount (₹)</label>
+                  <input
+                    name="amount"
+                    type="number"
+                    step="0.01"
+                    className="input-field font-mono"
+                    placeholder="e.g. 18500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1.5 block">Transaction Date</label>
+                  <input
+                    name="date"
+                    type="date"
+                    className="input-field font-mono"
+                    defaultValue={new Date().toISOString().split('T')[0]}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1.5 block">Description / Reference Note</label>
+                  <textarea
+                    name="description"
+                    className="input-field min-h-[70px]"
+                    placeholder="Operational purpose, invoice reference or supplier name..."
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="btn-secondary flex-1 text-xs cursor-pointer py-2.5 rounded-xl font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={createMutation.isPending}
+                    className="btn-primary flex-1 flex items-center justify-center gap-2 text-xs cursor-pointer py-2.5 rounded-xl font-bold"
+                  >
+                    {createMutation.isPending ? 'Writing Ledger...' : 'Commit Outflow'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Delete Expense Confirmation Modal */}
+        {expenseToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="card w-full max-w-sm shadow-2xl border border-slate-200 bg-white p-6 rounded-3xl space-y-4 text-center"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-ink-900">Delete Ledger Record?</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Are you sure you want to remove <span className="font-bold text-ink-900">"{expenseToDelete.description || expenseToDelete.category}"</span> (₹{Number(expenseToDelete.amount).toLocaleString('en-IN')})? This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setExpenseToDelete(null)}
+                  className="btn-secondary flex-1 text-xs cursor-pointer py-2.5 rounded-xl font-bold"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="btn-primary flex-1 flex items-center justify-center gap-2 text-xs cursor-pointer"
+                <button
+                  type="button"
+                  onClick={() => {
+                    deleteMutation.mutate(expenseToDelete.id);
+                    setExpenseToDelete(null);
+                  }}
+                  disabled={deleteMutation.isPending}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition cursor-pointer shadow-xs"
                 >
-                  {createMutation.isPending ? 'Logging...' : 'Save Outflow'}
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
-            </form>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 };

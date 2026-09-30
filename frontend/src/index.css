@@ -1,7 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Vibrant Three-Color Core Contrast (Rose, Violet, Emerald) */
+  --biz-rose: #E11D48;
+  --biz-rose-hover: #BE123C;
+  --biz-rose-subtle: rgba(225, 29, 72, 0.08);
+
+  --biz-violet: #7C3AED;
+  --biz-violet-hover: #6D28D9;
+  --biz-violet-subtle: rgba(124, 58, 237, 0.08);
+
+  --biz-emerald: #059669;
+  --biz-emerald-hover: #047857;
+  --biz-emerald-subtle: rgba(5, 150, 105, 0.08);
+
+  /* Core Bizpulse Colors */
+  --biz-cobalt: #2457FF;
+  --biz-cobalt-hover: #1743E5;
+  --biz-cobalt-active: #1132B8;
+  --biz-cobalt-subtle: rgba(36, 87, 255, 0.08);
+
+  --biz-vermilion: #F04438;
+  --biz-vermilion-hover: #D92D20;
+  --biz-vermilion-subtle: rgba(240, 68, 56, 0.08);
+
+  --biz-amber: #F5B700;
+  --biz-amber-hover: #D99B00;
+  --biz-amber-subtle: rgba(245, 183, 0, 0.12);
+
+  --biz-teal: #00A88F;
+  --biz-teal-hover: #008C77;
+  --biz-teal-subtle: rgba(0, 168, 143, 0.09);
+
+  --biz-ink: #111827;
+  --biz-ink-muted: #475569;
+  --biz-ink-subtle: #64748B;
+
+  /* Surfaces & Borders */
+  --biz-surface: #FFFFFF;
+  --biz-surface-subtle: #FAFAFD;
+  --biz-surface-muted: #F1F5F9;
+  --biz-border: #E2E8F0;
+  --biz-border-strong: #CBD5E1;
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 
 @layer base {
   * {
@@ -9,13 +57,17 @@
     margin: 0;
     padding: 0;
   }
+
   body {
-    background: #f8fafc;
-    color: #0f172a;
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #F8FAFC;
+    color: #111827;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
+
+  /* Custom Clean Financial Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -30,65 +82,145 @@
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(148, 163, 184, 0.6);
   }
-}
 
-@keyframes card-entry {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.99);
+  /* Respect reduced motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.animate-card {
-  animation: card-entry 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @layer components {
+  /* Crisp & Vibrant Financial Surfaces */
+  .card {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 1rem; /* 16px */
+    padding: 1.25rem;
+    box-shadow: 0 1px 3px 0 rgba(17, 24, 39, 0.04), 0 1px 2px -1px rgba(17, 24, 39, 0.02);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .card-interactive {
+    @apply card cursor-pointer;
+  }
+  .card-interactive:hover {
+    border-color: #CBD5E1;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -4px rgba(17, 24, 39, 0.08);
+  }
+
+  /* Modern Glassmorphic Surface inspired by Landing page */
   .glass {
-    background: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.88);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 20px -2px rgba(16, 24, 47, 0.05);
   }
+
   .glass-hover {
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .glass-hover:hover {
-    background: #ffffff;
-    border-color: rgba(225, 29, 72, 0.2);
-    box-shadow: 0 10px 30px -4px rgba(225, 29, 72, 0.08);
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(124, 58, 237, 0.25);
     transform: translateY(-2px);
+    box-shadow: 0 16px 36px -6px rgba(124, 58, 237, 0.12);
   }
-  .gradient-text {
-    background: linear-gradient(135deg, #e11d48, #9333ea);
+
+  /* Vibrant Gradient Typography from Landing Page */
+  .gradient-brand-text {
+    background-image: linear-gradient(100deg, #E11D48 0%, #C026D3 50%, #7C3AED 100%);
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
     background-clip: text;
+    color: transparent;
+    font-weight: 800;
+    letter-spacing: -0.02em;
   }
+
+  .gradient-text {
+    background-image: linear-gradient(100deg, #E11D48 0%, #7C3AED 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .gradient-emerald-text {
+    background-image: linear-gradient(100deg, #059669 0%, #00A88F 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* Vibrant Gradient Buttons & Badges */
+  .btn-gradient-primary {
+    @apply bg-gradient-to-r from-rose-600 via-purple-600 to-indigo-600 hover:from-rose-500 hover:via-purple-500 hover:to-indigo-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-md shadow-purple-500/20 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+  }
+
   .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-700 text-white font-bold px-5 py-2.5 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-brand-500/20 active:scale-95;
+    @apply bg-gradient-to-r from-cobalt-600 to-indigo-600 hover:from-cobalt-500 hover:to-indigo-500 active:from-cobalt-700 active:to-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
   }
+
   .btn-secondary {
-    @apply bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-xl transition-all duration-200 shadow-sm;
+    @apply bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-ink-900 font-bold px-3.5 py-2 rounded-xl text-xs transition-all shadow-2xs disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
   }
+
+  .btn-danger {
+    @apply bg-gradient-to-r from-rose-600 to-vermilion-600 hover:from-rose-500 hover:to-vermilion-500 active:from-rose-700 active:to-vermilion-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-xs active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent hover:bg-slate-100/80 text-slate-700 hover:text-ink-900 font-semibold px-3 py-1.5 rounded-xl text-xs transition-colors disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+  }
+
+  /* Precision Financial Input */
   .input-field {
-    @apply w-full bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 focus:border-brand-500 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/15 transition-all duration-200 font-semibold;
+    @apply w-full bg-white hover:border-slate-300 focus:bg-white border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/15 rounded-xl px-3 py-2 text-xs text-ink-900 placeholder-slate-400 focus:outline-none transition-all font-medium;
   }
-  .card {
-    @apply bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm animate-card;
-  }
+
+  /* Semantic Status Badges with Rich Vibrancy */
   .badge-low {
-    @apply bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md;
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full;
   }
+
   .badge-medium {
-    @apply bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md;
+    @apply bg-amber-50 text-amber-800 border border-amber-200/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full;
   }
+
   .badge-high {
-    @apply bg-red-50 text-red-700 border border-red-200 text-[10px] font-extrabold px-2 py-0.5 rounded-md;
+    @apply bg-rose-50 text-rose-700 border border-rose-200/80 text-[11px] font-bold px-2.5 py-0.5 rounded-full;
+  }
+
+  /* Financial Typography Utilities */
+  .financial-val {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: #111827;
+  }
+
+  .financial-label {
+    font-size: 0.75rem; /* 12px */
+    font-weight: 600;
+    color: #64748B;
+  }
+
+  .financial-heading {
+    font-size: 1.25rem; /* 20px */
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #111827;
   }
 }

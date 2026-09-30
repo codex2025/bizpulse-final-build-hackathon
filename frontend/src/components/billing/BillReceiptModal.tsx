@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Printer, X, FileText, Building2, Check, Edit3 } from 'lucide-react';
+import { Printer, X, FileText, Check, Edit3 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { userService } from '../../services/userService';
 
@@ -47,17 +47,9 @@ export const BillReceiptModal: React.FC<Props> = ({ invoice, onClose }) => {
   const printRef = useRef<HTMLDivElement>(null);
 
   // Editable fields directly in bill
-  const [editableGstNumber, setEditableGstNumber] = useState<string>('');
-  const [editableGstRate, setEditableGstRate] = useState<number | string>(18);
+  const [editableGstNumber, setEditableGstNumber] = useState<string>(() => profile?.gst_number || '27AAACG1234F1Z5');
+  const [editableGstRate, setEditableGstRate] = useState<number | string>(() => invoice?.gst_rate ?? 18);
   const [isEditingGst, setIsEditingGst] = useState(false);
-
-  // Initialize defaults on open
-  React.useEffect(() => {
-    if (invoice) {
-      setEditableGstNumber(profile?.gst_number || '27AAACG1234F1Z5');
-      setEditableGstRate(invoice.gst_rate ?? 18);
-    }
-  }, [invoice, profile]);
 
   if (!invoice) return null;
 
@@ -94,15 +86,15 @@ export const BillReceiptModal: React.FC<Props> = ({ invoice, onClose }) => {
         {/* Header Bar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/80 print:hidden">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 border border-brand-100 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-cobalt-50 text-cobalt-600 border border-cobalt-100 flex items-center justify-center">
               <FileText size={16} />
             </div>
             <div>
-              <h3 className="font-extrabold text-sm text-slate-900">
+              <h3 className="font-extrabold text-sm text-ink-900">
                 Tax Invoice & Service Bill — {invoiceNo}
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">
-                Official GST Compliant Document
+                Official GST Compliant Commercial Document
               </p>
             </div>
           </div>
@@ -110,7 +102,7 @@ export const BillReceiptModal: React.FC<Props> = ({ invoice, onClose }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-cobalt-600 hover:bg-cobalt-700 text-white text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
             >
               <Printer size={14} />
               Print / Save PDF
@@ -124,162 +116,147 @@ export const BillReceiptModal: React.FC<Props> = ({ invoice, onClose }) => {
           </div>
         </div>
 
-        {/* Printable Tax Invoice Sheet */}
-        <div ref={printRef} className="p-8 sm:p-10 space-y-7 bg-white text-slate-900 font-sans print:p-0">
-          {/* Top Section: Business Brand & Invoice Status */}
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 border-b border-slate-200 pb-6">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm">
-                  <Building2 size={18} />
+        {/* Printable Invoice Document Body */}
+        <div ref={printRef} className="p-8 space-y-6 text-slate-900 bg-white print:p-0">
+          {/* Top Brand & Metadata */}
+          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-xl bg-cobalt-600 text-white flex items-center justify-center font-black text-sm">
+                  BP
                 </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-900 tracking-tight">
-                    {profile?.business_name || profile?.full_name || 'Bizpulse Verified Enterprise'}
-                  </h2>
-                  <p className="text-xs text-slate-500 font-medium">{profile?.email || 'billing@bizpulse.com'}</p>
-                </div>
+                <h1 className="text-xl font-black text-ink-900 tracking-tight">
+                  {profile?.business_name || profile?.full_name || 'BIZPULSE COMMERCIAL LABS'}
+                </h1>
               </div>
-
-              {/* Editable GST Number Field */}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs font-bold text-slate-500">GSTIN:</span>
+              <p className="text-xs text-slate-500 font-medium">Enterprise Financial Operating Architecture</p>
+              
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs font-bold text-slate-500 font-mono">GSTIN:</span>
                 {isEditingGst ? (
                   <div className="flex items-center gap-1">
                     <input
                       type="text"
                       value={editableGstNumber}
-                      onChange={(e) => setEditableGstNumber(e.target.value)}
-                      placeholder="e.g. 27AAACG1234F1Z5"
-                      className="input-field py-1 px-2 text-xs font-mono w-44"
+                      onChange={(e) => setEditableGstNumber(e.target.value.toUpperCase())}
+                      className="border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono font-bold uppercase w-36"
                     />
                     <button
                       onClick={() => setIsEditingGst(false)}
-                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                      className="p-0.5 text-emerald-600 hover:text-emerald-700 cursor-pointer"
                     >
                       <Check size={14} />
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 group">
-                    <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md">
-                      {editableGstNumber || '27AAACG1234F1Z5'}
-                    </span>
+                    <span className="text-xs font-mono font-extrabold text-ink-900">{editableGstNumber}</span>
                     <button
                       onClick={() => setIsEditingGst(true)}
-                      className="text-slate-400 hover:text-brand-600 print:hidden p-0.5 cursor-pointer"
+                      className="text-slate-400 hover:text-slate-700 p-0.5 print:hidden cursor-pointer"
                       title="Edit GST Number"
                     >
-                      <Edit3 size={12} />
+                      <Edit3 size={11} />
                     </button>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="sm:text-right space-y-1">
-              <div>
-                <span className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
-                  isPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
-                }`}>
-                  {isPaid ? '✓ PAID IN FULL' : '⏳ PAYMENT DUE'}
-                </span>
-              </div>
-              <p className="text-base font-black text-slate-900 font-mono mt-1.5">{invoiceNo}</p>
-              <p className="text-xs text-slate-500 font-medium">Issue Date: <strong className="text-slate-700">{invoice.issue_date}</strong></p>
-              <p className="text-xs text-slate-500 font-medium">Due Date: <strong className="text-slate-700">{invoice.due_date}</strong></p>
+            <div className="text-right space-y-1">
+              <span className={`inline-block text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
+                isPaid
+                  ? 'bg-teal-50 text-teal-700 border-teal-200'
+                  : 'bg-amber-50 text-amber-700 border-amber-200'
+              }`}>
+                {isPaid ? 'PAID & SETTLED' : 'PENDING REMITTANCE'}
+              </span>
+              <p className="text-xs font-black text-ink-900 font-mono mt-1">{invoiceNo}</p>
+              <p className="text-[11px] text-slate-500 font-medium font-mono">Issued: {invoice.issue_date}</p>
+              <p className="text-[11px] text-slate-500 font-medium font-mono">Due: {invoice.due_date}</p>
             </div>
           </div>
 
-          {/* Billed To Client Card */}
-          <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-            <div className="space-y-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Billed To (Client / Customer)</span>
-              <h4 className="text-sm font-extrabold text-slate-900">{invoice.client?.name || 'Valued Client'}</h4>
-              <p className="text-xs text-slate-600 font-medium">{invoice.client?.email || 'N/A'}</p>
-              {invoice.client?.address && (
-                <p className="text-xs text-slate-500 font-medium">{invoice.client.address}</p>
+          {/* Billed To / From Addresses */}
+          <div className="grid grid-cols-2 gap-6 bg-slate-50 rounded-2xl p-5 border border-slate-100">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Billed To (Client)</p>
+              <h4 className="font-extrabold text-sm text-ink-900">{invoice.client?.name || 'Counterparty Customer'}</h4>
+              <p className="text-xs text-slate-600 font-medium mt-0.5">{invoice.client?.email || 'accounts@client.com'}</p>
+              {invoice.client?.address && <p className="text-xs text-slate-500 mt-0.5">{invoice.client.address}</p>}
+              {invoice.client?.gst_number && (
+                <p className="text-xs font-mono text-slate-600 mt-1">Client GSTIN: <strong>{invoice.client.gst_number}</strong></p>
               )}
             </div>
 
-            {invoice.client?.gst_number && (
-              <div className="sm:text-right space-y-0.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Client GSTIN</span>
-                <p className="text-xs font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 inline-block">
-                  {invoice.client.gst_number}
-                </p>
-              </div>
-            )}
+            <div className="text-right">
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1">Service Origin</p>
+              <h4 className="font-extrabold text-sm text-ink-900">{profile?.full_name || 'Account Holder'}</h4>
+              <p className="text-xs text-slate-600 font-medium mt-0.5">{profile?.email || 'finance@bizpulse.local'}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Verified Indian Merchant Provider</p>
+            </div>
           </div>
 
           {/* Line Items Table */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <div className="overflow-hidden border border-slate-200 rounded-2xl">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-black text-slate-600 uppercase tracking-wider">
-                  <th className="px-4 py-3">Description of Work / Service</th>
-                  <th className="px-4 py-3 text-center w-16">Qty</th>
-                  <th className="px-4 py-3 text-right w-28">Unit Rate</th>
-                  <th className="px-4 py-3 text-right w-28">Amount</th>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                  <th className="py-2.5 px-4">Item & Scope Description</th>
+                  <th className="py-2.5 px-4 text-center">Qty</th>
+                  <th className="py-2.5 px-4 text-right">Unit Rate</th>
+                  <th className="py-2.5 px-4 text-right">Net Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
-                {items.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50">
-                    <td className="px-4 py-3.5 font-bold text-slate-800">{item.description}</td>
-                    <td className="px-4 py-3.5 text-center text-slate-600 font-medium">{item.quantity}</td>
-                    <td className="px-4 py-3.5 text-right font-mono text-slate-700">₹{Number(item.unit_price).toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900">
-                      ₹{Number(item.quantity * item.unit_price).toLocaleString('en-IN')}
-                    </td>
-                  </tr>
-                ))}
+                {items.map((it, idx) => {
+                  const lineTotal = (Number(it.quantity) || 1) * Number(it.unit_price);
+                  return (
+                    <tr key={idx}>
+                      <td className="py-3 px-4 font-bold text-ink-900">{it.description}</td>
+                      <td className="py-3 px-4 text-center font-mono">{it.quantity}</td>
+                      <td className="py-3 px-4 text-right font-mono tabular-nums">₹{Number(it.unit_price).toLocaleString('en-IN')}</td>
+                      <td className="py-3 px-4 text-right font-mono font-bold tabular-nums">₹{lineTotal.toLocaleString('en-IN')}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          {/* Calculation & Tax Summary */}
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-6 pt-2">
-            <div className="space-y-1.5 max-w-xs text-xs text-slate-500 font-medium">
-              <p className="font-bold text-slate-800">Terms & Conditions:</p>
-              <p className="leading-relaxed">
-                {invoice.notes || 'Payment is requested within the due date specified. Thank you for your business!'}
-              </p>
-            </div>
-
-            <div className="w-full sm:w-72 space-y-2.5 p-4 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="flex justify-between text-xs text-slate-600 font-medium">
-                <span>Subtotal</span>
-                <span className="font-mono font-bold text-slate-900">₹{calculatedSubtotal.toLocaleString('en-IN')}</span>
+          {/* Calculations Summary */}
+          <div className="flex justify-end">
+            <div className="w-64 space-y-2 text-xs">
+              <div className="flex justify-between text-slate-600 font-medium font-mono tabular-nums">
+                <span>Taxable Value (Subtotal):</span>
+                <span>₹{calculatedSubtotal.toLocaleString('en-IN')}</span>
               </div>
-
-              {/* Editable GST percentage */}
-              <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+              <div className="flex justify-between text-slate-600 font-medium font-mono tabular-nums items-center">
                 <span className="flex items-center gap-1">
-                  <span>GST Rate:</span>
+                  GST ({effectiveGstRate}%):
                   <input
                     type="number"
                     value={editableGstRate}
                     onChange={(e) => setEditableGstRate(e.target.value)}
-                    placeholder="18"
-                    className="w-12 py-0.5 px-1 text-center font-bold text-xs rounded border border-slate-300 bg-white"
+                    className="w-12 text-center border border-slate-200 rounded text-[11px] font-mono py-0.5 print:hidden"
                   />
-                  <span>%</span>
                 </span>
-                <span className="font-mono font-bold text-slate-900">₹{calculatedGst.toLocaleString('en-IN')}</span>
+                <span>₹{calculatedGst.toLocaleString('en-IN')}</span>
               </div>
-
-              <div className="flex justify-between text-sm font-black text-slate-900 border-t border-slate-200 pt-2 mt-1">
-                <span>Grand Total</span>
-                <span className="font-mono text-brand-600 text-base">₹{calculatedTotal.toLocaleString('en-IN')}</span>
+              <div className="flex justify-between text-base font-black text-ink-900 border-t-2 border-slate-900 pt-2 font-mono tabular-nums">
+                <span>Total Amount Due:</span>
+                <span className="text-cobalt-600">₹{calculatedTotal.toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
 
-          {/* Clean Stamp Footer */}
-          <div className="border-t border-slate-200 pt-5 flex items-center justify-between text-[11px] text-slate-400 font-medium">
-            <span>Powered by Bizpulse Invoicing Engine</span>
-            <span>Computer Generated Tax Invoice • No Signature Required</span>
+          {/* Remittance & Bank Notes */}
+          <div className="border-t border-slate-200 pt-4 text-xs text-slate-500 space-y-1">
+            <p className="font-bold text-slate-700">Remittance Directives & Payment Terms:</p>
+            <p className="font-medium">{invoice.notes || 'Please settle via direct NEFT/RTGS to the authorized bank account or UPI within the specified due date.'}</p>
+            <p className="text-[10px] text-slate-400 font-medium pt-2">
+              This document is a computer-generated tax invoice issued in accordance with applicable electronic billing guidelines.
+            </p>
           </div>
         </div>
       </motion.div>

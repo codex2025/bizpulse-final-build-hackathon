@@ -26,21 +26,21 @@ export const DecisionTwinTab: React.FC = () => {
   const [result, setResult] = useState<SimulationResult | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
 
-  const runSimulation = async (customParams = params) => {
+  const runSimulation = React.useCallback(async (customParams?: SimulationParams) => {
     setIsSimulating(true);
     try {
-      const data = await decisionForgeService.simulateTwin(customParams);
+      const data = await decisionForgeService.simulateTwin(customParams || params);
       setResult(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Twin simulation error:', err);
     } finally {
       setIsSimulating(false);
     }
-  };
+  }, [params]);
 
   useEffect(() => {
     runSimulation();
-  }, []);
+  }, [runSimulation]);
 
   const chartData = result
     ? [
@@ -297,7 +297,7 @@ export const DecisionTwinTab: React.FC = () => {
                     tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
-                    formatter={(val: any) => [`$${Number(val).toLocaleString()}`, '']}
+                    formatter={(val) => [`$${Number(val).toLocaleString()}`, '']}
                     contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
                   />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />

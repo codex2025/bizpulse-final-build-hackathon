@@ -30,11 +30,52 @@ const gradeBadgeClass = (grade?: string) => {
   return 'bg-red-50 text-red-700 border-red-200';
 };
 
+interface IngestionUploadResult {
+  filename?: string;
+  total_records?: number;
+  total_rows?: number;
+  normalized_records: Record<string, unknown>[];
+  validation_report?: {
+    records_parsed: number;
+    invalid_records: number;
+    duplicates: number;
+    missing_probability: number;
+    missing_or_invalid_value: number;
+    stale_records: number;
+    warnings?: string[];
+  };
+  mapping_proposal: {
+    mapped_columns: Record<string, string>;
+    unmapped_columns?: string[];
+    confidence_scores?: Record<string, number>;
+    canonical_coverage_percent?: number;
+    is_ready_for_analysis?: boolean;
+  };
+}
+
+interface IngestionQualityReport {
+  completeness_percent: number;
+  anomaly_count: number;
+  stale_data_percent: number;
+  total_records: number;
+  quality_indicators?: Array<{ name: string; value: string }>;
+  grade?: string;
+  health_score?: number;
+  duplicate_count?: number;
+  stale_warnings?: string[];
+  missing_probability_count?: number;
+  missing_value_count?: number;
+  conflicting_probability_count?: number;
+  stale_record_count?: number;
+  issues_total?: number;
+  issue_counts?: Record<string, number>;
+}
+
 export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpdated, activeDataset }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
-  const [uploadResult, setUploadResult] = useState<any>(null);
-  const [qualityReport, setQualityReport] = useState<any>(null);
+  const [uploadResult, setUploadResult] = useState<IngestionUploadResult | null>(null);
+  const [qualityReport, setQualityReport] = useState<IngestionQualityReport | null>(null);
   const [activated, setActivated] = useState(false);
   const [issues, setIssues] = useState<any[]>([]);
   const [issueFilter, setIssueFilter] = useState<string>('ALL');
@@ -62,10 +103,10 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
     try {
       const data = await decisionForgeService.uploadCsv(file);
       setUploadResult(data);
-      // This is a *proposed* dataset -- the quality card below still reflects the
-      // currently active dataset until the user reviews the mapping and activates it.
-    } catch (err: any) {
-      alert(err.response?.data?.detail || err.message || 'File upload failed');
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.response?.data?.detail || (err as any)?.message || 'File upload failed';
+      alert(msg);
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -80,8 +121,10 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
       await loadCurrentQuality();
       setActivated(true);
       onDatasetUpdated();
-    } catch (err: any) {
-      alert(err.response?.data?.detail || err.message || 'Failed to activate dataset');
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.response?.data?.detail || (err as any)?.message || 'Failed to activate dataset';
+      alert(msg);
     } finally {
       setIsActivating(false);
     }
@@ -95,14 +138,18 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
       setActivated(false);
       await loadCurrentQuality();
       onDatasetUpdated();
-    } catch (err: any) {
-      alert(err.message || 'Demo reset failed');
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.message || 'Demo reset failed';
+      alert(msg);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const indicators: Array<{ name: string; value: string }> = qualityReport?.quality_indicators || [];
+  const indicators: Array<{ name: string; value: string }> = Array.isArray(qualityReport?.quality_indicators)
+    ? qualityReport.quality_indicators
+    : [];
   const getIndicator = (name: string) => indicators.find((i) => i.name === name)?.value;
 
   return (
@@ -225,12 +272,12 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
             </div>
           </div>
 
-          {qualityReport?.stale_warnings?.length > 0 && (
+          {(qualityReport?.stale_warnings?.length ?? 0) > 0 && (
             <div className="space-y-1.5 border-t border-slate-100 pt-3">
               <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> Stale-record warnings
               </span>
-              {qualityReport.stale_warnings.slice(0, 3).map((w: string, i: number) => (
+              {qualityReport?.stale_warnings && qualityReport.stale_warnings.slice(0, 3).map((w: string, i: number) => (
                 <p key={i} className="text-[11px] text-slate-500 leading-snug">{w}</p>
               ))}
             </div>
@@ -280,7 +327,7 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
           >
             <option value="ALL">All issue types</option>
             {Object.keys(qualityReport?.issue_counts || {}).map((k) => (
-              <option key={k} value={k}>{ISSUE_LABEL[k] || k} ({qualityReport.issue_counts[k]})</option>
+              <option key={k} value={k}>{ISSUE_LABEL[k] || k} ({qualityReport?.issue_counts?.[k]})</option>
             ))}
           </select>
         </div>
@@ -358,7 +405,7 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {Object.entries(uploadResult.mapping_proposal.mapped_columns).map(([src, target]: any) => {
+            {Object.entries(uploadResult.mapping_proposal.mapped_columns).map(([src, target]) => {
               const confidence = uploadResult.mapping_proposal.confidence_scores?.[src] ?? 1;
               return (
                 <div key={src} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
@@ -375,10 +422,10 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
             })}
           </div>
 
-          {uploadResult.mapping_proposal.unmapped_columns?.length > 0 && (
+          {(uploadResult.mapping_proposal.unmapped_columns?.length ?? 0) > 0 && (
             <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-100">
               <span className="font-semibold text-slate-600">Not mapped (ignored): </span>
-              {uploadResult.mapping_proposal.unmapped_columns.join(', ')}
+              {uploadResult.mapping_proposal.unmapped_columns?.join(', ')}
             </div>
           )}
 

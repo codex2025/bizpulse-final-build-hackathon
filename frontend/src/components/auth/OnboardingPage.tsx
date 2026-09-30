@@ -18,7 +18,7 @@ export const OnboardingPage: React.FC = () => {
     title: string;
     subtitle: string;
     desc: string;
-    icon: any;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
     tag: string;
     color: string;
     accentBorder: string;
@@ -30,8 +30,8 @@ export const OnboardingPage: React.FC = () => {
       desc: 'Commercial cashflow tracking, GST invoicing, client accounts, operational burn, and corporate contract intelligence. Includes instant toggle to Personal mode.',
       icon: Building2,
       tag: 'Enterprise & SMEs',
-      color: 'from-blue-600 to-indigo-700 text-blue-600 bg-blue-50/60',
-      accentBorder: 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/20',
+      color: 'text-cobalt-600 bg-cobalt-50',
+      accentBorder: 'border-cobalt-500 ring-2 ring-cobalt-500/20 bg-cobalt-50/20',
     },
     {
       id: 'self_employed',
@@ -40,8 +40,8 @@ export const OnboardingPage: React.FC = () => {
       desc: 'Milestone invoicing, retainer client management, volatility buffer tracking & freelancer micro-loans. Includes instant toggle to Personal mode.',
       icon: Laptop,
       tag: 'Freelance & Agency',
-      color: 'from-purple-600 to-violet-700 text-purple-600 bg-purple-50/60',
-      accentBorder: 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-50/20',
+      color: 'text-teal-600 bg-teal-50',
+      accentBorder: 'border-teal-500 ring-2 ring-teal-500/20 bg-teal-50/20',
     },
     {
       id: 'personal',
@@ -50,8 +50,8 @@ export const OnboardingPage: React.FC = () => {
       desc: 'Monthly salary management, take-home budget planning, personal debt-to-income (DTI) health, daily expense logging, and savings goals.',
       icon: Wallet,
       tag: 'Personal & Salaried',
-      color: 'from-emerald-600 to-teal-700 text-emerald-600 bg-emerald-50/60',
-      accentBorder: 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20',
+      color: 'text-amber-600 bg-amber-50',
+      accentBorder: 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/20',
     },
   ];
 
@@ -60,7 +60,7 @@ export const OnboardingPage: React.FC = () => {
     try {
       await setAccountMode(selectedMode);
       
-      const payload: any = { persona_type: selectedMode };
+      const payload: Record<string, string | number> = { persona_type: selectedMode };
       if (baselineAmount) {
         payload.monthly_income = parseFloat(baselineAmount) || 0;
       }
@@ -84,15 +84,15 @@ export const OnboardingPage: React.FC = () => {
       <div className="max-w-4xl mx-auto w-full">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-100 text-brand-700 text-xs font-bold mb-4 shadow-2xs">
-            <Zap size={13} className="text-brand-600" />
-            <span>Select Your Account Mode (Set During Registration)</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cobalt-50 border border-cobalt-100 text-cobalt-700 text-xs font-bold mb-4 shadow-2xs">
+            <Zap size={13} className="text-cobalt-600" />
+            <span>Select Your Primary Operating Workspace</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-            How will you use <span className="gradient-text">Bizpulse</span>?
+          <h1 className="text-3xl sm:text-4xl font-black text-ink-900 tracking-tight">
+            How will you deploy <span className="text-cobalt-600">Bizpulse</span>?
           </h1>
           <p className="text-sm sm:text-base text-slate-500 font-medium max-w-xl mx-auto mt-2">
-            Choose your primary account workspace. Your dashboard, invoicing, and analytics will be custom-tailored for your financial operations.
+            Choose your primary account workspace. Your dashboard, tax invoicing schema, and analytical telemetry will be custom-calibrated for your operations.
           </p>
         </div>
 
@@ -108,7 +108,7 @@ export const OnboardingPage: React.FC = () => {
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
                 onClick={() => setSelectedMode(m.id)}
-                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative flex flex-col justify-between bg-white shadow-xs ${
+                className={`p-5 rounded-3xl border-2 transition-all cursor-pointer relative flex flex-col justify-between bg-white shadow-xs ${
                   isSelected ? m.accentBorder : 'border-slate-200 hover:border-slate-300'
                 }`}
               >
@@ -120,7 +120,7 @@ export const OnboardingPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <div
                         className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                          isSelected ? 'bg-brand-600 text-white' : 'border border-slate-300'
+                          isSelected ? 'bg-cobalt-600 text-white' : 'border border-slate-300'
                         }`}
                       >
                         {isSelected && <Check size={12} strokeWidth={3} />}
@@ -128,11 +128,11 @@ export const OnboardingPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md inline-block mb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md inline-block mb-1.5 font-mono">
                     {m.tag}
                   </span>
-                  <h3 className="text-base font-black text-slate-900 leading-tight">{m.title}</h3>
-                  <p className="text-xs font-bold text-brand-600 mb-2 mt-0.5">{m.subtitle}</p>
+                  <h3 className="text-base font-black text-ink-900 leading-tight">{m.title}</h3>
+                  <p className="text-xs font-bold text-cobalt-600 mb-2 mt-0.5">{m.subtitle}</p>
                   <p className="text-xs text-slate-500 font-medium leading-relaxed">{m.desc}</p>
                 </div>
               </motion.div>
@@ -141,8 +141,8 @@ export const OnboardingPage: React.FC = () => {
         </div>
 
         {/* Financial Baseline Inputs */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4 max-w-xl mx-auto mb-8">
-          <h4 className="text-sm font-extrabold text-slate-900">Set Initial Financial Baseline</h4>
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-4 max-w-xl mx-auto mb-8">
+          <h4 className="text-sm font-extrabold text-ink-900">Establish Initial Operating Baseline</h4>
           
           {selectedMode !== 'personal' && (
             <div>
@@ -153,15 +153,15 @@ export const OnboardingPage: React.FC = () => {
                 type="text"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
-                placeholder={selectedMode === 'business' ? 'Acme Enterprises Pvt Ltd' : 'Sarah Doe Creative'}
-                className="w-full text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500"
+                placeholder={selectedMode === 'business' ? 'Apex Dynamics Precision Engineering Ltd' : 'Apex Creative Studio'}
+                className="input-field text-xs font-semibold w-full"
               />
             </div>
           )}
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              {selectedMode === 'personal' ? 'Estimated Monthly Salary / Inflow (₹)' : 'Average Monthly Revenue / Cash Inflow (₹)'}
+              {selectedMode === 'personal' ? 'Estimated Monthly Net Salary (₹)' : 'Average Monthly Inflow / Revenue (₹)'}
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
@@ -169,8 +169,8 @@ export const OnboardingPage: React.FC = () => {
                 type="number"
                 value={baselineAmount}
                 onChange={(e) => setBaselineAmount(e.target.value)}
-                placeholder="65,000"
-                className="w-full text-xs font-semibold pl-8 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-brand-500"
+                placeholder="150000"
+                className="input-field text-xs font-semibold pl-8 w-full font-mono"
               />
             </div>
           </div>
@@ -182,9 +182,9 @@ export const OnboardingPage: React.FC = () => {
             type="button"
             onClick={handleContinue}
             disabled={loading}
-            className="px-8 py-3.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white font-extrabold text-sm rounded-2xl shadow-md flex items-center gap-2 mx-auto transition-all cursor-pointer"
+            className="px-8 py-3.5 btn-primary disabled:opacity-50 text-white font-extrabold text-sm rounded-2xl shadow-md inline-flex items-center gap-2 mx-auto transition-all cursor-pointer"
           >
-            <span>{loading ? 'Initializing Workspace…' : 'Complete Setup & Launch Workspace'}</span>
+            <span>{loading ? 'Configuring Operating Ledger…' : 'Complete Setup & Launch Workspace'}</span>
             <ArrowRight size={16} />
           </button>
         </div>

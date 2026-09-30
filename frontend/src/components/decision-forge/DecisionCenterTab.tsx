@@ -79,7 +79,7 @@ export const DecisionCenterTab: React.FC<DecisionCenterTabProps> = ({
   const [showTrail, setShowTrail] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const recommendations = decisionData?.recommendations || [];
+  const recommendations = useMemo(() => decisionData?.recommendations || [], [decisionData?.recommendations]);
 
   const visibleRecommendations = useMemo(() => {
     const ids = answer?.matched_ids;

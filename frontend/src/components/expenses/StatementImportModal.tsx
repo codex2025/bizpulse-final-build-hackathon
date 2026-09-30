@@ -46,14 +46,16 @@ export const StatementImportModal: React.FC<Props> = ({ onClose }) => {
 
     try {
       const result = await statementService.importStatement(file);
-      const txs: Transaction[] = (result.transactions || []).map((t: any) => ({
+      const rawTxs = (result.transactions || []) as Array<Omit<Transaction, 'selected'>>;
+      const txs: Transaction[] = rawTxs.map((t) => ({
         ...t,
         selected: t.type === 'expense', // pre-select expense transactions
       }));
       setTransactions(txs);
       setStep('review');
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to parse statement. Please check the file format and try again.');
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(errorMsg || 'Failed to parse statement. Please check the file format and try again.');
       setStep('upload');
     }
   }, []);
@@ -89,7 +91,7 @@ export const StatementImportModal: React.FC<Props> = ({ onClose }) => {
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['forecast'] });
       setStep('done');
-    } catch (err: any) {
+    } catch {
       setError('Import failed. Please try again.');
       setStep('review');
     }

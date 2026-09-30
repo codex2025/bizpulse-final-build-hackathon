@@ -35,7 +35,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
       setReviewerNotes('');
       setConvertToClient(true);
     }
-  }, [item?.recommendation_id]);
+  }, [item]);
 
   if (!item) return null;
 
@@ -65,7 +65,7 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
           opportunityId: item.opportunity_id,
           companyName: item.company_name,
           contactEmail: item.contact_email || '',
-          location: item.evidence_pack?.structured_data?.location || '',
+          location: String(item.evidence_pack?.structured_data?.location || ''),
           dealValue: item.deal_value,
         });
 
@@ -78,8 +78,10 @@ export const ApprovalModal: React.FC<ApprovalModalProps> = ({
       }
 
       onClose();
-    } catch (err: any) {
-      alert(err.response?.data?.message || err.message || 'Approval action failed');
+    } catch (err: unknown) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Approval action failed';
+      alert(msg);
     } finally {
       setIsSubmitting(false);
     }

@@ -16,6 +16,8 @@ import { WealthPage } from './components/wealth/WealthPage';
 import { authService } from './services/authService';
 import { PersonaProvider } from './context/PersonaContext';
 import { ToastProvider } from './context/ToastContext';
+import { TourProvider } from './context/TourContext';
+import { ProductTour } from './components/tour/ProductTour';
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 10000, retry: 1 } } });
 
@@ -46,7 +48,9 @@ function App() {
       <ToastProvider>
         <PersonaProvider>
           <BrowserRouter>
-          <Routes>
+            <TourProvider>
+              <ProductTour />
+              <Routes>
             <Route path="/login" element={<AuthPage mode="login" />} />
             <Route path="/register" element={<AuthPage mode="register" />} />
             {/* Public alias so the landing page can be viewed while signed in. */}
@@ -87,6 +91,7 @@ function App() {
               }
             />
           </Routes>
+            </TourProvider>
         </BrowserRouter>
       </PersonaProvider>
     </ToastProvider>

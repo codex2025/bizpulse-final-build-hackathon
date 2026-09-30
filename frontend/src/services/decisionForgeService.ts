@@ -2,7 +2,7 @@ import api from './api';
 
 export interface DecisionFactor {
   name: string;
-  raw_value: any;
+  raw_value: string | number | boolean;
   score: number;
   weight: number;
   weighted_contribution: number;
@@ -33,7 +33,7 @@ export interface RecommendationItem {
   badge_color: 'emerald' | 'amber' | 'slate';
   factors: DecisionFactor[];
   evidence_pack: {
-    structured_data: Record<string, any>;
+    structured_data: Record<string, string | number | boolean | null | undefined>;
     rag_notes: Array<{ snippet: string; company_name: string }>;
     /** Facts traceable to a cited URL (real-dataset records only). */
     sourced_facts?: Record<string, string | number>;
@@ -104,9 +104,9 @@ export interface SimulationResult {
   expected_closed_deals: number;
   comparisons: Array<{
     parameter: string;
-    baseline: any;
-    scenario: any;
-    delta: any;
+    baseline: string | number;
+    scenario: string | number;
+    delta: string | number;
     unit: string;
     impact: 'positive' | 'negative' | 'neutral';
   }>;
@@ -203,6 +203,36 @@ export interface DecisionPolicy {
   updatedAt: string;
 }
 
+export interface AuditLogItem {
+  id: string;
+  eventType: string;
+  decisionRunId?: string;
+  opportunityId?: string;
+  companyName?: string;
+  actorId?: string;
+  actorEmail?: string;
+  timestamp?: string;
+  created_at?: string;
+  payload?: Record<string, string | number | boolean | null | undefined>;
+}
+
+export interface ApprovalItem {
+  id: string;
+  recommendationId: string;
+  decisionRunId?: string;
+  opportunityId?: string;
+  companyName: string;
+  contact_name?: string;
+  dealValue: number;
+  status: 'PENDING' | 'APPROVED' | 'MODIFIED' | 'REJECTED';
+  approvedAction: string;
+  reviewerNotes?: string;
+  convertedClientId?: string;
+  approverEmail?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const decisionForgeService = {
   async getDataset() {
     const res = await api.get('/decision-forge/dataset');
@@ -243,7 +273,7 @@ export const decisionForgeService = {
     return res.data;
   },
 
-  async applyMapping(records: any[]) {
+  async applyMapping(records: Record<string, unknown>[]) {
     const res = await api.post('/decision-forge/ingest/apply-mapping', { records });
     return res.data;
   },
@@ -258,14 +288,14 @@ export const decisionForgeService = {
     return res.data;
   },
 
-  async runDecisions(policyOverrides?: any): Promise<DecisionRunData> {
+  async runDecisions(policyOverrides?: Partial<DecisionPolicy>): Promise<DecisionRunData> {
     const res = await api.post('/decision-forge/decide/run', policyOverrides || {});
     return res.data;
   },
 
   async fetchExternalContext(opportunityId: string) {
     const res = await api.post(`/decision-forge/opportunities/${opportunityId}/fetch-context`);
-    return res.data as { status: 'fetched' | 'no_signal' | 'unavailable'; message: string; signal: any };
+    return res.data as { status: 'fetched' | 'no_signal' | 'unavailable'; message: string; signal: unknown };
   },
 
   async simulateTwin(inputs: SimulationParams): Promise<SimulationResult> {
@@ -273,32 +303,32 @@ export const decisionForgeService = {
     return res.data;
   },
 
-  async approveRecommendation(id: string, payload: any) {
+  async approveRecommendation(id: string, payload: Record<string, unknown>) {
     const res = await api.post(`/decision-forge/recommendations/${id}/approve`, payload);
     return res.data;
   },
 
-  async modifyRecommendation(id: string, payload: any) {
+  async modifyRecommendation(id: string, payload: Record<string, unknown>) {
     const res = await api.post(`/decision-forge/recommendations/${id}/modify`, payload);
     return res.data;
   },
 
-  async rejectRecommendation(id: string, payload: any) {
+  async rejectRecommendation(id: string, payload: Record<string, unknown>) {
     const res = await api.post(`/decision-forge/recommendations/${id}/reject`, payload);
     return res.data;
   },
 
-  async convertToClient(id: string, payload: any) {
+  async convertToClient(id: string, payload: Record<string, unknown>) {
     const res = await api.post(`/decision-forge/recommendations/${id}/convert-to-client`, payload);
     return res.data;
   },
 
-  async getAuditLogs() {
+  async getAuditLogs(): Promise<AuditLogItem[]> {
     const res = await api.get('/decision-forge/audit');
     return res.data;
   },
 
-  async getApprovals() {
+  async getApprovals(): Promise<ApprovalItem[]> {
     const res = await api.get('/decision-forge/approvals');
     return res.data;
   },

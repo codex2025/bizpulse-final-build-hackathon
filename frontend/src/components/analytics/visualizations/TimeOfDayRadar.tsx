@@ -21,21 +21,21 @@ export const TimeOfDayRadar: React.FC<Props> = ({ data = [] }) => {
       case 'coffee':
         return <Coffee size={18} className="text-amber-700" />;
       case 'moon':
-        return <Moon size={18} className="text-indigo-500" />;
+        return <Moon size={18} className="text-cobalt-600" />;
       default:
-        return <Sparkles size={18} className="text-purple-500" />;
+        return <Sparkles size={18} className="text-teal-600" />;
     }
   };
 
   return (
-    <div className="card p-6 border border-slate-200 rounded-3xl space-y-4 bg-white">
+    <div className="card p-6 border border-slate-200 rounded-3xl space-y-4 bg-white shadow-xs">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
-          <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-            <Clock size={16} className="text-indigo-600" /> Spending by Time of Day
+          <h3 className="font-extrabold text-sm text-ink-900 flex items-center gap-2">
+            <Clock size={16} className="text-cobalt-600" /> Spending Velocity by Time Window
           </h3>
           <p className="text-xs text-slate-500 font-medium">
-            Behavioral habit analysis revealing your daily peak spending windows
+            Behavioral habit analysis revealing peak operational disbursement windows
           </p>
         </div>
       </div>
@@ -45,24 +45,28 @@ export const TimeOfDayRadar: React.FC<Props> = ({ data = [] }) => {
           <div
             key={item.period}
             className={`p-4 rounded-2xl border transition-all flex flex-col justify-between space-y-3 ${
-              item.peak ? 'border-indigo-300 bg-indigo-50/50 shadow-xs ring-2 ring-indigo-500/10' : 'border-slate-100 bg-slate-50/50'
+              item.peak ? 'border-cobalt-300 bg-cobalt-50/40 shadow-xs ring-2 ring-cobalt-500/10' : 'border-slate-100 bg-slate-50/50'
             }`}
           >
             <div className="flex items-center justify-between">
-              <div className="w-8 h-8 rounded-xl bg-white shadow-xs flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl bg-white shadow-xs flex items-center justify-center border border-slate-100">
                 {getIcon(item.icon)}
               </div>
               {item.peak && (
-                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-600 text-white">
+                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-cobalt-600 text-white font-mono">
                   Peak Window
                 </span>
               )}
             </div>
 
             <div>
-              <p className="text-lg font-black text-slate-900">₹{item.amount.toLocaleString('en-IN')}</p>
+              <p className="text-lg font-black text-ink-900 font-mono tabular-nums">
+                ₹{item.amount.toLocaleString('en-IN')}
+              </p>
               <p className="text-xs font-bold text-slate-600 mt-0.5">{item.period}</p>
-              <p className="text-[11px] text-slate-400 font-medium">{item.count} logged transactions</p>
+              <p className="text-[11px] text-slate-400 font-medium font-mono tabular-nums">
+                {item.count} logged dispatches
+              </p>
             </div>
           </div>
         ))}
