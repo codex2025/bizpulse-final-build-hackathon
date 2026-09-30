@@ -211,6 +211,16 @@ test.describe('Analytics', () => {
   });
 });
 
+test.describe('Contracts', () => {
+  test('TC-09 a loan with an EMI never shows a zero principal', async ({ page }) => {
+    await open(page, '/contracts');
+    await page.getByRole('button', { name: /Load Sample MSE Agreement/i }).click();
+    const principal = page.getByText('Sanctioned Principal').locator('xpath=following-sibling::p[1]');
+    await expect(principal).toBeVisible({ timeout: 30_000 });
+    await expect(principal).not.toHaveText(/^₹0$/);
+  });
+});
+
 test.describe('Every screen: geometry and errors', () => {
   for (const route of ROUTES) {
     test(`TC-08 ${route} has no sideways scroll and no console errors`, async ({ page }) => {

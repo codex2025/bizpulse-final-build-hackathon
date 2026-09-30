@@ -75,6 +75,14 @@ async def analyze_contract(
     )
     simulation = simulator.simulate(sim_input)
     sim_dict = simulation.dict()
+    # The simulator returns only derived figures; the screen also needs the terms they were derived from
+    # (otherwise the sanctioned principal renders as 0).
+    sim_dict.update(
+        loan_amount=sim_input.loan_amount,
+        annual_interest_rate=sim_input.annual_interest_rate,
+        tenure_months=sim_input.tenure_months,
+        penalty_rate=sim_input.penalty_rate,
+    )
 
     # 5. Persona & Ledger-Aware Affordability Decision
     income = float(monthly_income) if monthly_income and monthly_income > 0 else (55000.0 if ptype == "employee" else 65000.0)
