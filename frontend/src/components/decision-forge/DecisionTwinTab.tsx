@@ -13,6 +13,8 @@ import {
 import { decisionForgeService } from '../../services/decisionForgeService';
 import type { SimulationParams, SimulationResult } from '../../services/decisionForgeService';
 
+import { TermsSandbox } from './TermsSandbox';
+
 export const DecisionTwinTab: React.FC = () => {
 
   const [params, setParams] = useState<SimulationParams>({
@@ -370,6 +372,7 @@ export const DecisionTwinTab: React.FC = () => {
           </div>
         </div>
       </div>
+      <TermsSandbox />
     </div>
   );
 };

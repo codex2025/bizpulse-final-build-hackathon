@@ -31,6 +31,8 @@ import { ContractExposureChart } from './visualizations/ContractExposureChart';
 import { DecisionPipelineChart } from './visualizations/DecisionPipelineChart';
 import { ExecutiveBriefing } from './ExecutiveBriefing';
 import { MonteCarloForecast } from './MonteCarloForecast';
+import { UnitEconomics } from './UnitEconomics';
+import { ExpenseAllocation } from './ExpenseAllocation';
 
 const BIZPULSE_COLORS = ['#E11D48', '#7C3AED', '#059669', '#2457FF', '#F5B700', '#111827'];
 
@@ -43,7 +45,7 @@ const TIMEFRAME_PRESETS = [
   { id: 'custom', label: 'Custom' },
 ];
 
-type AnalyticsTab = 'ALL' | 'CASH_FLOW' | 'BUDGET' | 'FORECAST' | 'CONTRACTS' | 'DECISIONS';
+type AnalyticsTab = 'ALL' | 'UNIT' | 'SPRAWL' | 'CASH_FLOW' | 'BUDGET' | 'FORECAST' | 'CONTRACTS' | 'DECISIONS';
 
 const WINDOW_MONTHS: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, '2y': 24 };
 
@@ -83,27 +85,37 @@ export const AnalyticsPage: React.FC = () => {
     if (!contracts || !Array.isArray(contracts) || contracts.length === 0) return undefined;
     interface RawContractItem {
       id: string;
-      title?: string;
-      parties?: string[];
-      sanctioned_amount?: number;
-      monthly_emi?: number;
-      interest_rate?: number;
-      tenure_months?: number;
-      overall_risk?: string;
+      document_name?: string;
+      overall_risk_rating?: string;
+      simulation_results?: {
+        loan_amount?: number;
+        monthly_emi?: number;
+        annual_interest_rate?: number;
+        tenure_months?: number;
+        prepayment_penalty?: number;
+      } | null;
     }
-    return (contracts as RawContractItem[]).map((c) => ({
-      id: c.id,
-      title: c.title || 'Commercial Facility Agreement',
-      institution: c.parties?.[0] || 'Institutional Lender',
-      facilityType: 'Secured Credit Facility',
-      principalAmount: Number(c.sanctioned_amount || 7500000),
-      monthlyEmi: Number(c.monthly_emi || 169690),
-      interestRate: Number(c.interest_rate || 12.75),
-      tenorRemainingMonths: Number(c.tenure_months || 60),
-      foreclosureFeePercent: 3.5,
-      riskLevel: (c.overall_risk === 'critical' ? 'critical' : c.overall_risk === 'caution' ? 'caution' : 'nominal') as 'critical' | 'caution' | 'nominal',
-      covenants: ['Hypothecated machinery', 'Personal director guarantee'],
-    }));
+    // Only analysed loans carry repayment terms. Everything shown here comes from the contract's own simulation
+    // results; documents without them (MSA, SLA, NDA) are not obligations of this kind and are left out.
+    return (contracts as RawContractItem[])
+      .filter((c) => Number(c.simulation_results?.monthly_emi) > 0)
+      .map((c) => {
+        const sim = c.simulation_results!;
+        const rating = (c.overall_risk_rating || '').toLowerCase();
+        return {
+          id: c.id,
+          title: c.document_name || 'Loan agreement',
+          institution: 'As stated in the agreement',
+          facilityType: 'Loan agreement',
+          principalAmount: Number(sim.loan_amount || 0),
+          monthlyEmi: Number(sim.monthly_emi || 0),
+          interestRate: Number(sim.annual_interest_rate || 0),
+          tenorRemainingMonths: Number(sim.tenure_months || 0),
+          foreclosureFeePercent: Number(sim.prepayment_penalty || 0),
+          riskLevel: (rating.includes('high') ? 'critical' : rating.includes('moderate') ? 'caution' : 'nominal') as 'critical' | 'caution' | 'nominal',
+          covenants: [] as string[],
+        };
+      });
   }, [contracts]);
 
   const { data: decisionsData, isLoading: loadingDecisions } = useQuery({
@@ -111,6 +123,13 @@ export const AnalyticsPage: React.FC = () => {
     queryFn: () => decisionForgeService.runDecisions(),
   });
 
+  // Start of the selected window, used by the tabs that read raw ledger rows.
+  const windowStart = React.useMemo(() => {
+    if (timeframe === 'custom') return new Date(customStart);
+    const d = new Date();
+    d.setMonth(d.getMonth() - (WINDOW_MONTHS[timeframe] || 1));
+    return d;
+  }, [timeframe, customStart]);
   const isLoading = loadingAdv || loadingVis;
   const isError = errorAdv || errorVis;
 
@@ -276,6 +295,8 @@ export const AnalyticsPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-2xl border border-slate-200/80">
             {[
               { id: 'ALL', label: 'Overview' },
+              { id: 'UNIT', label: 'Unit Economics' },
+              { id: 'SPRAWL', label: 'Expense Allocation' },
               { id: 'CASH_FLOW', label: 'Cash Flow' },
               { id: 'BUDGET', label: 'Budget & Variance' },
               { id: 'FORECAST', label: 'Monte Carlo Forecast' },
@@ -462,6 +483,12 @@ export const AnalyticsPage: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* TAB: UNIT ECONOMICS */}
+            {activeTab === 'UNIT' && <UnitEconomics since={windowStart} windowMonths={windowMonths} />}
+
+            {/* TAB: EXPENSE ALLOCATION & VENDOR SPRAWL */}
+            {activeTab === 'SPRAWL' && <ExpenseAllocation since={windowStart} />}
 
             {/* TAB: MONTE CARLO FORECAST */}
             {activeTab === 'FORECAST' && (

@@ -64,6 +64,33 @@ async def analyze_contract(
     borrower_rights = extracted_data.get("borrower_rights", [])
     detected_glossary = extracted_data.get("detected_glossary", [])
 
+    document_type = extracted_data.get("document_type", "loan")
+    if document_type != "loan":
+        # Not a lending document: there is no principal, EMI or affordability to simulate, so none is reported.
+        n_high = sum(1 for c in clauses if c.get("risk_level") == "High")
+        return {
+            "contract_id": cid,
+            "chroma_collection_id": collection_id,
+            "total_chunks": len(chunks),
+            "document_type": document_type,
+            "executive_summary": executive_summary,
+            "overall_risk_rating": overall_risk_rating,
+            "red_flags": red_flags,
+            "borrower_rights": borrower_rights,
+            "detected_glossary": detected_glossary,
+            "clauses": clauses,
+            "simulation_results": None,
+            "decision": {
+                "decision_type": "REVIEW",
+                "action_headline": "Review the flagged clauses before signing" if n_high else "No high-attention clauses found by the keyword rules",
+                "action_summary": "This is not a loan, so there is no affordability verdict. The clause review below is rule-based; have a lawyer read anything you rely on.",
+                "reasons": [f"{n_high} high-attention clause(s) found"] if n_high else [],
+                "alternatives": [],
+            },
+            "ledger_impact": None,
+            "negotiation_tips": [c["actionable_tip"] for c in clauses if c.get("risk_level") == "High" and c.get("actionable_tip")][:5],
+        }
+
     loan_params = extractor.extract_loan_params(clauses)
 
     # 4. Financial Simulation

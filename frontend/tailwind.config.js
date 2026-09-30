@@ -109,6 +109,9 @@ export default {
         },
       },
       boxShadow: {
+        'glass-sm': 'var(--shadow-glass-sm)',
+        'glass-md': 'var(--shadow-glass-md)',
+        'glass-lg': 'var(--shadow-glass-lg)',
         '2xs': '0 1px 2px 0 rgba(17, 24, 39, 0.03)',
         'xs': '0 1px 3px 0 rgba(17, 24, 39, 0.05), 0 1px 2px -1px rgba(17, 24, 39, 0.05)',
         'subtle': '0 1px 3px 0 rgba(17, 24, 39, 0.04), 0 1px 2px -1px rgba(17, 24, 39, 0.03)',

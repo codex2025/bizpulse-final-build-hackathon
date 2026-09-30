@@ -31,6 +31,7 @@ import {
   LOCALIZED_UI
 } from './contractTranslations';
 import { SAMPLE_CONTRACT_UJJIVAN } from './sampleContracts';
+import { ContractSplitReview } from './ContractSplitReview';
 
 // --- SEMANTIC RISK BADGE ---
 // Rose -> critical, Amber -> caution, Emerald -> positive/low concern
@@ -783,7 +784,7 @@ export const ContractsPage: React.FC = () => {
   const [translatedContractCache, setTranslatedContractCache] = useState<Record<string, ContractAnalysisData>>({});
   const [analyzing, setAnalyzing] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ContractWorkflowStep>('extracted');
+  const [activeTab, setActiveTab] = useState<ContractWorkflowStep>('split');
   const [clauseSearch, setClauseSearch] = useState('');
   const [clauseFilter, setClauseFilter] = useState<'all' | 'critical' | 'caution' | 'low' | 'red_flags'>('all');
   const qc = useQueryClient();
@@ -839,7 +840,7 @@ export const ContractsPage: React.FC = () => {
       const result = await contractService.uploadAndAnalyze(files[0]);
       qc.invalidateQueries({ queryKey: ['contracts'] });
       setActiveId(result.id);
-      setActiveTab('extracted');
+      setActiveTab('split');
     } catch (err: unknown) {
       console.error('Upload failed:', err);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -861,7 +862,7 @@ export const ContractsPage: React.FC = () => {
       );
       qc.invalidateQueries({ queryKey: ['contracts'] });
       setActiveId(result.id);
-      setActiveTab('extracted');
+      setActiveTab('split');
     } catch (err: unknown) {
       console.error('Sample load failed:', err);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -895,6 +896,8 @@ export const ContractsPage: React.FC = () => {
     },
   });
 
+  // A document with no simulation results is not a loan (MSA, SLA, NDA ...): loan figures are hidden, never defaulted.
+  const isLoan = Boolean(activeContract?.simulation_results);
   const sim = activeContract?.simulation_results || {
     loan_amount: 7500000,
     annual_interest_rate: 12.75,
@@ -904,6 +907,10 @@ export const ContractsPage: React.FC = () => {
     total_interest: 2681400,
     prepayment_penalty: 3.5
   };
+
+  useEffect(() => {
+    if (activeContract && !isLoan && (activeTab === 'extracted' || activeTab === 'risk')) setActiveTab('split');
+  }, [activeContract, isLoan, activeTab]);
 
   // Filter clauses
   const filteredClauses = useMemo(() => {
@@ -1078,8 +1085,13 @@ export const ContractsPage: React.FC = () => {
           <div className="flex items-center justify-between border-b border-slate-200 pb-2 overflow-x-auto">
             <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/60">
               {[
-                { id: 'extracted', label: '1. Extracted Information', icon: FileCheck },
-                { id: 'risk', label: '2. Risk & Affordability', icon: AlertTriangle },
+                { id: 'split', label: 'Master–Detail Review', icon: Scale },
+                ...(isLoan
+                  ? [
+                      { id: 'extracted', label: '1. Extracted Information', icon: FileCheck },
+                      { id: 'risk', label: '2. Risk & Affordability', icon: AlertTriangle },
+                    ]
+                  : []),
                 { id: 'clauses', label: `3. Clause Analysis (${activeContract.clauses?.length || 0})`, icon: Scale },
                 { id: 'evidence', label: '4. Supporting Evidence', icon: ShieldCheck },
                 { id: 'assistant', label: '5. Contract Assistant', icon: Sparkles },
@@ -1117,6 +1129,18 @@ export const ContractsPage: React.FC = () => {
           </div>
 
           <AnimatePresence mode="wait">
+            {activeTab === 'split' && (
+              <motion.div
+                key="split"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.16, ease: EASE_FINANCIAL }}
+              >
+                <ContractSplitReview contract={activeContract} />
+              </motion.div>
+            )}
+
             {/* STAGE 1: EXTRACTED INFORMATION */}
             {activeTab === 'extracted' && (
               <motion.div
@@ -1510,7 +1534,7 @@ export const ContractsPage: React.FC = () => {
                     </p>
                     <button
                       type="button"
-                      onClick={() => setActiveTab('extracted')}
+                      onClick={() => setActiveTab('split')}
                       className="w-full mt-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer text-center"
                     >
                       Return to Overview

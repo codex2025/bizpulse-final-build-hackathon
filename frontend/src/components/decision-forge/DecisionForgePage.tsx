@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Layers,
   Sliders,
@@ -22,6 +22,7 @@ import { AuditTrailTab } from './AuditTrailTab';
 import { EvidenceDrawer } from './EvidenceDrawer';
 import { ApprovalModal } from './ApprovalModal';
 import { PolicyModal } from './PolicyModal';
+import { StageStepper, deriveStages } from './StageStepper';
 import { decisionForgeService } from '../../services/decisionForgeService';
 import type { DatasetKey, DecisionRunData, RecommendationItem } from '../../services/decisionForgeService';
 import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
@@ -34,6 +35,7 @@ export interface ScoreFlash {
 
 export const DecisionForgePage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const prefersReducedMotion = usePrefersReducedMotion();
   const [activeTab, setActiveTab] = useState<'evaluator' | 'center' | 'twin' | 'ingestion' | 'audit'>('evaluator');
   const [decisionData, setDecisionData] = useState<DecisionRunData | null>(null);
@@ -155,6 +157,20 @@ export const DecisionForgePage: React.FC = () => {
     }
   };
 
+  // "Review & Approve" on the dashboard stream lands here with the opportunity to open, once the run is loaded.
+  const reviewRequestId = (location.state as { reviewOpportunityId?: string } | null)?.reviewOpportunityId;
+  const handledReview = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!reviewRequestId || !decisionData || handledReview.current === reviewRequestId) return;
+    const rec = decisionData.recommendations.find((r) => r.opportunity_id === reviewRequestId);
+    if (!rec) return;
+    handledReview.current = reviewRequestId;
+    setSelectedOpportunityId(rec.opportunity_id);
+    handleOpenApproval(rec);
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewRequestId, decisionData]);
+
   const activeOpportunity = decisionData?.recommendations.find(
     (r) => r.opportunity_id === selectedOpportunityId
   ) || decisionData?.recommendations[0] || null;
@@ -272,7 +288,12 @@ export const DecisionForgePage: React.FC = () => {
           </div>
         )}
 
-        {/* Tab Switcher */}
+        {/* Tier 2: stage progression, derived from the real run and approval state */}
+        <div className="pt-3.5 border-t border-slate-100 relative">
+          <StageStepper stages={deriveStages(decisionData, activeOpportunity, approvalStatus)} />
+        </div>
+
+        {/* Tier 3 switcher */}
         <div className="flex border-b border-slate-200 pt-2 overflow-x-auto gap-2 relative">
           {[
             { id: 'evaluator', label: 'Decision Progression (7-Step Evaluator)', icon: Compass, badge: 'Flagship', badgeColor: 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white' },

@@ -5,6 +5,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Blueprint design tokens (section 2.1): canvas, ink, glass borders and elevation. Dark values are applied by
+   `html.dark`, which Settings toggles; styles/dark.css remaps the light utility classes that components use. */
+:root {
+  --canvas-bg: #f8fafc;
+  --canvas-subtle: #f1f5f9;
+  --surface-card: #ffffff;
+  --surface-card-subtle: rgba(255, 255, 255, 0.75);
+  --ink-primary: #0f172a;
+  --ink-secondary: #334155;
+  --ink-muted: #64748b;
+  --ink-faint: #94a3b8;
+  --border-glass: rgba(226, 232, 240, 0.85);
+  --border-glass-hover: rgba(148, 163, 184, 0.4);
+  --border-accent: rgba(99, 102, 241, 0.3);
+  --shadow-glass-sm: 0 2px 8px -1px rgba(15, 23, 42, 0.04), 0 1px 4px -1px rgba(15, 23, 42, 0.02);
+  --shadow-glass-md: 0 8px 24px -4px rgba(15, 23, 42, 0.06), 0 2px 8px -2px rgba(15, 23, 42, 0.02);
+  --shadow-glass-lg: 0 20px 40px -8px rgba(15, 23, 42, 0.09), 0 4px 16px -4px rgba(15, 23, 42, 0.03);
+}
+html.dark {
+  --canvas-bg: #0b0f19;
+  --canvas-subtle: #111827;
+  --surface-card: #151d2f;
+  --surface-card-subtle: rgba(21, 29, 47, 0.8);
+  --ink-primary: #f8fafc;
+  --ink-secondary: #cbd5e1;
+  --ink-muted: #94a3b8;
+  --ink-faint: #64748b;
+  --border-glass: rgba(30, 41, 59, 0.8);
+}
+
 :root {
   /* Vibrant Three-Color Core Contrast (Rose, Violet, Emerald) */
   --biz-rose: #E11D48;

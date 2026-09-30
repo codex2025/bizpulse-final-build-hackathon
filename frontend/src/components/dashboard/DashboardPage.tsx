@@ -47,6 +47,9 @@ import { usePersona } from '../../context/PersonaContext';
 import { ForecastWidget } from './ForecastWidget';
 import { AntigravityInsights } from './AntigravityInsights';
 import { FinancialHealthBreakdown } from './FinancialHealthBreakdown';
+import { RunwayGauge } from './RunwayGauge';
+import { DecisionStream } from './DecisionStream';
+import { SampleWorkspaceCard } from './SampleWorkspaceCard';
 import { staggerContainer, staggerItem } from '../../utils/motion';
 
 interface CashFlowRecord {
@@ -372,6 +375,8 @@ export const DashboardPage: React.FC = () => {
             </motion.div>
           </motion.div>
         )}
+
+        {!invoicesLoading && !expensesLoading && invoices.length === 0 && expenses.length === 0 && <SampleWorkspaceCard />}
 
         {/* Capitalio Analytical Chart Composition & Financial Health */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -837,6 +842,10 @@ export const DashboardPage: React.FC = () => {
                 </Button>
               </div>
             </Card>
+
+            <RunwayGauge monthlyOutflow={Number(metrics?.totalExpenses || 0)} />
+
+            <DecisionStream />
 
             {/* Month-End Forecast Widget */}
             <ForecastWidget />

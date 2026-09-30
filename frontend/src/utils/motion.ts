@@ -32,6 +32,23 @@ export const SPRING_STIFF: Transition = {
   mass: 0.8,
 };
 
+// Blueprint kinetic tokens (section 2.2)
+export const SPRING_TACTILE: Transition = {
+  type: 'spring',
+  stiffness: 420,
+  damping: 28,
+  mass: 0.8,
+};
+
+export const FADE_UP_VARIANTS = {
+  hidden: { opacity: 0, y: 14 },
+  visible: (custom: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: custom * 0.05, duration: 0.45, ease: EASE_FINANCIAL },
+  }),
+};
+
 export const SPRING_SMOOTH: Transition = {
   type: 'spring',
   stiffness: 350,

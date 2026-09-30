@@ -10,6 +10,7 @@ import { expenseService } from '../../services/invoiceService';
 import { CustomDropdown } from '../common/CustomDropdown';
 import { useToast } from '../../context/ToastContext';
 import { StatementImportModal } from './StatementImportModal';
+import { toCsv, downloadCsv } from '../../utils/csv';
 import { AnimatedNumber } from '../common/AnimatedNumber';
 
 interface ExpenseItem {
@@ -99,6 +100,8 @@ export const ExpensesPage: React.FC = () => {
   const topCategory = topCategoryEntry ? topCategoryEntry[0] : 'None';
   const topCategoryAmount = topCategoryEntry ? topCategoryEntry[1] : 0;
 
+  const mostRecent = [...expenses].sort((a, b) => String(b.expense_date || '').localeCompare(String(a.expense_date || '')))[0];
+
   const totalThisMonth = expenses.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
   const exportToCSV = () => {
@@ -106,23 +109,11 @@ export const ExpensesPage: React.FC = () => {
       toast.info('No Data', 'No expenses available to export.');
       return;
     }
-    const headers = ['ID', 'Category', 'Description', 'Amount (INR)', 'Date'];
-    const rows = expenses.map(e => [
-      `"${e.id}"`,
-      `"${e.category}"`,
-      `"${(e.description || '').replace(/"/g, '""')}"`,
-      e.amount,
-      `"${e.expense_date}"`
-    ]);
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `bizpulse_expenses_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csv = toCsv(
+      ['ID', 'Category', 'Description', 'Amount (INR)', 'Date'],
+      expenses.map((e) => [e.id, e.category, e.description, Number(e.amount), e.expense_date]),
+    );
+    downloadCsv(`bizpulse_expenses_${new Date().toISOString().split('T')[0]}.csv`, csv);
     toast.success('Export Successful', 'Expenses exported as CSV');
   };
 
@@ -168,12 +159,12 @@ export const ExpensesPage: React.FC = () => {
             <span className="text-[11px] font-bold uppercase tracking-wider">Recent Disbursement</span>
           </div>
           <p className="text-2xl font-black text-ink-900 font-mono tabular-nums pt-1">
-            {expenses.length > 0 ? (
-              <AnimatedNumber value={Number(expenses[0].amount)} prefix="₹" />
+            {mostRecent ? (
+              <AnimatedNumber value={Number(mostRecent.amount)} prefix="₹" />
             ) : '₹0'}
           </p>
           <p className="text-xs text-slate-400 font-medium capitalize truncate">
-            {expenses.length > 0 ? (expenses[0].description || expenses[0].category) : 'No transactions recorded'}
+            {mostRecent ? (mostRecent.description || mostRecent.category) : 'No transactions recorded'}
           </p>
         </div>
       </div>

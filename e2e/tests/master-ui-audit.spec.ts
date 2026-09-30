@@ -215,9 +215,169 @@ test.describe('Contracts', () => {
   test('TC-09 a loan with an EMI never shows a zero principal', async ({ page }) => {
     await open(page, '/contracts');
     await page.getByRole('button', { name: /Load Sample MSE Agreement/i }).click();
+    await page.getByRole('button', { name: /Extracted Information/i }).click({ timeout: 30_000 });
     const principal = page.getByText('Sanctioned Principal').locator('xpath=following-sibling::p[1]');
     await expect(principal).toBeVisible({ timeout: 30_000 });
     await expect(principal).not.toHaveText(/^₹0$/);
+  });
+});
+
+test.describe('Contracts master-detail review', () => {
+  test('TC-10 split view: document left, three isolated panels right', async ({ page }) => {
+    await open(page, '/contracts');
+    await page.getByRole('button', { name: /Try Sample/i }).first().click();
+    const split = page.getByTestId('contract-split');
+    await expect(split).toBeVisible({ timeout: 30_000 });
+    for (const id of ['panel-scorecard', 'panel-radar', 'panel-obligations']) {
+      await expect(page.getByTestId(id)).toBeVisible();
+    }
+    // The score is a number 0-100 computed from the clause bands shown in the radar.
+    const score = Number(await page.getByTestId('contract-risk-score').innerText());
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+    const counts = await Promise.all(
+      ['critical', 'moderate', 'standard'].map(async (b) => Number(await page.getByTestId(`band-count-${b}`).innerText())),
+    );
+    expect(counts.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+
+    // Search highlights matches in the document viewer.
+    await page.getByLabel('Search the document').fill('interest');
+    await expect(page.locator('[aria-label="Document viewer"] mark').first()).toBeVisible();
+
+    // Desktop: two columns of (roughly) equal width. Mobile: stacked.
+    const viewer = await page.locator('[aria-label="Document viewer"]').boundingBox();
+    const scorecard = await page.getByTestId('panel-scorecard').boundingBox();
+    expect(viewer && scorecard).toBeTruthy();
+    if (page.viewportSize()!.width >= 1024) {
+      expect(Math.abs(viewer!.width - scorecard!.width)).toBeLessThan(40);
+      expect(scorecard!.x).toBeGreaterThan(viewer!.x + viewer!.width - 1);
+    } else {
+      expect(scorecard!.y).toBeGreaterThan(viewer!.y + viewer!.height - 1);
+    }
+  });
+});
+
+test.describe('DecisionForge stages and terms sandbox', () => {
+  test('TC-11 four-stage stepper is derived from the run; terms sandbox recomputes exactly', async ({ page }) => {
+    await open(page, '/decision-forge');
+    const stepper = page.getByTestId('stage-stepper');
+    await expect(stepper).toBeVisible();
+    await expect(stepper.locator('li')).toHaveCount(4);
+    await expect(stepper.locator('[data-stage="ingestion"]')).toHaveAttribute('data-state', 'done');
+    await expect(stepper.locator('[data-stage="policy"]')).toHaveAttribute('data-state', 'done');
+
+    await page.getByRole('button', { name: /Decision Twin/i }).first().click();
+    const box = page.getByTestId('terms-sandbox');
+    await expect(box).toBeVisible();
+    const baseline = await box.getByTestId('terms-baseline').innerText();
+    await expect(box.getByTestId('terms-scenario')).toHaveText(baseline); // unchanged = identical
+
+    const setRange = (id: string, value: string) =>
+      page.locator(`#${id}`).evaluate((el: HTMLInputElement, v: string) => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, v);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }, value);
+    await setRange('terms-discount', '10');
+    await expect(box.getByTestId('terms-delta')).toHaveText(/^-\$/);
+    await setRange('terms-discount', '0');
+    await expect(box.getByTestId('terms-delta')).toHaveText(/^\+\$0$/);
+  });
+
+  test('TC-11b dashboard Review and Approve opens the approval dialog for that opportunity', async ({ page }) => {
+    await open(page, '/');
+    const stream = page.getByTestId('decision-stream');
+    await expect(stream).toBeVisible();
+    const first = stream.getByRole('button', { name: /Review & Approve/i }).first();
+    await expect(first).toBeVisible({ timeout: 20_000 });
+    await first.click();
+    await expect(page).toHaveURL(/\/decision-forge$/);
+    await expect(page.getByText(/Review Action for/i)).toBeVisible({ timeout: 20_000 });
+  });
+});
+
+test.describe('Analytics tabs', () => {
+  test('TC-12 unit economics needs real inputs; expense allocation aggregates the ledger', async ({ page, request }) => {
+    const auth = { Authorization: `Bearer ${session.token}` };
+    const apiBase = process.env.API_URL || 'http://localhost:3001/api';
+    const today = new Date().toISOString().slice(0, 10);
+    for (const [category, description, amount] of [
+      ['Cloud', 'AWS', 100000],
+      ['Cloud', 'AWS', 50000],
+      ['Ads', 'Google Ads', 50000],
+    ] as const) {
+      const r = await request.post(`${apiBase}/expenses`, { headers: auth, data: { category, description, amount, expense_date: today } });
+      expect(r.ok()).toBeTruthy();
+    }
+    await open(page, '/analytics');
+
+    await page.getByRole('button', { name: /^Unit Economics$/ }).click();
+    const ue = page.getByTestId('unit-economics');
+    await expect(ue).toBeVisible();
+    // Nothing is invented: with no margin / churn entered the lifetime value is blank.
+    await expect(ue.getByTestId('ue-ltv')).toHaveText('—');
+    await ue.getByLabel('Gross margin').fill('80');
+    await ue.getByLabel('Monthly customer churn').fill('2');
+    await ue.getByLabel('Revenue per customer / month').fill('5000');
+    await expect(ue.getByTestId('ue-ltv')).toHaveText('₹2,00,000');
+    await ue.getByLabel('Acquisition spend').fill('100000');
+    await ue.getByLabel('New customers in period').fill('10');
+    await expect(ue.getByTestId('ue-cac')).toHaveText('₹10,000');
+    await expect(ue.getByTestId('ue-ratio')).toHaveText('20.0 : 1');
+
+    await page.getByRole('button', { name: /^Expense Allocation$/ }).click();
+    const ea = page.getByTestId('expense-allocation');
+    await expect(ea.getByTestId('expense-total')).toHaveText('₹2,00,000');
+    await expect(ea.getByText('Cloud', { exact: true })).toBeVisible();
+    await expect(ea.getByTestId('top3-share')).toHaveText('100%');
+  });
+});
+
+test.describe('Expense CSV export', () => {
+  test('TC-13 export is RFC 4180 and neutralises formulas', async ({ page, request }) => {
+    const auth = { Authorization: `Bearer ${session.token}` };
+    const apiBase = process.env.API_URL || 'http://localhost:3001/api';
+    const r = await request.post(`${apiBase}/expenses`, {
+      headers: auth,
+      data: { category: 'Misc', description: '=HYPERLINK("http://x"),"quoted"', amount: 12.5, expense_date: new Date().toISOString().slice(0, 10) },
+    });
+    expect(r.ok()).toBeTruthy();
+    await open(page, '/expenses');
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /Export/i }).first().click()]);
+    const { readFile } = await import('node:fs/promises');
+    const text = (await readFile(await download.path(), 'utf8')).replace(/^﻿/, '');
+    expect(text.split('\r\n')[0]).toBe('ID,Category,Description,Amount (INR),Date');
+    expect(text).toContain(`"'=HYPERLINK(""http://x""),""quoted"""`);
+    expect(text.endsWith('\r\n')).toBe(true);
+  });
+});
+
+test.describe('Sample enterprise workspace (opt-in)', () => {
+  test('TC-14 an empty dashboard offers it; loading creates ordinary records', async ({ browser }) => {
+    const fresh = await registerThrowaway('business');
+    const ctx = await browser.newContext({ viewport: { width: 1536, height: 730 } });
+    await signIn(ctx, fresh);
+    const page = await ctx.newPage();
+    await open(page, '/');
+    const card = page.getByTestId('sample-workspace');
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Sample', { exact: true })).toBeVisible();
+    await card.getByRole('button', { name: /Load sample workspace/i }).click();
+    await expect(card).toBeHidden({ timeout: 120_000 });
+
+    await open(page, '/billing');
+    await expect(page.getByText('Apex Dynamics Ltd').first()).toBeVisible();
+    await expect(page.getByText('Zenith Global Logistics').first()).toBeVisible();
+    await expect(page.getByTestId('nav-count-billing').first()).toHaveText('4');
+
+    // The three sample contracts are not loans: they are read clause by clause, with no invented loan figures.
+    await expect(page.getByTestId('nav-count-contracts').first()).toHaveText('3');
+    await open(page, '/contracts');
+    await expect(page.getByTestId('contract-split')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: /Extracted Information/i })).toHaveCount(0);
+    await expect(page.getByText('Sanctioned Principal')).toHaveCount(0);
+    await expect(page.getByTestId('contract-jurisdiction')).toHaveText('India');
+    await expect(page.getByTestId('panel-obligations')).toBeVisible();
+    await ctx.close();
   });
 });
 

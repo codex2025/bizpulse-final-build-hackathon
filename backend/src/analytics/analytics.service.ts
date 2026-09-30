@@ -794,18 +794,8 @@ export class AnalyticsService {
       }))
       .slice(0, 3);
 
-    const fallbackAnomalies = spendingAnomalies.length === 0 ? [
-      {
-        id: 'anom-1',
-        title: 'Unusual Software Subscription Spike',
-        category: 'Software & SaaS',
-        amount: 6500,
-        averageAmount: 2200,
-        factor: '2.9x',
-        date: 'Aug 18, 2026',
-        reason: 'Annual developer seat renewal processed.',
-      },
-    ] : spendingAnomalies;
+    // Only real month-over-month spikes are reported; with none, the radar is simply empty (no invented anomaly).
+    const fallbackAnomalies = spendingAnomalies;
 
     const timeOfDay = [
       { period: 'Morning (6am - 12pm)', amount: Math.round(totalSpent * 0.18), count: 8 * monthsCount, icon: 'sun' },

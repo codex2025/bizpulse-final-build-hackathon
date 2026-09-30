@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from app.config import settings
 from app.services.knowledge_base_service import KnowledgeBaseService
+from app.services.general_extractor import is_lending_document, extract_general_clauses
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,12 @@ class ClauseExtractor:
         Enriched with pre-seeded Banking Glossary and Predatory Red-Flag Knowledge Base.
         """
         result = {}
-        if self.llm is not None:
+        # Only lending documents go through the loan template / loan prompt. Anything else (MSA, SLA, NDA, lease ...)
+        # is read clause by clause from its own wording, so no lender, principal or EMI is ever invented for it.
+        doc_text = chr(10).join(c.get("text", "") for c in chunks)
+        if not is_lending_document(doc_text):
+            result = extract_general_clauses(doc_text)
+        if not result and self.llm is not None:
             try:
                 chunk_context = "\n\n".join([
                     f"[Chunk {c['chunk_id']} | Page {c.get('page_number', 1)} | Section: {c.get('section_title', '')}]\n{c['text']}"
@@ -83,7 +89,7 @@ Contract Text:
                 logger.warning(f"LLM extraction failed ({e}). Using knowledge-base powered semantic extractor.")
 
         # Fallback / Knowledge-Base Powered Semantic Extractor
-        if not result or not result.get("clauses"):
+        if not result:
             result = self._semantic_knowledge_base_extract(chunks)
 
         # Document-wide Glossary Matching

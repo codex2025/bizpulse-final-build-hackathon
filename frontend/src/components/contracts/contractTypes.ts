@@ -84,4 +84,4 @@ export interface ContractAnalysisData {
   negotiation_tips?: string[];
 }
 
-export type ContractWorkflowStep = 'extracted' | 'risk' | 'clauses' | 'evidence' | 'assistant';
+export type ContractWorkflowStep = 'split' | 'extracted' | 'risk' | 'clauses' | 'evidence' | 'assistant';
