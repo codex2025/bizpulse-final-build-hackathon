@@ -14,7 +14,6 @@ import { StatementModule } from './statement/statement.module';
 import { DecisionForgeModule } from './decision-forge/decision-forge.module';
 import { join } from 'path';
 
-import { SeedService } from './common/services/seed.service';
 import { User } from './users/entities/user.entity';
 import { Client } from './clients/entities/client.entity';
 import { Invoice } from './invoices/entities/invoice.entity';
@@ -32,10 +31,11 @@ import { AppService } from './app.service';
     ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'better-sqlite3',
-      // On Vercel only /tmp is writable, and it's wiped between cold starts --
-      // that's fine here: `synchronize: true` recreates the schema and
-      // SeedService (below) reseeds the demo account on every fresh instance.
-      database: process.env.VERCEL ? '/tmp/finsight.db' : join(process.cwd(), 'finsight.db'),
+      // DATABASE_PATH puts the SQLite file on a persistent volume (for example a mounted disk); without
+      // it, Vercel only has /tmp, which is wiped between cold starts, and `synchronize: true` recreates an EMPTY
+      // schema. Nothing is seeded: there are no built-in accounts, every user signs up (Google or email).
+      // Accounts, runs, approvals, policy and each user's recoverable workspace state live in this one file.
+      database: process.env.DATABASE_PATH || (process.env.VERCEL ? '/tmp/finsight.db' : join(process.cwd(), 'finsight.db')),
       autoLoadEntities: true,
       synchronize: true,
     }),
@@ -53,7 +53,7 @@ import { AppService } from './app.service';
     DecisionForgeModule,
   ],
   controllers: [AppController],
-  providers: [AppService, SeedService],
+  providers: [AppService],
 })
 export class AppModule {}
 

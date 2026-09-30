@@ -8,7 +8,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() body: any) {
-    return this.authService.login(body.email, body.password);
+    return this.authService.login(body?.email, body?.password);
   }
 
   @Post('register')
@@ -16,9 +16,15 @@ export class AuthController {
     return this.authService.register(body);
   }
 
-  @Post('firebase-login')
+  /**
+   * Google sign-up and sign-in in one call. The body is `{ idToken }` (a Firebase ID token from the Google popup) plus
+   * optional profile choices for a new account. The token is verified against Google's keys; nothing about who the
+   * person is is taken from the body. (This replaces the old `firebase-login` route, which trusted a client-supplied
+   * email and so let anyone sign in as anyone.)
+   */
+  @Post('google')
   @HttpCode(HttpStatus.OK)
-  async firebaseLogin(@Body() body: any) {
-    return this.authService.firebaseAuth(body);
+  async google(@Body() body: any) {
+    return this.authService.googleAuth(body);
   }
 }
