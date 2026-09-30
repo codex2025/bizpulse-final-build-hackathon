@@ -70,34 +70,39 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       {/* Top subtle ambient glow strip */}
       <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${currentSentiment.glow}`} />
 
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <span className="text-[11.5px] font-bold text-slate-500 uppercase tracking-wider truncate">
-          {label}
-        </span>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {badge}
+      {/* Zone 1: label + icon on the left, change pill / badge on the right. Nothing here can reach the value. */}
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2 min-w-0">
           {icon && (
-            <div className="p-1.5 rounded-xl bg-slate-50/90 border border-slate-100 text-slate-600 shadow-2xs">
+            <div className="p-1.5 rounded-xl bg-slate-50/90 border border-slate-100 text-slate-600 shadow-2xs shrink-0">
               {icon}
             </div>
           )}
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight line-clamp-2" title={label}>
+            {label}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {change !== undefined && (
+            <span
+              data-testid="metric-change"
+              className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full border shadow-2xs whitespace-nowrap font-mono tabular-nums ${currentSentiment.bg} ${currentSentiment.text}`}
+            >
+              {currentSentiment.icon}
+              <span>{change}</span>
+            </span>
+          )}
+          {badge}
           {action}
         </div>
       </div>
 
-      <div className="flex items-baseline justify-between gap-3 mt-1">
-        <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-mono tabular-nums truncate">
-          {value}
-        </div>
-
-        {change !== undefined && (
-          <div
-            className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${currentSentiment.bg} ${currentSentiment.text} flex-shrink-0 font-mono tabular-nums`}
-          >
-            {currentSentiment.icon}
-            <span>{change}</span>
-          </div>
-        )}
+      {/* Zone 2: the figure, on its own row, never truncated */}
+      <div
+        data-testid="metric-value"
+        className="text-[clamp(1.25rem,1.9vw,1.875rem)] leading-tight font-black text-slate-900 tracking-tight font-mono tabular-nums whitespace-nowrap"
+      >
+        {value}
       </div>
 
       {(period || subtitle) && (

@@ -23,6 +23,8 @@ import { usePersona, type AccountPersonaType } from '../../context/PersonaContex
 import { useTour } from '../../context/TourContext';
 import { authService } from '../../services/authService';
 import { dropdownVariants } from '../../utils/motion';
+import { CommandPalette } from './CommandPalette';
+import { ServiceHealthPill } from './ServiceHealthPill';
 
 interface TopbarProps {
   title?: string;
@@ -65,10 +67,8 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
   const [personaOpen, setPersonaOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const personaRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -81,12 +81,12 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
   const displayTitle = title || currentRouteMeta.title;
   const displaySubtitle = subtitle || currentRouteMeta.subtitle;
 
-  // Ctrl+K to focus search
+  // Ctrl/Cmd+K opens the command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        setPaletteOpen((o) => !o);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -186,24 +186,27 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
       <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
         {action && <div className="hidden sm:flex items-center">{action}</div>}
 
-        {/* Search — compact, expands on focus */}
-        <div className="relative hidden md:block">
-          <Search size={13} className={`absolute left-2.5 top-1/2 -translate-y-1/2 transition-colors ${searchFocused ? 'text-slate-600' : 'text-slate-400'}`} />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            placeholder="Search…"
-            aria-label="Search"
-            className={`bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-10 py-1.5 text-xs text-ink-900 placeholder-slate-400 focus:outline-none focus:border-slate-300 focus:bg-white transition-all font-medium ${searchFocused ? 'w-52' : 'w-32'}`}
-          />
-          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-slate-400 bg-white px-1 py-0.5 rounded border border-slate-200 hidden sm:block">
-            ⌘K
-          </kbd>
-        </div>
+        <ServiceHealthPill />
+
+        {/* Command palette trigger (Ctrl/Cmd+K) */}
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          aria-label="Open search (Ctrl+K)"
+          className="hidden md:flex items-center gap-2 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg pl-2.5 pr-2 py-1.5 text-xs text-slate-400 font-medium w-40 transition-colors cursor-pointer"
+        >
+          <Search size={13} />
+          <span className="flex-1 text-left">Search…</span>
+          <kbd className="text-[10px] font-mono text-slate-400 bg-white px-1 py-0.5 rounded border border-slate-200">Ctrl K</kbd>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          aria-label="Open search"
+          className="md:hidden w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 cursor-pointer"
+        >
+          <Search size={14} />
+        </button>
 
         {/* Persona Mode Switcher */}
         <div className="relative" ref={personaRef}>
@@ -421,6 +424,7 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
           </AnimatePresence>
         </div>
       </div>
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </header>
   );
 };

@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { Topbar } from '../common/Topbar';
 import { goalsService } from '../../services/analyticsService';
+import { SamplePreset } from '../common/SamplePreset';
+import { SAMPLE_GOALS } from '../../data/seedPresets';
 
 export interface GoalItem {
   id: string;
@@ -341,6 +343,26 @@ export const GoalsPage: React.FC = () => {
   });
 
   const onCreated = () => qc.invalidateQueries({ queryKey: ['goals-summary'] });
+
+  // One click turns the labelled sample into ordinary goals in this user's own workspace.
+  const loadSample = useMutation({
+    mutationFn: async () => {
+      for (const g of SAMPLE_GOALS) {
+        const created = await goalsService.create({
+          title: g.title,
+          description: `${g.description} Milestones: ${g.milestones
+            .map((m) => `${m.completed ? '✔' : '○'} ${m.name}`)
+            .join(' · ')}`,
+          icon: g.icon,
+          color: g.color,
+          target_amount: g.target_amount,
+          deadline: g.deadline,
+        });
+        if (g.current_amount > 0 && created?.id) await goalsService.contribute(created.id, g.current_amount);
+      }
+    },
+    onSuccess: onCreated,
+  });
   const onContributed = () => qc.invalidateQueries({ queryKey: ['goals-summary'] });
 
   const goals: GoalItem[] = summary?.goals || [];
@@ -434,6 +456,48 @@ export const GoalsPage: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Sample preset (empty workspace only) */}
+      {!isLoading && goals.length === 0 && (
+        <SamplePreset
+          title="Institutional goal presets"
+          description="Example corporate targets. Nothing is saved until you load them; after that they are normal goals you can edit or delete."
+          loading={loadSample.isPending}
+          error={loadSample.isError ? 'Could not load the sample goals. Please try again.' : null}
+          onLoad={() => loadSample.mutate()}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {SAMPLE_GOALS.map((g) => {
+              const pct = Math.min(100, Math.round((g.current_amount / g.target_amount) * 100));
+              return (
+                <div key={g.title} className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg" aria-hidden>{g.icon}</span>
+                    <p className="text-xs font-extrabold text-slate-900 leading-snug">{g.title}</p>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[11px] font-mono font-bold tabular-nums text-slate-600 mb-1">
+                      <span>{pct}%</span>
+                      <span>Due {g.deadline}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full bg-cobalt-600 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                  <ul className="space-y-1">
+                    {g.milestones.map((m) => (
+                      <li key={m.name} className={`text-[11px] font-medium flex items-center gap-1.5 ${m.completed ? 'text-emerald-700' : 'text-slate-500'}`}>
+                        <span aria-hidden>{m.completed ? '✔' : '○'}</span>
+                        {m.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </SamplePreset>
       )}
 
       {/* Empty State */}

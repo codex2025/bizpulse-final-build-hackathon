@@ -261,7 +261,7 @@ export const DecisionForgePage: React.FC = () => {
                     )}
                     <span className="relative z-10 flex items-center gap-1.5">
                       <span>{rec.company_name}</span>
-                      <span className="font-mono text-[10.5px] px-1 rounded bg-black/20 text-white font-extrabold">
+                      <span data-testid={isSelected ? 'selected-opportunity-score' : undefined} className="font-mono text-[10.5px] px-1 rounded bg-black/20 text-white font-extrabold">
                         {rec.priority_score}
                       </span>
                     </span>
@@ -324,6 +324,7 @@ export const DecisionForgePage: React.FC = () => {
             <DecisionProgressionEvaluator
               recommendation={activeOpportunity}
               policyVersion={decisionData?.policy_version || '1.0'}
+              policy={decisionData?.policy}
               decisionRunId={decisionData?.decision_run_id || 'run-live'}
               onOpenApproval={handleOpenApproval}
               onFetchContext={handleFetchContext}

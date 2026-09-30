@@ -44,3 +44,24 @@ Defaults match the commands above; override with `APP_URL`, `GATEWAY_URL` (inclu
 Tokens from the emulator are **unsigned**, so they cannot be verified with Google's keys. With `FIREBASE_AUTH_EMULATOR_HOST` set (development
 only) the gateway asks the emulator to look the token up instead. That switch is refused in production: the gateway will not start with it
 set while `NODE_ENV=production`, because it would accept forged tokens. See `docs/AUTHENTICATION.md`.
+
+## UI audit (Playwright Test)
+
+`tests/master-ui-audit.spec.ts` checks the signed-in app against the UI blueprint on a **desktop (1536x730)** and a **mobile
+(375x667)** viewport: the Net Operating Profit card never overlaps its amount, the top bar has no theme switch (appearance lives in
+Settings), the Ctrl+K palette, the live service-health pill, dark mode, DecisionForge's evaluator showing the engine's own score,
+the GST tax invoice printing to a single A4 page (real PDF render), the labelled Goals / Net Worth sample presets, the analytics
+briefing and Monte Carlo tab, and no sideways scroll or console errors on all nine screens.
+
+It runs against a stack that is already up (ai-service :8000, gateway :3001, Vite :5173) and registers its own throwaway account
+through the public API, so it needs no seeded login:
+
+```bash
+cd e2e && npm install && npx playwright install chromium
+npx playwright test                      # both viewports
+npx playwright test --project=desktop    # one viewport
+APP_URL=http://localhost:5174 API_URL=http://localhost:3001/api npx playwright test
+```
+
+The tests create throwaway accounts (and a client + invoice) in the target database; never point them at a real deployment.
+

@@ -1,0 +1,203 @@
+/* Dark appearance for the signed-in app.
+   The app is written with light utility classes, so dark mode remaps those utilities inside
+   `.app-shell` (and the command palette) instead of touching every component. The public landing
+   page has its own theme and the printed invoice is always white paper, so neither is affected. */
+@media screen {
+  :root {
+    --dk-bg: #0b0f19;
+    --dk-surface: #151d2f;
+    --dk-surface-2: #1b2438;
+    --dk-surface-3: #222d45;
+    --dk-border: #2a3650;
+    --dk-ink: #f1f5f9;
+    --dk-ink-2: #cbd5e1;
+    --dk-muted: #94a3b8;
+    --dk-faint: #64748b;
+  }
+
+  html.dark body {
+    background: var(--dk-bg);
+    color: var(--dk-ink);
+  }
+
+  html.dark .app-shell,
+  html.dark [data-testid='command-palette'] {
+    color: var(--dk-ink);
+  }
+
+  /* Surfaces */
+  html.dark .app-shell .bg-white,
+  html.dark .app-shell .bg-surface-900,
+  html.dark .app-shell .bg-white\/90,
+  html.dark .app-shell .bg-white\/95,
+  html.dark .app-shell .bg-white\/80,
+  html.dark .app-shell .bg-white\/70,
+  html.dark [data-testid='command-palette'] .bg-white {
+    background-color: var(--dk-surface) !important;
+  }
+  html.dark .app-shell .bg-slate-50,
+  html.dark .app-shell .bg-slate-50\/50,
+  html.dark .app-shell .bg-slate-50\/60,
+  html.dark .app-shell .bg-slate-50\/70,
+  html.dark .app-shell .bg-slate-50\/80,
+  html.dark .app-shell .bg-slate-50\/90,
+  html.dark [data-testid='command-palette'] .bg-slate-50 {
+    background-color: var(--dk-surface-2) !important;
+  }
+  html.dark .app-shell .bg-slate-100,
+  html.dark .app-shell .bg-slate-100\/50,
+  html.dark .app-shell .bg-slate-100\/70,
+  html.dark .app-shell .bg-slate-100\/80,
+  html.dark .app-shell .bg-slate-100\/90,
+  html.dark .app-shell .bg-slate-200,
+  html.dark .app-shell .bg-slate-200\/60,
+  html.dark .app-shell .bg-slate-200\/70,
+  html.dark .app-shell .bg-slate-200\/80 {
+    background-color: var(--dk-surface-3) !important;
+  }
+  html.dark .app-shell {
+    background-color: var(--dk-bg) !important;
+  }
+  html.dark .app-shell .glass {
+    background: rgba(21, 29, 47, 0.88) !important;
+    border-color: var(--dk-border) !important;
+  }
+
+  /* Gradient surfaces written for light backgrounds (exact class tokens, so vivid gradients are untouched) */
+  html.dark .app-shell [class~='from-slate-50'],
+  html.dark .app-shell [class~='via-white'],
+  html.dark .app-shell [class~='to-slate-50\/60'],
+  html.dark .app-shell [class~='to-violet-50\/30'],
+  html.dark .app-shell [class~='from-violet-50\/90'],
+  html.dark .app-shell [class~='from-rose-50'][class~='to-violet-50'] {
+    background-image: none !important;
+    background-color: var(--dk-surface-2) !important;
+  }
+  html.dark .app-shell .bg-clip-text.text-transparent {
+    background-image: linear-gradient(90deg, #f1f5f9, #c4b5fd 55%, #fda4af) !important;
+  }
+  html.dark .app-shell .hover\:text-red-600:hover,
+  html.dark .app-shell .text-red-600,
+  html.dark .app-shell .text-rose-700 {
+    color: #fda4af !important;
+  }
+
+  /* Coloured text written for light surfaces: lift to the -300 shade (any shade, including opacity variants) */
+  html.dark .app-shell [class*='text-emerald-'], html.dark .app-shell [class*='text-teal-'], html.dark .app-shell [class*='text-green-'] {
+    color: #6ee7b7 !important;
+  }
+  html.dark .app-shell [class*='text-amber-'], html.dark .app-shell [class*='text-yellow-'] {
+    color: #fcd34d !important;
+  }
+  html.dark .app-shell [class*='text-violet-'], html.dark .app-shell [class*='text-purple-'], html.dark .app-shell [class*='text-indigo-'] {
+    color: #c4b5fd !important;
+  }
+  html.dark .app-shell [class*='text-cobalt-'], html.dark .app-shell [class*='text-blue-'] {
+    color: #93c5fd !important;
+  }
+  html.dark .app-shell [class*='text-rose-'], html.dark .app-shell [class*='text-vermilion-'] {
+    color: #fda4af !important;
+  }
+
+  /* Tinted status surfaces stay readable on dark (exact -50 shade only, never -500) */
+  html.dark .app-shell [class~='bg-emerald-50'],
+  html.dark .app-shell [class*='bg-emerald-50\/'],
+  html.dark .app-shell [class~='bg-teal-50'],
+  html.dark .app-shell [class*='bg-teal-50\/'],
+  html.dark .app-shell [class~='bg-green-50'],
+  html.dark .app-shell [class*='bg-green-50\/'] {
+    background-color: rgba(16, 185, 129, 0.12) !important;
+  }
+  html.dark .app-shell [class~='bg-rose-50'],
+  html.dark .app-shell [class*='bg-rose-50\/'],
+  html.dark .app-shell [class~='bg-vermilion-50'],
+  html.dark .app-shell [class*='bg-vermilion-50\/'],
+  html.dark .app-shell [class~='bg-red-50'],
+  html.dark .app-shell [class*='bg-red-50\/'] {
+    background-color: rgba(244, 63, 94, 0.12) !important;
+  }
+  html.dark .app-shell [class~='bg-amber-50'],
+  html.dark .app-shell [class*='bg-amber-50\/'],
+  html.dark .app-shell [class~='bg-yellow-50'],
+  html.dark .app-shell [class*='bg-yellow-50\/'] {
+    background-color: rgba(245, 158, 11, 0.12) !important;
+  }
+  html.dark .app-shell [class~='bg-violet-50'],
+  html.dark .app-shell [class*='bg-violet-50\/'],
+  html.dark .app-shell [class~='bg-cobalt-50'],
+  html.dark .app-shell [class*='bg-cobalt-50\/'],
+  html.dark .app-shell [class~='bg-purple-50'],
+  html.dark .app-shell [class*='bg-purple-50\/'],
+  html.dark .app-shell [class~='bg-blue-50'],
+  html.dark .app-shell [class*='bg-blue-50\/'],
+  html.dark .app-shell [class~='bg-indigo-50'],
+  html.dark .app-shell [class*='bg-indigo-50\/'] {
+    background-color: rgba(124, 58, 237, 0.16) !important;
+  }
+
+  /* Borders */
+  html.dark .app-shell .border-slate-100,
+  html.dark .app-shell .border-slate-200,
+  html.dark .app-shell .border-slate-200\/50,
+  html.dark .app-shell .border-slate-200\/80,
+  html.dark .app-shell .border-slate-200\/90,
+  html.dark .app-shell .border-slate-300,
+  html.dark .app-shell .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  html.dark [data-testid='command-palette'] .border-slate-100,
+  html.dark [data-testid='command-palette'] .border-slate-200 {
+    border-color: var(--dk-border) !important;
+  }
+
+  /* Text */
+  html.dark .app-shell .text-slate-900,
+  html.dark .app-shell .text-slate-800,
+  html.dark .app-shell .text-ink-900,
+  html.dark [data-testid='command-palette'] .text-slate-900 {
+    color: var(--dk-ink) !important;
+  }
+  html.dark .app-shell .text-slate-700,
+  html.dark .app-shell .text-slate-600 {
+    color: var(--dk-ink-2) !important;
+  }
+  html.dark .app-shell .text-slate-500,
+  html.dark .app-shell .text-slate-400 {
+    color: var(--dk-muted) !important;
+  }
+  html.dark .app-shell .text-slate-300 {
+    color: var(--dk-faint) !important;
+  }
+  html.dark .app-shell .hover\:bg-slate-50:hover,
+  html.dark .app-shell .hover\:bg-slate-100:hover {
+    background-color: var(--dk-surface-3) !important;
+  }
+
+  /* Form controls */
+  html.dark .app-shell input,
+  html.dark .app-shell select,
+  html.dark .app-shell textarea,
+  html.dark [data-testid='command-palette'] input {
+    color: var(--dk-ink);
+    background-color: var(--dk-surface-2);
+    border-color: var(--dk-border);
+  }
+  html.dark .app-shell input::placeholder,
+  html.dark .app-shell textarea::placeholder {
+    color: var(--dk-faint);
+  }
+
+  /* Charts (Recharts) */
+  html.dark .app-shell .recharts-cartesian-grid line {
+    stroke: var(--dk-border);
+  }
+  html.dark .app-shell .recharts-text {
+    fill: var(--dk-muted);
+  }
+  html.dark .app-shell .recharts-default-tooltip {
+    background-color: var(--dk-surface-2) !important;
+    border-color: var(--dk-border) !important;
+  }
+
+  html.dark ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+  }
+}

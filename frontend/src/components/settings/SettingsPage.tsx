@@ -4,13 +4,14 @@ import {
   Building2, Laptop, Wallet, Save, LogOut,
   User, Briefcase, DollarSign,
   TrendingDown, Settings as SettingsIcon, Lock, ArrowRightLeft, CheckCircle2, Compass,
-  Eye, EyeOff, Key
+  Eye, EyeOff, Key, Sun, Moon, Monitor, Palette
 } from 'lucide-react';
 import { Topbar } from '../common/Topbar';
 import { userService } from '../../services/userService';
 import { authService } from '../../services/authService';
 import { usePersona, PERSONA_CONFIGS, type PersonaType } from '../../context/PersonaContext';
 import { useTour } from '../../context/TourContext';
+import { getStoredTheme, setTheme, type ThemeChoice } from '../../utils/theme';
 
 interface ProfileData {
   id?: string;
@@ -257,6 +258,8 @@ export const SettingsPage: React.FC = () => {
         }}
       />
 
+      <AppearanceCard />
+
       {/* Change Password Card */}
       <ChangePasswordCard />
 
@@ -294,6 +297,63 @@ export const SettingsPage: React.FC = () => {
         </button>
       </div>
     </div>
+  );
+};
+
+// Appearance: the only place the colour theme is chosen (the top bar deliberately has no theme switch).
+const THEME_OPTIONS: { id: ThemeChoice; label: string; hint: string; icon: React.ComponentType<{ size?: number }> }[] = [
+  { id: 'light', label: 'Light', hint: 'Bright canvas', icon: Sun },
+  { id: 'dark', label: 'Dark', hint: 'Low-glare canvas', icon: Moon },
+  { id: 'system', label: 'System', hint: 'Follow your device', icon: Monitor },
+];
+
+const AppearanceCard: React.FC = () => {
+  const [choice, setChoice] = useState<ThemeChoice>(getStoredTheme);
+
+  return (
+    <section
+      aria-label="Appearance"
+      data-testid="appearance-card"
+      className="card p-6 border border-slate-200 rounded-3xl bg-white shadow-xs space-y-4"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-violet-50 border border-violet-100 text-violet-700 flex items-center justify-center">
+          <Palette size={18} />
+        </div>
+        <div>
+          <h2 className="text-base font-extrabold text-ink-900">Appearance</h2>
+          <p className="text-xs text-slate-500 font-medium">Applies instantly across the whole workspace and is remembered on this device.</p>
+        </div>
+      </div>
+      <div role="radiogroup" aria-label="Colour theme" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {THEME_OPTIONS.map(({ id, label, hint, icon: Icon }) => {
+          const active = choice === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => {
+                setChoice(id);
+                setTheme(id);
+              }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                active ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 hover:border-slate-300 bg-white'
+              }`}
+            >
+              <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${active ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                <Icon size={16} />
+              </span>
+              <span>
+                <span className="block text-sm font-extrabold text-ink-900">{label}</span>
+                <span className="block text-[11px] font-medium text-slate-500">{hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 };
 

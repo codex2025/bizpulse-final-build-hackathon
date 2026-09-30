@@ -59,3 +59,7 @@ yarn-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Playwright output
+e2e/test-results/
+e2e/playwright-report/

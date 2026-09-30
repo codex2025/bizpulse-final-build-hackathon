@@ -1,0 +1,96 @@
+/* A4 print engine for the commercial tax invoice.
+   The invoice modal is portalled to <body> (outside #root), so printing hides the app
+   and lets the invoice flow as a normal document. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+    overflow: visible !important;
+    height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all interactive app chrome */
+  #root,
+  nav,
+  aside,
+  header,
+  .topbar,
+  button,
+  .no-print,
+  [data-tour] {
+    display: none !important;
+  }
+
+  .bill-receipt-modal {
+    position: static !important;
+    display: block !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .invoice-print-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+  }
+
+  .invoice-print-container table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .invoice-print-container tr,
+  .invoice-print-container .financial-summary-box,
+  .invoice-print-container .invoice-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .invoice-print-container th,
+  .invoice-print-container td {
+    padding: 6pt 8pt !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  .invoice-print-container .financial-summary-box {
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  .invoice-print-container input {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .print-page-break {
+    page-break-after: always;
+  }
+}

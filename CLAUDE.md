@@ -6,9 +6,10 @@ This section records what has actually been built, verified and decided, and wha
 standing target architecture and execution policy. **Where they differ, the repository and this section win.**
 Update this section at the end of every work session (date, commits, test counts, backlog).
 
-- **Last updated:** 2026-09-30 (third work session)
+- **Last updated:** 2026-10-01 (fourth work session: branch merge + UI blueprint)
 - **Branch / remote:** `praveen` → `hackathon` (`github.com/codex2025/bizpulse-final-build-hackathon`)
 - **Verified at:** committed and pushed to `hackathon/praveen` at the end of the session (`git log --oneline -14`). Baseline `bc2efcf`; after it, session 2 (workspace recovery, what-if in words, CSV body-limit fix, deployment groundwork) and session 3 (sign-in: no seeded accounts, Google sign-in through Firebase, `e2e/`, this file renamed from `CLAUDE(1).md`).
+- **Session 4:** merged the teammate's UI branch (`Shyamalan`: design system, 7-step evaluator, tour, new pages) into `praveen` and pushed the result to `hackathon/main` (owner-authorised, once) and `hackathon/praveen`; conflicts in `AuthPage`, `DashboardPage`, `DecisionForgePage`, `DataIngestionTab`, `AuditTrailTab`, `decisionForgeService` were resolved by keeping the teammate's layout and re-applying this branch's behaviour (Google sign-in without a demo box, dataset switching, approval badges, replay view). Then the UI blueprint work, see "UI blueprint status" below.
 - **Overall:** every phase in §40 is implemented and verified locally. Sign-in is now real: Google through Firebase (verified server-side) or email + password, and **no built-in accounts**. **Not verified: any real deployment, Docker, and Google sign-in with a real Firebase project and a real Google account** (it was verified end to end against the Firebase Auth emulator).
 
 ### Verification snapshot (re-run before trusting this file)
@@ -17,14 +18,16 @@ Update this section at the end of every work session (date, commits, test counts
 |---|---|---|
 | AI service tests | `cd ai-service && python -m pytest tests -q` | 284 passed |
 | Workflow evaluation | `cd ai-service && python evals/run_eval.py` | 40 cases (25 representative, 15 adversarial; 14 of them what-if): success 1.00, hallucination 0.00, determinism 1.00, data accuracy 1.00, recovery 1.00 |
-| Gateway tests / build | `cd backend && npx jest && npx tsc --noEmit -p tsconfig.json && npx nest build` | 199 passed (9 suites; 21 boot the whole gateway over HTTP with an in-memory database), builds |
-| Frontend | `cd frontend && npx tsc -b && npx vite build` | typechecks and builds (there are no UI tests) |
+| Gateway tests / build | `cd backend && npx jest && npx tsc --noEmit -p tsconfig.json && npx nest build` | 203 passed (9 suites; 21 boot the whole gateway over HTTP with an in-memory database), builds |
+| Frontend | `cd frontend && npx tsc -b && npx vite build` | typechecks and builds; UI behaviour is covered by the Playwright audit in `e2e/` (no unit tests) |
 | HTTP smoke test of the demo | `python scripts/smoke_demo.py [--gateway URL/api --ai URL --ai-token T]` | 34/34 on the dev stack (empty database; it signs up its own account); 36/36 against the compiled gateway in production mode with the service token enforced |
 | Google sign-in, API level (Firebase Auth emulator) | `cd e2e && python google-signin.emulator.api.py` (needs the emulator and an emulator-mode gateway, see `e2e/README.md`) | 20/20 |
 | Google sign-in, real browser (Playwright + emulator popup) | `cd e2e && node google-signin.emulator.js` | 21/21, three runs in a row |
 | Production startup guards | run `node backend/dist/main` with `NODE_ENV=production` and no/placeholder/fallback `JWT_SECRET`, or `FIREBASE_AUTH_EMULATOR_HOST` set | refuses to start in all 4 cases |
 | Restart resilience (kills and restarts the ai-service) | throwaway script, not in the repo | 18/18 on the dev stack and in production mode: chosen dataset, a 600-row upload and fetched context all survive |
 | Clean install | copy of the working tree, fresh venv from the pinned `requirements-dev.txt`, `npm ci` | ai-service 271 tests + the eval pass; gateway 46 tests + build; frontend typecheck + build (Windows, Python 3.12.10, Node 24.18) |
+| UI audit (Playwright Test, desktop 1536x730 + mobile 375x667) | `cd e2e && npx playwright test` (stack up; registers its own throwaway account) | 36 passed, 2 skipped (keyboard/hover-only cases on mobile) |
+| Gateway health endpoint | `cd backend && npx jest src/app.controller.spec.ts` | 5 passed (part of the 203-test gateway run) |
 | Browser (Chrome, local stack) | manual, script in `docs/DECISIONFORGE_DEMO.md` | main flow clicked through; the what-if card (table, chips, refusal) checked on both datasets; login page (no demo box, Google button state) checked; no console errors |
 
 ### Run the stack
@@ -59,6 +62,7 @@ Python modules below live in `ai-service/app/decision_forge/` unless a full path
 | Gateway | `backend/src/decision-forge/`, `backend/src/common/body-limits.ts` | approval state machine, ownership checks, replay, query trail, summary, rate limit, workspace-state persistence and restore-and-retry (axios interceptors in `ai()`), `normalizeServiceUrl`, 6 MB JSON limit on `ingest/apply-mapping` only |
 | Frontend | `frontend/src/components/decision-forge/`, `services/decisionForgeService.ts`, dashboard banner | tabs: Decision Center (answer card renders the what-if comparison), Decision Twin, Data Quality, Evidence & Audit |
 | Sign-in | `backend/src/auth/` (`auth.service.ts`, `firebase-token.verifier.ts`, `jwt-secret.ts`), `backend/src/users/profile-fields.ts`, `frontend/src/services/authService.ts`, `frontend/src/firebase/firebaseConfig.ts`, `frontend/src/components/auth/AuthPage.tsx` | `POST /auth/google` verifies a Firebase ID token with `jose` against Google's keys (no server secret); `/auth/register` + `/auth/login` for email accounts; explicit profile-field whitelist; JWT secret fail-closed in production; nothing seeded |
+| UI blueprint pieces | `frontend/src/components/common/{MetricCard,CommandPalette,ServiceHealthPill,SamplePreset}.tsx`, `frontend/src/components/billing/BillReceiptModal.tsx`, `frontend/src/styles/{print,dark}.css`, `frontend/src/utils/{theme,monteCarlo,amountInWords}.ts`, `frontend/src/data/seedPresets.ts`, `frontend/src/components/analytics/{ExecutiveBriefing,MonteCarloForecast}.tsx`, `GET /api/health/services` | see "UI blueprint status" |
 | Docs | `docs/*.md`, `README.md`, `ai-service/data/README-data-provenance.md` | audit (with three remediation logs), architecture, data model, evaluation, demo, deployment, **authentication** |
 | Ops | `scripts/smoke_demo.py`, `render.yaml`, `backend/vercel.json`, `.env.example` (root, backend, frontend) | smoke test is the acceptance test after any deployment |
 | E2E | `e2e/` (own `package.json`, Playwright) | Google sign-in against the Firebase Auth emulator; no real Google account needed; `e2e/README.md` has the four-terminal recipe |
@@ -80,6 +84,14 @@ Python modules below live in `ai-service/app/decision_forge/` unless a full path
 12. **Linking retires the password.** A Google sign-in whose verified email matches an email + password account links to it (data kept) and replaces its password with an unusable hash, because the password sign-up was never verified (pre-hijacking defence).
 13. **Tokens from the Firebase emulator are unsigned**, so the gateway asks the emulator (dev only, `FIREBASE_AUTH_EMULATOR_HOST`); the process refuses to start with that variable set in production. Do not add any other way to accept unsigned tokens.
 
+### UI blueprint status (session 4)
+
+Done and covered by `e2e/tests/master-ui-audit.spec.ts`: split-zone `MetricCard` (the change pill can no longer overlap or clip the amount); Topbar with a live API/AI health pill (`GET /api/health/services`, up/down and latency only) and a Ctrl/Cmd+K palette (pages, invoices, clients, contracts), and **no** theme switch; appearance (Light/Dark/System) only in Settings, implemented as a `dark` class on `<html>` plus `styles/dark.css` remapping the light utility classes inside `.app-shell` (landing page and the printed invoice are unaffected); sidebar count badges; GST tax invoice (`BillReceiptModal`: HSN/SAC, CGST+SGST or IGST from the two GSTIN state codes, amount in words, bank/UPI with a UPI QR, signatory; seller fields are editable and stored in `localStorage`, never invented) printing to one A4 page through `styles/print.css` (the modal is portalled outside `#root` so print hides the whole app); Goals and Net Worth show a **labelled SAMPLE** preset that the user loads with one click (nothing is saved or shown as the user's own data until then); analytics "Executive briefing" (built by fixed rules from the page's own figures, no LLM) and a deterministic seeded Monte Carlo 12-month tab; contract-obligations card now reads real contracts instead of a hardcoded ₹1.69L.
+
+**Fixed correctness bug:** the teammate's 7-step evaluator recomputed the score in the browser with hardcoded weights (and engagement fixed at 80), so it disagreed with the engine (74.2 vs 81.8 for the same deal). It now shows the engine's `priority_score` and factors; a moved lever applies the engine's own rules (deal value / 500k ceiling, win probability, recency bands 95/80/60/25) as an exact delta, is labelled "What-if score", and uses the policy's real class thresholds. The recency lever is banded because the engine only scores bands.
+
+**Deliberately not done:** the mock API-token generator and "active sessions" list from the blueprint (they would be fake security controls with no backend); a Unit Economics tab (CAC/LTV/NRR need data the app does not hold); Bloomberg-style redesign of Contracts (existing page kept). **Still open from the audit:** the backend still invents baseline income / expense categories for an account with no data (`analytics.service.ts`, P1 backlog), so a brand-new account's dashboard and analytics show ₹2,20,000 and a ₹6,500 "anomaly" that the person never entered; the Topbar notification list is hardcoded sample text; remaining `no-explicit-any` and two pre-existing lint errors (`CustomDropdown`, `TourContext`).
+
 ### Gotchas
 
 - **Do not `git stash` or switch branches while `nest start --watch` is running.** `synchronize: true` rebuilds tables and nulls newly added columns on existing rows (this happened once; demo rows only).
@@ -91,6 +103,9 @@ Python modules below live in `ai-service/app/decision_forge/` unless a full path
 - `JWT_SECRET`: production refuses to start without a strong, non-placeholder value; in development an empty one means a random key per start, so every gateway restart signs people out (put a real one in `backend/.env`).
 - The Firebase **web** config is public by design (it ships in the bundle); do not treat `VITE_FIREBASE_*` as secrets and do not commit real `.env` files. The root `.gitignore` deliberately ignores `*firebase*.json` (service-account keys); `e2e/firebase.json` is a harmless exception.
 - Vite reads `frontend/.env` only at start-up: restart `npm run dev` after editing it. Two `nest start --watch` processes fight over `backend/dist`; run a second gateway from the compiled build (`node dist/main`).
+- `git show HEAD:<path>` can fail with `mmap failed: Invalid argument` on this OneDrive checkout for some blobs (fsck is clean); `git diff` still works.
+- Stale dev servers from earlier sessions may hold :3001 / :5173 and serve old code; check with `Get-NetTCPConnection -LocalPort 3001,5173` before trusting what the browser shows.
+- The product tour overlays every page for a fresh browser profile; set `localStorage.bizpulse_tour_completed_v1 = 'skipped'` (the e2e helper does).
 - Playwright: Firebase opens the Google popup detached from the page, so it arrives as a **new page in the context** (`context.waitForEvent('page')`), not a `popup` event. The emulator's popup wires its buttons a moment after showing them, so clicks must be retried. Firebase notices a closed popup only on a slow poll (about 10 s).
 - The finance dashboard shows **invented figures for an account with no data** (assumed baseline income ₹2,20,000 / ₹1,50,000 in `analytics.service.ts`). Pre-existing, was hidden by the seeded user, left unchanged (out of scope).
 - The onboarding flag (`bizpulse_onboarded`) lives only in the browser; only new accounts (`is_new_user`) are sent through mode selection.

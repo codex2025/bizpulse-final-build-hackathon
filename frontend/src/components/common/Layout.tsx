@@ -13,7 +13,7 @@ const LayoutContent: React.FC<LayoutContentProps> = ({ children }) => {
   const { mobileMenuOpen, setMobileMenuOpen } = useLayout();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F8FAFC] text-ink-900">
+    <div className="app-shell flex h-screen overflow-hidden bg-[#F8FAFC] text-ink-900">
       {/* Desktop Sidebar (Persistent) */}
       <div className="hidden lg:flex h-full flex-shrink-0 z-20">
         <Sidebar />

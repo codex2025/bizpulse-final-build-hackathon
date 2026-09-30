@@ -10,6 +10,8 @@ import {
 import { Topbar } from '../common/Topbar';
 import { wealthService } from '../../services/analyticsService';
 import { AnimatedNumber } from '../common/AnimatedNumber';
+import { SamplePreset } from '../common/SamplePreset';
+import { SAMPLE_WEALTH } from '../../data/seedPresets';
 
 export interface WealthItem {
   id: string;
@@ -192,6 +194,16 @@ export const WealthPage: React.FC = () => {
 
   const onDone = () => qc.invalidateQueries({ queryKey: ['wealth-summary'] });
 
+  const loadSample = useMutation({
+    mutationFn: async () => {
+      const asOf = new Date().toISOString().split('T')[0];
+      for (const it of SAMPLE_WEALTH) {
+        await wealthService.create({ ...it, as_of_date: asOf });
+      }
+    },
+    onSuccess: onDone,
+  });
+
   const netWorth = summary?.netWorth || 0;
   const isPositive = netWorth >= 0;
   const assets: WealthItem[] = (summary?.items || []).filter((i) => i.type === 'asset');
@@ -235,6 +247,37 @@ export const WealthPage: React.FC = () => {
           </div>
         </div>
       </motion.div>
+
+      {(summary?.items || []).length === 0 && (
+        <SamplePreset
+          title="Institutional asset & liability registry"
+          description="An example balance sheet. Nothing is saved until you load it; after that the entries are normal and can be edited or deleted."
+          loading={loadSample.isPending}
+          error={loadSample.isError ? 'Could not load the sample registry. Please try again.' : null}
+          onLoad={() => loadSample.mutate()}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(['asset', 'liability'] as const).map((t) => {
+              const rows = SAMPLE_WEALTH.filter((i) => i.type === t);
+              const total = rows.reduce((s, r) => s + r.value, 0);
+              return (
+                <div key={t} className="rounded-2xl bg-white border border-slate-200 p-4 space-y-2">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">{t === 'asset' ? 'Assets' : 'Liabilities'}</span>
+                    <span className="text-sm font-black font-mono tabular-nums text-slate-900">{fmt(total)}</span>
+                  </div>
+                  {rows.map((r) => (
+                    <div key={r.name} className="flex justify-between text-xs">
+                      <span className="font-semibold text-slate-700">{r.name}</span>
+                      <span className="font-mono font-bold tabular-nums text-slate-900">{fmt(r.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </SamplePreset>
+      )}
 
       {/* Action Buttons */}
       <div className="flex gap-3">

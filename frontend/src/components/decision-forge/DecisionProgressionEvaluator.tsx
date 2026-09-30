@@ -10,9 +10,23 @@ import { AnimatedNumber } from '../common/AnimatedNumber';
 import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
 import type { RecommendationItem } from '../../services/decisionForgeService';
 
+// These mirror the engine's own scoring rules (ai-service decision_engine.py), so a moved lever changes the
+// score by exactly what the engine would change it by. Everything else (engagement, external signal, buying
+// intent, data-quality penalty) stays as the engine computed it.
+const DEAL_VALUE_CEILING = 500000;
+const dealScore = (value: number) => Math.min(100, (Math.max(0, value) / DEAL_VALUE_CEILING) * 100);
+const recencyScore = (days: number) => (days <= 7 ? 95 : days <= 14 ? 80 : days <= 30 ? 60 : 25);
+/** A representative day count for the engine's recency band (the engine only scores bands, not exact days). */
+const recencyDaysForScore = (score?: number) => (score === undefined ? 14 : score >= 95 ? 5 : score >= 80 ? 12 : score >= 60 ? 21 : 40);
+
+const findFactor = (rec: RecommendationItem, fragment: string) =>
+  rec.factors.find((f) => f.name.toLowerCase().includes(fragment));
+
 interface DecisionProgressionEvaluatorProps {
   recommendation: RecommendationItem;
   policyVersion: string;
+  /** The active policy snapshot (weights and class thresholds), when the run carries it. */
+  policy?: Record<string, unknown>;
   decisionRunId: string;
   onOpenApproval: (item: RecommendationItem) => void;
   onFetchContext: (item: RecommendationItem) => void;
@@ -22,19 +36,17 @@ interface DecisionProgressionEvaluatorProps {
 export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluatorProps> = ({
   recommendation,
   policyVersion,
+  policy,
   decisionRunId,
   onOpenApproval,
   onFetchContext,
   fetchingContextId,
 }) => {
   const prefersReducedMotion = usePrefersReducedMotion();
-  // Interactive Overrides / What-If editing
+  // What-if levers. They start at the engine's own inputs; the score below is the engine's score until a lever moves.
   const [overrideDealValue, setOverrideDealValue] = useState<number>(recommendation.deal_value);
-  const [overrideWinProb, setOverrideWinProb] = useState<number>(recommendation.win_probability * 100);
-  const [overrideRecencyDays, setOverrideRecencyDays] = useState<number>(() => {
-    const raw = recommendation.factors.find(f => f.name.toLowerCase().includes('recency'))?.raw_value;
-    return typeof raw === 'number' ? raw : 14;
-  });
+  const [overrideWinProb, setOverrideWinProb] = useState<number>(Math.round(recommendation.win_probability * 100));
+  const [overrideRecencyDays, setOverrideRecencyDays] = useState<number>(() => recencyDaysForScore(findFactor(recommendation, 'recency')?.score));
   const [isRecalculating, setIsRecalculating] = useState<boolean>(false);
 
   // Section expansions
@@ -48,36 +60,45 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
 
   // Real-time recalculated metrics based on user overrides
   const liveCalculations = useMemo(() => {
-    // Baseline factors from recommendation
-    const dealFactor = Math.min(100, Math.round((overrideDealValue / 200000) * 100));
-    const winFactor = Math.min(100, Math.round(overrideWinProb));
-    const recencyFactor = Math.max(0, Math.round(100 - overrideRecencyDays * 2.5));
-    const engagementFactor = 80;
-    const externalFactor = recommendation.evidence_pack.external_signal ? 85 : 40;
+    // Start from the engine's factors; only the three levers can change a factor's score.
+    const base = {
+      deal: findFactor(recommendation, 'deal'),
+      win: findFactor(recommendation, 'win'),
+      recency: findFactor(recommendation, 'recency'),
+    };
+    const rows = recommendation.factors.map((f) => {
+      let score = f.score;
+      if (f === base.deal) score = dealScore(overrideDealValue);
+      else if (f === base.win) score = Math.min(100, Math.max(0, overrideWinProb));
+      else if (f === base.recency) score = recencyScore(overrideRecencyDays);
+      // The data-quality penalty row already carries its own signed contribution.
+      const contribution = f.name.toLowerCase().includes('penalty') ? f.weighted_contribution : score * f.weight;
+      return { ...f, score: +score.toFixed(1), contribution: +contribution.toFixed(1) };
+    });
 
-    // Weights from Bizpulse policy
-    const wDeal = 0.25;
-    const wWin = 0.20;
-    const wEngage = 0.20;
-    const wRecency = 0.15;
-    const wExt = 0.20;
+    const moved =
+      overrideDealValue !== recommendation.deal_value ||
+      overrideWinProb !== Math.round(recommendation.win_probability * 100) ||
+      recencyScore(overrideRecencyDays) !== (base.recency?.score ?? recencyScore(overrideRecencyDays));
 
-    const dealContribution = +(dealFactor * wDeal).toFixed(1);
-    const winContribution = +(winFactor * wWin).toFixed(1);
-    const engageContribution = +(engagementFactor * wEngage).toFixed(1);
-    const recencyContribution = +(recencyFactor * wRecency).toFixed(1);
-    const extContribution = +(externalFactor * wExt).toFixed(1);
-
-    const computedScore = +(dealContribution + winContribution + engageContribution + recencyContribution + extContribution).toFixed(1);
+    // Unchanged levers: the score IS the engine's score. Moved levers: the engine's score plus exact factor deltas.
+    const delta = rows.reduce((sum, r, i) => sum + (r.contribution - recommendation.factors[i].weighted_contribution), 0);
+    const computedScore = moved
+      ? +Math.max(0, recommendation.priority_score + delta).toFixed(1)
+      : recommendation.priority_score;
 
     // Derived Expected Value
     const expectedValue = Math.round(overrideDealValue * (overrideWinProb / 100));
 
     // Decision state classification
+    const highCut = Number(policy?.high_priority_threshold ?? 75);
+    const mediumCut = Number(policy?.medium_priority_threshold ?? 55);
     let liveClass: 'IMMEDIATE_ACTION' | 'PROCEED_WITH_QUALIFICATION' | 'NURTURE_MONITOR';
-    if (computedScore >= 75) {
+    if (!moved) {
+      liveClass = recommendation.decision_class;
+    } else if (computedScore >= highCut) {
       liveClass = 'IMMEDIATE_ACTION';
-    } else if (computedScore >= 55) {
+    } else if (computedScore >= mediumCut) {
       liveClass = 'PROCEED_WITH_QUALIFICATION';
     } else {
       liveClass = 'NURTURE_MONITOR';
@@ -128,22 +149,14 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
     }
 
     return {
-      dealFactor,
-      winFactor,
-      recencyFactor,
-      engagementFactor,
-      externalFactor,
-      dealContribution,
-      winContribution,
-      engageContribution,
-      recencyContribution,
-      extContribution,
+      rows,
+      moved,
       computedScore,
       expectedValue,
       liveClass,
-      risks
+      risks,
     };
-  }, [overrideDealValue, overrideWinProb, overrideRecencyDays, recommendation]);
+  }, [overrideDealValue, overrideWinProb, overrideRecencyDays, recommendation, policy]);
 
   const handleSliderChange = (setter: (val: number) => void, val: number) => {
     setter(val);
@@ -153,9 +166,8 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
 
   const handleResetInputs = () => {
     setOverrideDealValue(recommendation.deal_value);
-    setOverrideWinProb(recommendation.win_probability * 100);
-    const raw = recommendation.factors.find(f => f.name.toLowerCase().includes('recency'))?.raw_value;
-    setOverrideRecencyDays(typeof raw === 'number' ? raw : 14);
+    setOverrideWinProb(Math.round(recommendation.win_probability * 100));
+    setOverrideRecencyDays(recencyDaysForScore(findFactor(recommendation, 'recency')?.score));
   };
 
   const isDeclineOrNurture = liveCalculations.liveClass === 'NURTURE_MONITOR';
@@ -184,9 +196,11 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
 
           <div className="flex items-center gap-3">
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-right">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Decision Score</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                {liveCalculations.moved ? 'What-if score' : 'Decision Score'}
+              </span>
               <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                <span className="text-2xl font-black font-mono tabular-nums text-slate-900">
+                <span data-testid="decision-score" className="text-2xl font-black font-mono tabular-nums text-slate-900">
                   <AnimatedNumber value={liveCalculations.computedScore} formatFn={(v) => v.toFixed(1)} />
                 </span>
                 <span className="text-xs text-slate-400">/ 100</span>
@@ -286,16 +300,16 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
             </div>
             <input
               type="range"
-              min="10000"
-              max="250000"
+              min="0"
+              max={Math.max(DEAL_VALUE_CEILING, recommendation.deal_value)}
               step="5000"
               value={overrideDealValue}
               onChange={(e) => handleSliderChange(setOverrideDealValue, Number(e.target.value))}
               className="w-full accent-cobalt-600 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-slate-400">
-              <span>$10k (Pilot)</span>
-              <span>$250k (Enterprise)</span>
+              <span>$0</span>
+              <span>${Math.max(DEAL_VALUE_CEILING, recommendation.deal_value).toLocaleString()}</span>
             </div>
           </div>
 
@@ -323,7 +337,7 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
           {/* Lever 3: Days Since Last Contact */}
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-700">3. Days Since Last Contact</span>
+              <span className="text-xs font-bold text-slate-700">3. Days Since Last Contact (banded)</span>
               <span className={`text-xs font-mono font-black ${overrideRecencyDays > 30 ? 'text-vermilion-600' : 'text-slate-800'}`}>
                 {overrideRecencyDays} Days
               </span>
@@ -369,48 +383,62 @@ export const DecisionProgressionEvaluator: React.FC<DecisionProgressionEvaluator
               transition={{ duration: 0.18, ease: EASE_FINANCIAL }}
               className="space-y-4 pt-1 overflow-hidden"
             >
-              {/* Formula Callout */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
-                <div>
-                  <span className="font-bold text-slate-700">Deterministic Scoring Formula:</span>
-                  <p className="font-mono text-cobalt-800 font-semibold mt-0.5">
-                    Score = (Deal × 25%) + (WinProb × 20%) + (Engage × 20%) + (Recency × 15%) + (MarketSignal × 20%)
-                  </p>
+              {/* Formula slate box: the active policy's real weights */}
+              <div className="bg-slate-900 text-slate-100 p-5 rounded-2xl border border-slate-800 space-y-2 font-mono text-xs" data-testid="formula-box">
+                <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
+                  <span className="font-bold tracking-wider">EXECUTION SCORING ALGORITHM</span>
+                  <span className="text-violet-400">Policy {policyVersion} Active</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-500">Expected Value:</span>
-                  <span className="font-mono font-black text-slate-900 text-sm">
-                    ${liveCalculations.expectedValue.toLocaleString()}
-                  </span>
+                <p className="text-teal-300 font-bold break-words leading-relaxed">
+                  Score ={' '}
+                  {liveCalculations.rows
+                    .filter((r) => !r.name.toLowerCase().includes('penalty'))
+                    .map((r) => `(${r.name} × ${Math.round(r.weight * 100)}%)`)
+                    .join(' + ')}
+                  {liveCalculations.rows.some((r) => r.name.toLowerCase().includes('penalty')) ? ' − DataQualityPenalty' : ''}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400 pt-2">
+                  <div>
+                    Calculated score: <span className="text-white font-bold">{liveCalculations.computedScore.toFixed(1)} / 100</span>
+                    {liveCalculations.moved && <span className="text-amber-300"> (what-if; engine says {recommendation.priority_score.toFixed(1)})</span>}
+                  </div>
+                  <div>
+                    Expected value (deal × win probability):{' '}
+                    <span className="text-white font-bold">${liveCalculations.expectedValue.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Factor Contribution Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
-                {[
-                  { name: 'Deal Value', raw: `$${overrideDealValue.toLocaleString()}`, score: liveCalculations.dealFactor, weight: '25%', contribution: liveCalculations.dealContribution },
-                  { name: 'Win Prob.', raw: `${overrideWinProb}%`, score: liveCalculations.winFactor, weight: '20%', contribution: liveCalculations.winContribution },
-                  { name: 'Engagement', raw: 'High', score: liveCalculations.engagementFactor, weight: '20%', contribution: liveCalculations.engageContribution },
-                  { name: 'Recency', raw: `${overrideRecencyDays}d`, score: liveCalculations.recencyFactor, weight: '15%', contribution: liveCalculations.recencyContribution },
-                  { name: 'Market Signal', raw: recommendation.evidence_pack.external_signal ? 'Verified' : 'Unchecked', score: liveCalculations.externalFactor, weight: '20%', contribution: liveCalculations.extContribution },
-                ].map((factor, idx) => (
-                  <motion.div
-                    key={idx}
-                    animate={isRecalculating ? { scale: [1, 1.02, 1] } : {}}
-                    transition={{ duration: 0.2 }}
-                    className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1"
-                  >
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block truncate">{factor.name}</span>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-xs font-bold text-slate-800">{factor.raw}</span>
-                      <span className="text-xs font-mono font-black text-cobalt-600">+{factor.contribution}</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-1 mt-1 overflow-hidden">
-                      <div className="bg-cobalt-600 h-full rounded-full" style={{ width: `${factor.score}%` }} />
-                    </div>
-                    <span className="text-[9px] text-slate-400 block text-right font-medium">Wt {factor.weight}</span>
-                  </motion.div>
-                ))}
+              {/* Factor Contribution Grid (the engine's factors, not a local guess) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5">
+                {liveCalculations.rows.map((factor) => {
+                  const isPenalty = factor.name.toLowerCase().includes('penalty');
+                  return (
+                    <motion.div
+                      key={factor.name}
+                      animate={isRecalculating ? { scale: [1, 1.02, 1] } : {}}
+                      transition={{ duration: 0.2 }}
+                      className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs space-y-1"
+                      title={factor.description}
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block truncate">{factor.name}</span>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-800 truncate">{String(factor.raw_value)}</span>
+                        <span className={`text-xs font-mono font-black ${isPenalty ? 'text-vermilion-600' : 'text-cobalt-600'}`}>
+                          {factor.contribution >= 0 ? '+' : ''}{factor.contribution}
+                        </span>
+                      </div>
+                      {!isPenalty && (
+                        <div className="w-full bg-slate-100 rounded-full h-1 mt-1 overflow-hidden">
+                          <div className="bg-cobalt-600 h-full rounded-full" style={{ width: `${Math.min(100, factor.score)}%` }} />
+                        </div>
+                      )}
+                      <span className="text-[9px] text-slate-400 block text-right font-medium">
+                        {isPenalty ? 'deducted' : `Wt ${Math.round(factor.weight * 100)}%`}
+                      </span>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           )}

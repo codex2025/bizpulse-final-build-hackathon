@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -27,6 +28,9 @@ import { usePersona } from '../../context/PersonaContext';
 import { useLayout } from '../../context/useLayout';
 import { SPRING_SMOOTH, usePrefersReducedMotion } from '../../utils/motion';
 import { Tooltip } from './Tooltip';
+import { invoiceService } from '../../services/invoiceService';
+import { contractService } from '../../services/contractService';
+import { decisionForgeService } from '../../services/decisionForgeService';
 
 interface SidebarProps {
   isMobileDrawer?: boolean;
@@ -60,6 +64,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
   const { sidebarCollapsed, toggleSidebar } = useLayout();
   const { persona, config, canSwitchToPersonal, toggleWorkPersonal } = usePersona();
   const prefersReducedMotion = usePrefersReducedMotion();
+
+  // Live counts shown as small badges. A count is only shown when the service answered with a real number.
+  const countOf = (x: unknown) => (Array.isArray(x) ? x.length : undefined);
+  const { data: invoiceCount } = useQuery({
+    queryKey: ['nav-count-invoices'],
+    queryFn: () => invoiceService.getAll().then(countOf),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const { data: contractCount } = useQuery({
+    queryKey: ['nav-count-contracts'],
+    queryFn: () => contractService.getAll().then(countOf),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const { data: decisionSummary } = useQuery({
+    queryKey: ['decision-forge-summary'],
+    queryFn: () => decisionForgeService.getSummary(),
+    staleTime: 30_000,
+    retry: false,
+  });
+  const navCounts: Record<string, number | undefined> = {
+    '/billing': invoiceCount,
+    '/contracts': contractCount,
+    '/decision-forge': decisionSummary?.hasRun ? decisionSummary.requiresAttention : undefined,
+  };
 
   // In mobile drawer mode, never collapse
   const collapsed = isMobileDrawer ? false : sidebarCollapsed;
@@ -290,7 +320,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
                             : 'text-slate-400 group-hover:text-slate-600'
                         }`}
                       />
-                      {!collapsed && <span className="truncate">{label}</span>}
+                      {!collapsed && <span className="truncate flex-1">{label}</span>}
+                      {!collapsed && navCounts[to] ? (
+                        <span
+                          data-testid={`nav-count-${to.replace('/', '') || 'home'}`}
+                          className="ml-auto min-w-5 text-center text-[10px] font-black font-mono tabular-nums px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200"
+                          aria-label={`${navCounts[to]} items`}
+                        >
+                          {navCounts[to]}
+                        </span>
+                      ) : null}
                     </>
                   )}
                 </NavLink>

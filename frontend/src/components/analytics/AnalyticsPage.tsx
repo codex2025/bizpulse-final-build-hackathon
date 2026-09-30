@@ -29,6 +29,8 @@ import { TimeOfDayRadar } from './visualizations/TimeOfDayRadar';
 import { AnomalyAlertCard } from './visualizations/AnomalyAlertCard';
 import { ContractExposureChart } from './visualizations/ContractExposureChart';
 import { DecisionPipelineChart } from './visualizations/DecisionPipelineChart';
+import { ExecutiveBriefing } from './ExecutiveBriefing';
+import { MonteCarloForecast } from './MonteCarloForecast';
 
 const BIZPULSE_COLORS = ['#E11D48', '#7C3AED', '#059669', '#2457FF', '#F5B700', '#111827'];
 
@@ -41,7 +43,9 @@ const TIMEFRAME_PRESETS = [
   { id: 'custom', label: 'Custom' },
 ];
 
-type AnalyticsTab = 'ALL' | 'CASH_FLOW' | 'BUDGET' | 'CONTRACTS' | 'DECISIONS';
+type AnalyticsTab = 'ALL' | 'CASH_FLOW' | 'BUDGET' | 'FORECAST' | 'CONTRACTS' | 'DECISIONS';
+
+const WINDOW_MONTHS: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, '2y': 24 };
 
 export const AnalyticsPage: React.FC = () => {
   const { persona } = usePersona();
@@ -139,11 +143,31 @@ export const AnalyticsPage: React.FC = () => {
   const retainedSavings = incomeFlow?.retainedSavings || (grossIncome - totalExpenses);
   const savingsPct = incomeFlow?.savingsPercentage || Math.round((retainedSavings / grossIncome) * 100);
 
+  const windowMonths =
+    timeframe === 'custom'
+      ? Math.max(1, (new Date(customEnd).getTime() - new Date(customStart).getTime()) / (30 * 86400000))
+      : WINDOW_MONTHS[timeframe] || 1;
+  const windowLabel = TIMEFRAME_PRESETS.find((p) => p.id === timeframe)?.label.toLowerCase() || 'the selected window';
+  const contractEmiPerMonth = (contractObligations || []).reduce((s, c) => s + c.monthlyEmi, 0);
+  const contractPrincipal = (contractObligations || []).reduce((s, c) => s + c.principalAmount, 0);
+  const fmtLakh = (n: number) => (n >= 10000000 ? `₹${(n / 10000000).toFixed(2)}Cr` : n >= 100000 ? `₹${(n / 100000).toFixed(2)}L` : `₹${Math.round(n).toLocaleString('en-IN')}`);
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <Topbar
         title="Financial Analytics & Capital Intelligence"
         subtitle={`Unified analytical telemetry adapted for ${persona.toUpperCase()} mode`}
+      />
+
+      <ExecutiveBriefing
+        grossIncome={grossIncome}
+        totalExpenses={totalExpenses}
+        retainedSavings={retainedSavings}
+        savingsPct={savingsPct}
+        windowLabel={windowLabel}
+        pipelineValue={decisionsData?.pipeline_total_value}
+        immediateActions={decisionsData?.high_priority_count}
+        contractEmiPerMonth={contractEmiPerMonth}
       />
 
       {/* High-Level Financial Executive Ribbon */}
@@ -229,10 +253,14 @@ export const AnalyticsPage: React.FC = () => {
           </div>
           <div>
             <span className="text-2xl font-black text-slate-900 font-mono tabular-nums">
-              ₹1.69L<span className="text-xs font-semibold text-slate-400">/mo</span>
+              {contractEmiPerMonth > 0 ? fmtLakh(contractEmiPerMonth) : '₹0'}<span className="text-xs font-semibold text-slate-400">/mo</span>
             </span>
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700 mt-1">
-              <span>₹75L active MSE loan principal</span>
+              <span>
+                {contractPrincipal > 0
+                  ? `${fmtLakh(contractPrincipal)} principal across ${contractObligations?.length} contract${contractObligations?.length === 1 ? '' : 's'}`
+                  : 'No contracts analysed yet'}
+              </span>
             </div>
           </div>
         </motion.div>
@@ -250,6 +278,7 @@ export const AnalyticsPage: React.FC = () => {
               { id: 'ALL', label: 'Overview' },
               { id: 'CASH_FLOW', label: 'Cash Flow' },
               { id: 'BUDGET', label: 'Budget & Variance' },
+              { id: 'FORECAST', label: 'Monte Carlo Forecast' },
               { id: 'CONTRACTS', label: 'Contract Exposure' },
               { id: 'DECISIONS', label: 'Commercial Decisions' },
             ].map((tab) => {
@@ -432,6 +461,14 @@ export const AnalyticsPage: React.FC = () => {
                   <CalendarSpendingHeatmap data={visData.dailyHeatmap} />
                 )}
               </div>
+            )}
+
+            {/* TAB: MONTE CARLO FORECAST */}
+            {activeTab === 'FORECAST' && (
+              <MonteCarloForecast
+                monthlyInflow={grossIncome / windowMonths}
+                monthlyOutflow={totalExpenses / windowMonths}
+              />
             )}
 
             {/* TAB: CONTRACT OBLIGATIONS & EXPOSURE */}
