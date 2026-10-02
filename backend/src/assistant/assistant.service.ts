@@ -306,7 +306,7 @@ export class AssistantService {
         if (s.hasRun) {
           const usd = (n: number) => `$${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
           return { facts: [`The pipeline is ${usd(s.pipelineTotal)} with a weighted expected value of ${usd(s.weightedExpectedValue)}. ` +
-            `${plural(s.immediateActions, 'opportunity')} need immediate action and ${s.staleOpportunities} ${s.staleOpportunities === 1 ? 'is' : 'are'} stale.`] };
+            `${s.immediateActions} ${s.immediateActions === 1 ? 'opportunity needs' : 'opportunities need'} immediate action and ${s.staleOpportunities} ${s.staleOpportunities === 1 ? 'is' : 'are'} stale.`] };
         }
       }
     }
