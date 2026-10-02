@@ -97,7 +97,7 @@ Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORG
 | Layer | Technology |
 |---|---|
 | Frontend | React 19, TypeScript, Vite 8, Tailwind CSS, TanStack Query, React Router, Recharts, Framer Motion |
-| API gateway | NestJS 11 (Node.js, TypeScript), TypeORM, SQLite (`better-sqlite3`), Passport JWT |
+| API gateway | NestJS 11 (Node.js, TypeScript), TypeORM, SQLite (`better-sqlite3`) or Postgres (`pg`), Passport JWT |
 | AI service | Python, FastAPI, Pydantic, Uvicorn; PyMuPDF / pdfplumber / python-docx for contract files |
 | Retrieval (RAG) | In-process index with hashed bag-of-words vectors and a lexical rerank; no external vector database |
 | Language model | Optional. OpenAI (`gpt-4o-mini`) may classify a question into a fixed intent; off by default, rules planner otherwise |
@@ -267,7 +267,8 @@ Every variable is optional for a local run except `JWT_SECRET` in production.
 | `JWT_SECRET` | backend | Signs session tokens. Production refuses to start without a strong value (32+ characters). In development a random key is used when it is empty | empty |
 | `AI_SERVICE_URL` | backend | Address of the AI service (full URL or `host:port`) | `http://localhost:8000` |
 | `AI_SERVICE_TOKEN` | backend and ai-service | Shared secret between the two services. When set, the AI service rejects requests without it | unset |
-| `DATABASE_PATH` | backend | SQLite file. Put it on a persistent disk in production | `./finsight.db` |
+| `DATABASE_URL` | backend | Postgres connection string. When set, the gateway uses Postgres instead of SQLite. Needed on serverless hosts, where several copies of the gateway run at once | unset |
+| `DATABASE_PATH` | backend | SQLite file (used when `DATABASE_URL` is unset). Put it on a persistent disk in production | `./finsight.db` |
 | `FIREBASE_PROJECT_ID` | backend | Firebase project for Google sign-in. Empty turns Google sign-in off | empty |
 | `VITE_API_URL` | frontend | Gateway address | `http://localhost:3001/api` |
 | `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID` | frontend | Firebase web config (public identifiers, not secrets) | empty |
