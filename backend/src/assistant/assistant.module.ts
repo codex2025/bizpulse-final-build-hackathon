@@ -11,7 +11,14 @@ import { AssistantController } from './assistant.controller';
 import { AssistantService } from './assistant.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Invoice, Expense]), AnalyticsModule, GoalsModule, WealthModule, ContractsModule, DecisionForgeModule],
+  imports: [
+    TypeOrmModule.forFeature([Invoice, Expense]),
+    AnalyticsModule,
+    GoalsModule,
+    WealthModule,
+    ContractsModule,
+    DecisionForgeModule,
+  ],
   controllers: [AssistantController],
   providers: [AssistantService],
 })

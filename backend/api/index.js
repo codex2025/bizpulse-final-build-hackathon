@@ -14,13 +14,14 @@
 const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../dist/app.module');
 const { configureBodyLimits } = require('../dist/common/body-limits');
+const { configureHttp } = require('../dist/common/http-setup');
 
 let cachedApp;
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger: ['error', 'warn'] });
   configureBodyLimits(app);
-  app.enableCors({ origin: '*' });
+  configureHttp(app);
   app.setGlobalPrefix('api');
   await app.init();
   return app.getHttpAdapter().getInstance();

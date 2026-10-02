@@ -40,7 +40,7 @@ export const ContractExposureChart: React.FC<Props> = ({ obligations = [], isLoa
         <FileText size={22} className="text-slate-400 mx-auto" />
         <h3 className="text-sm font-extrabold text-slate-900">No contracts analysed yet</h3>
         <p className="text-xs text-slate-500 max-w-md mx-auto">Monthly commitments, interest and exit fees appear here once a contract has been analysed.</p>
-        <Link to="/contracts" className="inline-block text-xs font-bold text-violet-700 hover:underline">Analyse a contract</Link>
+        <Link to="/contracts" className="inline-block py-1.5 text-xs font-bold text-violet-700 hover:underline">Analyse a contract</Link>
       </div>
     );
   }

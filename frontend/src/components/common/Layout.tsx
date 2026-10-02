@@ -55,7 +55,8 @@ const LayoutContent: React.FC<LayoutContentProps> = ({ children }) => {
       </AnimatePresence>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden relative z-10 [&>*]:min-w-0 [&>*]:max-w-full">
+      {/* pb-20: the last controls on a page can always be scrolled clear of the floating assistant button */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden relative z-10 pb-20 [&>*]:min-w-0 [&>*]:max-w-full">
         {children}
       </main>
 

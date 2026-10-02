@@ -72,7 +72,6 @@ def run_query(ws: WorkspaceState, question: str, llm: Optional[LLMClient] = None
     rag: Dict[str, Any] = {"status": "not_required", "evidence": [], "message": ""}
     fallbacks: List[str] = []
     warnings: List[str] = []
-    items: List[Dict[str, Any]] = []
     recs = []
     answer = UNSUPPORTED
     confidence = 0.9

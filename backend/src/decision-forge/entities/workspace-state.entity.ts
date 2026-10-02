@@ -1,4 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  UpdateDateColumn,
+} from 'typeorm';
 
 /**
  * What the gateway must remember so ANY ai-service instance can rebuild a user's workspace after a
@@ -29,7 +34,11 @@ export class DecisionWorkspaceState {
   @Column({ type: 'simple-json', nullable: true })
   records: any[] | null;
 
-  @Column({ name: 'fetched_opportunity_ids', type: 'simple-json', nullable: true })
+  @Column({
+    name: 'fetched_opportunity_ids',
+    type: 'simple-json',
+    nullable: true,
+  })
   fetchedOpportunityIds: string[] | null;
 
   @UpdateDateColumn({ name: 'updated_at' })

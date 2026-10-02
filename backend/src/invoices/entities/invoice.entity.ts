@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+} from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Client } from '../../clients/entities/client.entity';
 import { InvoiceItem } from './invoice-item.entity';
@@ -22,7 +30,10 @@ export class Invoice {
   @JoinColumn({ name: 'client_id' })
   client: Client;
 
-  @OneToMany(() => InvoiceItem, (item) => item.invoice, { cascade: true, eager: true })
+  @OneToMany(() => InvoiceItem, (item) => item.invoice, {
+    cascade: true,
+    eager: true,
+  })
   items: InvoiceItem[];
 
   @Column({ unique: true })
@@ -37,7 +48,7 @@ export class Invoice {
   @Column({ type: 'float' })
   subtotal: number;
 
-  @Column({ type: 'float', default: 18.00 })
+  @Column({ type: 'float', default: 18.0 })
   gst_rate: number;
 
   @Column({ type: 'float', nullable: true })

@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { ContractAnalysis } from './contract-analysis.entity';
 
 @Entity('contract_queries')
@@ -9,7 +16,9 @@ export class ContractQuery {
   @Column()
   contract_id: string;
 
-  @ManyToOne(() => ContractAnalysis, (analysis) => analysis.contract_queries, { onDelete: 'CASCADE' })
+  @ManyToOne(() => ContractAnalysis, (analysis) => analysis.contract_queries, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'contract_id' })
   contract: ContractAnalysis;
 

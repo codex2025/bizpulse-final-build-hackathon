@@ -18,7 +18,6 @@ interface TourContextValue {
   currentStep: TourStep;
   totalSteps: number;
   targetRect: TargetRect | null;
-  isTargetReady: boolean;
   startTour: () => void;
   nextStep: () => void;
   prevStep: () => void;
@@ -40,7 +39,6 @@ export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isOpen, setIsOpen] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
-  const [isTargetReady, setIsTargetReady] = useState(false);
   const [hasCompletedTour, setHasCompletedTour] = useState(() => {
     return Boolean(localStorage.getItem(TOUR_STORAGE_KEY));
   });
@@ -53,11 +51,7 @@ export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateTargetRect = useCallback(() => {
     if (!isOpen) return;
 
-    if (!currentStep.targetSelector) {
-      setTargetRect(null);
-      setIsTargetReady(true);
-      return;
-    }
+    if (!currentStep.targetSelector) return;
 
     const el = document.querySelector(currentStep.targetSelector);
     if (el) {
@@ -70,18 +64,14 @@ export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children
         bottom: rect.bottom,
         right: rect.right,
       });
-      setIsTargetReady(true);
     } else {
       setTargetRect(null);
-      setIsTargetReady(false);
     }
   }, [isOpen, currentStep]);
 
   // Synchronize route and wait for target DOM element when step changes
   useEffect(() => {
     if (!isOpen) return;
-
-    setIsTargetReady(false);
 
     // If destination route differs from current route, navigate
     if (currentStep.route && location.pathname !== currentStep.route) {
@@ -94,12 +84,8 @@ export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children
       pollTimerRef.current = null;
     }
 
-    // If step is a centered overview/finish modal with no selector
-    if (!currentStep.targetSelector) {
-      setTargetRect(null);
-      setIsTargetReady(true);
-      return;
-    }
+    // A centred overview/finish card has no target to wait for
+    if (!currentStep.targetSelector) return;
 
     // Poll for the target element to mount in the DOM (up to 3 seconds)
     const startTime = Date.now();
@@ -116,7 +102,6 @@ export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (Date.now() - startTime > 3500) {
         // Fallback after timeout
         if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-        setIsTargetReady(true);
         setTargetRect(null);
       }
     }, 60);
@@ -155,7 +140,11 @@ export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children
       location.pathname === '/register' ||
       location.pathname === '/welcome';
 
-    if (isAuthenticated && !isCompleted && !isPublicRoute && !isOpen) {
+    // The tour starts by itself only on screens wide enough for the spotlight; on a phone it covers the
+    // page, so there it is opt-in (Help, or "start the tour" in the assistant).
+    const isWideScreen = window.matchMedia('(min-width: 1024px)').matches;
+
+    if (isAuthenticated && !isCompleted && !isPublicRoute && !isOpen && isWideScreen) {
       const timer = setTimeout(() => {
         setIsOpen(true);
         setCurrentStepIndex(0);
@@ -220,8 +209,8 @@ export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentStepIndex,
         currentStep,
         totalSteps,
-        targetRect,
-        isTargetReady,
+        // A step without a target is a centred card: never reuse the previous step's spotlight.
+        targetRect: currentStep.targetSelector ? targetRect : null,
         startTour,
         nextStep,
         prevStep,

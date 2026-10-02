@@ -205,10 +205,10 @@ export const AssistantWidget: React.FC = () => {
         onClick={() => setOpen(true)}
         data-testid="assistant-open"
         aria-label="Open the Bizpulse assistant"
-        className="fixed bottom-4 right-4 z-40 flex items-center gap-2 pl-3 pr-4 h-12 rounded-full bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold shadow-lg shadow-violet-600/30 cursor-pointer transition"
+        className="fixed bottom-4 right-4 z-40 flex items-center justify-center gap-2 w-12 sm:w-auto sm:pl-3 sm:pr-4 h-12 rounded-full bg-violet-600 hover:bg-violet-500 text-white text-sm font-bold shadow-lg shadow-violet-600/30 cursor-pointer transition"
       >
         <Bot size={18} />
-        <span>Ask Bizpulse</span>
+        <span className="hidden sm:inline">Ask Bizpulse</span>
       </button>
     );
   }

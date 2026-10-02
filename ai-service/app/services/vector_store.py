@@ -1,8 +1,6 @@
-import os
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from app.services.lite_vector_store import LiteVectorClient
-from app.config import settings
 from app.services.embedder import LocalEmbedder
 
 logger = logging.getLogger(__name__)

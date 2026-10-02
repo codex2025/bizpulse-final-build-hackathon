@@ -3,7 +3,7 @@ Deterministic Decision Engine.
 Evaluates opportunities using mathematical policy scoring, classification thresholds,
 and bundles full provenance into evidence packs.
 """
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from app.decision_forge.schemas import PolicyWeights, DecisionFactor, RecommendationItem
 from app.decision_forge.external_gateway import ExternalContextGateway

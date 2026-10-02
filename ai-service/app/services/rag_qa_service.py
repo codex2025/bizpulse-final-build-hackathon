@@ -4,7 +4,7 @@ import requests
 from typing import Dict, Any, List
 from app.config import settings
 from app.services.vector_store import ChromaVectorStore
-from app.services.translation_service import dynamic_translate_text, SUPPORTED_LANGUAGES
+from app.services.translation_service import dynamic_translate_text
 
 logger = logging.getLogger(__name__)
 

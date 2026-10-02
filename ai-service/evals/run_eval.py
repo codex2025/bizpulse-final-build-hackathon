@@ -26,13 +26,12 @@ import statistics
 import sys
 import time
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List
+from typing import Any, Dict, List
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from app.decision_forge.planner import plan_query  # noqa: E402
 from app.decision_forge.query_pipeline import run_query  # noqa: E402
 from app.decision_forge.scenario_parser import SUPPORTED_LEVERS_HELP  # noqa: E402
 from app.decision_forge.workspace import WorkspaceState  # noqa: E402

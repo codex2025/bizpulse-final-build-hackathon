@@ -13,7 +13,10 @@ export class ClientsService {
   }
 
   findAll(userId: string) {
-    return this.repo.find({ where: { user_id: userId }, order: { created_at: 'DESC' } });
+    return this.repo.find({
+      where: { user_id: userId },
+      order: { created_at: 'DESC' },
+    });
   }
 
   findOne(id: string, userId: string) {

@@ -34,7 +34,7 @@ export const DecisionPipelineChart: React.FC<Props> = ({
         <Target size={22} className="text-slate-400 mx-auto" />
         <h3 className="text-sm font-extrabold text-slate-900">No sales data yet</h3>
         <p className="text-xs text-slate-500 max-w-md mx-auto">Ranked opportunities and pipeline value appear here once you add your opportunities.</p>
-        <Link to="/decision-forge" className="inline-block text-xs font-bold text-violet-700 hover:underline">Add data in DecisionForge</Link>
+        <Link to="/decision-forge" className="inline-block py-1.5 text-xs font-bold text-violet-700 hover:underline">Add data in DecisionForge</Link>
       </div>
     );
   }

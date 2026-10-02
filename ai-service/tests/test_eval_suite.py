@@ -1,7 +1,6 @@
 """Phase 10: the workflow evaluation runs in CI and each metric has its own floor (no blended score)."""
 import json
 import logging
-import os
 
 import pytest
 

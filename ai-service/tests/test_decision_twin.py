@@ -1,5 +1,4 @@
 """Phase 8: Decision Twin baseline/scenario math, capacity limits, non-mutation, honesty."""
-import copy
 import hashlib
 import json
 from datetime import datetime, timezone

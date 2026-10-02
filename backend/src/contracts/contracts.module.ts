@@ -17,5 +17,3 @@ import { AnalyticsModule } from '../analytics/analytics.module';
   exports: [ContractsService],
 })
 export class ContractsModule {}
-
-

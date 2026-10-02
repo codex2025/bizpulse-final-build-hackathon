@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 /**
  * DRAFT    recommendation exists, nobody has looked at it
@@ -6,7 +12,13 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
  * APPROVED / REJECTED  terminal
  * MODIFIED the reviewer changed the action; may still be approved or rejected afterwards
  */
-export type ApprovalStatus = 'DRAFT' | 'REVIEW' | 'APPROVED' | 'MODIFIED' | 'REJECTED' | 'PENDING';
+export type ApprovalStatus =
+  | 'DRAFT'
+  | 'REVIEW'
+  | 'APPROVED'
+  | 'MODIFIED'
+  | 'REJECTED'
+  | 'PENDING';
 
 @Entity('decision_approvals')
 export class DecisionApproval {

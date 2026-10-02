@@ -54,18 +54,29 @@ export class DecisionForgeController {
 
   @Post('reset-demo')
   resetDemo(@Body() body: any, @Req() req: any) {
-    return this.dfService.resetDemoData(req.user.userId, req.user.email, body?.dataset, body?.clearHistory === true);
+    return this.dfService.resetDemoData(
+      req.user.userId,
+      req.user.email,
+      body?.dataset,
+      body?.clearHistory === true,
+    );
   }
 
   @Post('ingest/file')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES } }),
+  )
   ingestFile(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
     return this.dfService.ingestFile(file, req.user.userId, req.user.email);
   }
 
   @Post('ingest/apply-mapping')
   applyMapping(@Body() body: { records: any[] }, @Req() req: any) {
-    return this.dfService.applyMapping(body?.records, req.user.userId, req.user.email);
+    return this.dfService.applyMapping(
+      body?.records,
+      req.user.userId,
+      req.user.email,
+    );
   }
 
   @Get('policy')
@@ -80,12 +91,25 @@ export class DecisionForgeController {
 
   @Post('decide/run')
   runDecisions(@Body() body: any, @Req() req: any) {
-    return this.dfService.runDecisionEngine(req.user.userId, req.user.email, body);
+    return this.dfService.runDecisionEngine(
+      req.user.userId,
+      req.user.email,
+      body,
+    );
   }
 
   @Post('decisions/query')
-  queryDecision(@Body() body: any, @Query('preset') preset: string, @Req() req: any) {
-    return this.dfService.queryDecision(body?.question, req.user.userId, req.user.email, preset || body?.preset);
+  queryDecision(
+    @Body() body: any,
+    @Query('preset') preset: string,
+    @Req() req: any,
+  ) {
+    return this.dfService.queryDecision(
+      body?.question,
+      req.user.userId,
+      req.user.email,
+      preset || body?.preset,
+    );
   }
 
   @Get('decisions')
@@ -99,13 +123,21 @@ export class DecisionForgeController {
   }
 
   @Get('decisions/:runId/evidence')
-  getEvidence(@Param('runId') runId: string, @Query('opportunityId') opportunityId: string, @Req() req: any) {
+  getEvidence(
+    @Param('runId') runId: string,
+    @Query('opportunityId') opportunityId: string,
+    @Req() req: any,
+  ) {
     return this.dfService.getEvidence(runId, req.user.userId, opportunityId);
   }
 
   @Post('opportunities/:id/fetch-context')
   fetchExternalContext(@Param('id') id: string, @Req() req: any) {
-    return this.dfService.fetchExternalContext(id, req.user.userId, req.user.email);
+    return this.dfService.fetchExternalContext(
+      id,
+      req.user.userId,
+      req.user.email,
+    );
   }
 
   @Post('twin/simulate')
@@ -115,27 +147,55 @@ export class DecisionForgeController {
 
   @Post('recommendations/:id/review')
   startReview(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.dfService.startReview(id, body, req.user.userId, req.user.email);
+    return this.dfService.startReview(
+      id,
+      body,
+      req.user.userId,
+      req.user.email,
+    );
   }
 
   @Post('recommendations/:id/approve')
   approveAction(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.dfService.reviewAction(id, 'APPROVED', body, req.user.userId, req.user.email);
+    return this.dfService.reviewAction(
+      id,
+      'APPROVED',
+      body,
+      req.user.userId,
+      req.user.email,
+    );
   }
 
   @Post('recommendations/:id/modify')
   modifyAction(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.dfService.reviewAction(id, 'MODIFIED', body, req.user.userId, req.user.email);
+    return this.dfService.reviewAction(
+      id,
+      'MODIFIED',
+      body,
+      req.user.userId,
+      req.user.email,
+    );
   }
 
   @Post('recommendations/:id/reject')
   rejectAction(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.dfService.reviewAction(id, 'REJECTED', body, req.user.userId, req.user.email);
+    return this.dfService.reviewAction(
+      id,
+      'REJECTED',
+      body,
+      req.user.userId,
+      req.user.email,
+    );
   }
 
   @Post('recommendations/:id/convert-to-client')
   convertToClient(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.dfService.convertToClient(id, body, req.user.userId, req.user.email);
+    return this.dfService.convertToClient(
+      id,
+      body,
+      req.user.userId,
+      req.user.email,
+    );
   }
 
   @Get('audit')

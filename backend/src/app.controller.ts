@@ -36,7 +36,9 @@ export class AppController {
    */
   @Get('health/services')
   async getServiceHealth() {
-    const aiUrl = normalizeServiceUrl(this.config.get('AI_SERVICE_URL', 'http://localhost:8000'));
+    const aiUrl = normalizeServiceUrl(
+      this.config.get('AI_SERVICE_URL', 'http://localhost:8000'),
+    );
     const started = Date.now();
     let ai: 'up' | 'down' = 'down';
     try {

@@ -82,7 +82,8 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
       case 'Enter':
       case ' ':
         e.preventDefault();
-        isOpen ? close() : open();
+        if (isOpen) close();
+        else open();
         break;
       case 'ArrowDown':
         e.preventDefault();

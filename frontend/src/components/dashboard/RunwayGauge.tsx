@@ -43,7 +43,7 @@ export const RunwayGauge: React.FC<{ monthlyOutflow: number }> = ({ monthlyOutfl
       {months === null ? (
         <p className="mt-3 text-[11px] text-slate-500 font-medium text-center">
           Needs liquid assets in{' '}
-          <button type="button" onClick={() => navigate('/wealth')} className="font-bold text-cobalt-600 hover:underline cursor-pointer">Net Worth</button>{' '}
+          <button type="button" onClick={() => navigate('/wealth')} className="inline-block py-1 font-bold text-cobalt-600 hover:underline cursor-pointer">Net Worth</button>{' '}
           and recorded expenses this month.
         </p>
       ) : (

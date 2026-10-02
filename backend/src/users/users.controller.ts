@@ -17,7 +17,10 @@ export class UsersController {
   /** Only profile fields are writable here; email, password and the linked Google identity are not. */
   @Patch('profile')
   async updateProfile(@Req() req: any, @Body() body: any) {
-    const user = await this.usersService.update(req.user.userId, pickProfileFields(body));
+    const user = await this.usersService.update(
+      req.user.userId,
+      pickProfileFields(body),
+    );
     return user ? publicUser(user) : null;
   }
 }

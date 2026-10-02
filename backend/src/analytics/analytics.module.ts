@@ -8,7 +8,9 @@ import { User } from '../users/entities/user.entity';
 import { HealthScoreSnapshot } from './entities/health-score-snapshot.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Invoice, Expense, User, HealthScoreSnapshot])],
+  imports: [
+    TypeOrmModule.forFeature([Invoice, Expense, User, HealthScoreSnapshot]),
+  ],
   providers: [AnalyticsService],
   controllers: [AnalyticsController],
   exports: [AnalyticsService],

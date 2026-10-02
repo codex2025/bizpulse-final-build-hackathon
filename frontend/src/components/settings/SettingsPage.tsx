@@ -433,7 +433,7 @@ const ChangePasswordCard: React.FC = () => {
               className="input-field pl-10 pr-10 text-xs font-semibold"
               placeholder="Current password"
             />
-            <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+            <button type="button" onClick={() => setShowCurrent(!showCurrent)} aria-label={showCurrent ? 'Hide current password' : 'Show current password'} className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 cursor-pointer">
               {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
@@ -453,7 +453,7 @@ const ChangePasswordCard: React.FC = () => {
                 className="input-field pl-10 pr-10 text-xs font-semibold"
                 placeholder="Min. 8 characters"
               />
-              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+              <button type="button" onClick={() => setShowNew(!showNew)} aria-label={showNew ? 'Hide new password' : 'Show new password'} className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 cursor-pointer">
                 {showNew ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>

@@ -6,9 +6,7 @@ import io
 import csv
 import json
 import re
-from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException
-from pydantic import BaseModel
 
 try:
     import pdfplumber

@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { GoalsService } from './goals.service';
 
@@ -33,7 +43,11 @@ export class GoalsController {
   }
 
   @Post(':id/contribute')
-  contribute(@Param('id') id: string, @Body() body: { amount: number }, @Req() req: any) {
+  contribute(
+    @Param('id') id: string,
+    @Body() body: { amount: number },
+    @Req() req: any,
+  ) {
     return this.goalsService.contribute(id, req.user.userId, body.amount);
   }
 

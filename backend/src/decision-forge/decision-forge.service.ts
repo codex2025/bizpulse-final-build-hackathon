@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import FormData from 'form-data';
 import { DecisionRun } from './entities/decision-run.entity';
 import { DecisionApproval, ApprovalStatus } from './entities/approval.entity';
 import { DecisionAuditLog } from './entities/audit-log.entity';
@@ -46,7 +47,10 @@ function cleanText(value: any, max: number, field: string): string {
     throw new HttpException(`${field} must be text.`, HttpStatus.BAD_REQUEST);
   }
   if (value.length > max) {
-    throw new HttpException(`${field} is too long (limit ${max} characters).`, HttpStatus.BAD_REQUEST);
+    throw new HttpException(
+      `${field} is too long (limit ${max} characters).`,
+      HttpStatus.BAD_REQUEST,
+    );
   }
   return value.trim();
 }
@@ -86,7 +90,9 @@ export class DecisionForgeService {
     @InjectRepository(DecisionWorkspaceState)
     private readonly workspaceRepo: Repository<DecisionWorkspaceState>,
   ) {
-    this.aiUrl = normalizeServiceUrl(this.config.get('AI_SERVICE_URL', 'http://localhost:8000'));
+    this.aiUrl = normalizeServiceUrl(
+      this.config.get('AI_SERVICE_URL', 'http://localhost:8000'),
+    );
   }
 
   /**
@@ -103,16 +109,24 @@ export class DecisionForgeService {
     // Say which workspace state we expect the ai-service to hold (dataset, upload, fetched context).
     client.interceptors.request.use(async (cfg) => {
       const state = await this.getWorkspaceState(userId);
-      if (state?.stateFingerprint) cfg.headers.set('X-Workspace-State', state.stateFingerprint);
+      if (state?.stateFingerprint)
+        cfg.headers.set('X-Workspace-State', state.stateFingerprint);
       return cfg;
     });
 
     // A cold, restarted or different ai-service instance answers 409 rather than serving a default
     // dataset: rebuild the workspace from what we persisted, then retry the original call once.
     client.interceptors.response.use(undefined, async (err) => {
-      const cfg = err?.config as (InternalAxiosRequestConfig & { restoreTried?: boolean }) | undefined;
+      const cfg = err?.config as
+        | (InternalAxiosRequestConfig & { restoreTried?: boolean })
+        | undefined;
       const code = err?.response?.data?.detail?.code;
-      if (cfg && !cfg.restoreTried && err?.response?.status === 409 && code === RESTORE_REQUIRED) {
+      if (
+        cfg &&
+        !cfg.restoreTried &&
+        err?.response?.status === 409 &&
+        code === RESTORE_REQUIRED
+      ) {
         cfg.restoreTried = true;
         await this.restoreWorkspace(userId);
         return client.request(cfg);
@@ -131,7 +145,13 @@ export class DecisionForgeService {
   /** Remembers what this user's ai-service workspace was built from (see workspace-state.entity.ts). */
   private async saveWorkspaceState(
     userId: string,
-    next: { datasetKey: string; snapshotId?: string; stateFingerprint?: string; records: any[] | null; fetchedOpportunityIds: string[] },
+    next: {
+      datasetKey: string;
+      snapshotId?: string;
+      stateFingerprint?: string;
+      records: any[] | null;
+      fetchedOpportunityIds: string[];
+    },
   ) {
     if (!next.stateFingerprint) {
       // The ai-service did not describe its state, so nothing we could store would be checkable.
@@ -144,19 +164,34 @@ export class DecisionForgeService {
   }
 
   /** Adds an opportunity whose external context was fetched, and adopts the ai-service's new fingerprint. */
-  private async recordFetched(userId: string, opportunityId: string, view: any) {
+  private async recordFetched(
+    userId: string,
+    opportunityId: string,
+    view: any,
+  ) {
     if (!view?.state_fingerprint) return;
     const existing = await this.getWorkspaceState(userId);
     if (existing) {
-      const ids = Array.from(new Set([...(existing.fetchedOpportunityIds || []), opportunityId]));
-      await this.workspaceRepo.update({ userId }, {
-        fetchedOpportunityIds: ids, stateFingerprint: view.state_fingerprint, snapshotId: view.snapshot_id,
-      });
+      const ids = Array.from(
+        new Set([...(existing.fetchedOpportunityIds || []), opportunityId]),
+      );
+      await this.workspaceRepo.update(
+        { userId },
+        {
+          fetchedOpportunityIds: ids,
+          stateFingerprint: view.state_fingerprint,
+          snapshotId: view.snapshot_id,
+        },
+      );
     } else if (view.dataset_key && view.dataset_key !== 'custom') {
       // Default (never explicitly reset) preset workspace; an uploaded one cannot be rebuilt without its records.
       await this.workspaceRepo.save({
-        userId, datasetKey: view.dataset_key, snapshotId: view.snapshot_id, stateFingerprint: view.state_fingerprint,
-        records: null, fetchedOpportunityIds: [opportunityId],
+        userId,
+        datasetKey: view.dataset_key,
+        snapshotId: view.snapshot_id,
+        stateFingerprint: view.state_fingerprint,
+        records: null,
+        fetchedOpportunityIds: [opportunityId],
       });
     }
   }
@@ -177,26 +212,40 @@ export class DecisionForgeService {
         `${this.aiUrl}/decision-forge/workspace/restore`,
         {
           dataset_key: state.datasetKey,
-          records: state.datasetKey === 'custom' ? state.records || [] : undefined,
+          records:
+            state.datasetKey === 'custom' ? state.records || [] : undefined,
           fetched_opportunity_ids: state.fetchedOpportunityIds || [],
           expected_state: state.stateFingerprint,
         },
-        { timeout: 60000, headers: { 'X-Workspace-Id': userId, ...this.serviceHeaders() } },
+        {
+          timeout: 60000,
+          headers: { 'X-Workspace-Id': userId, ...this.serviceHeaders() },
+        },
       );
       const restored = res.data || {};
-      if (restored.state_fingerprint && restored.state_fingerprint !== state.stateFingerprint) {
+      if (
+        restored.state_fingerprint &&
+        restored.state_fingerprint !== state.stateFingerprint
+      ) {
         // Rebuilt from the same inputs but the data differs from when it was saved (for example a new
         // release of a preset dataset). Adopt the new fingerprint so the mismatch is not repeated.
-        await this.workspaceRepo.update({ userId }, {
-          stateFingerprint: restored.state_fingerprint, snapshotId: restored.snapshot_id,
-        });
+        await this.workspaceRepo.update(
+          { userId },
+          {
+            stateFingerprint: restored.state_fingerprint,
+            snapshotId: restored.snapshot_id,
+          },
+        );
       }
       await this.auditRepo.save({
         eventType: 'WORKSPACE_RESTORED',
         actorId: userId,
         payload: {
-          datasetKey: state.datasetKey, snapshotId: restored.snapshot_id, matchesExpected: restored.matches_expected,
-          uploadedRecords: state.datasetKey === 'custom' ? (state.records || []).length : 0,
+          datasetKey: state.datasetKey,
+          snapshotId: restored.snapshot_id,
+          matchesExpected: restored.matches_expected,
+          uploadedRecords:
+            state.datasetKey === 'custom' ? (state.records || []).length : 0,
           fetchedContext: (state.fetchedOpportunityIds || []).length,
         },
       });
@@ -218,9 +267,14 @@ export class DecisionForgeService {
   /** Per-user sliding-window limit on questions (each one can run a full decision pass). */
   private checkQueryRate(userId: string): void {
     const now = Date.now();
-    const recent = (this.queryHits.get(userId) || []).filter((t) => now - t < DecisionForgeService.QUERY_WINDOW_MS);
+    const recent = (this.queryHits.get(userId) || []).filter(
+      (t) => now - t < DecisionForgeService.QUERY_WINDOW_MS,
+    );
     if (recent.length >= DecisionForgeService.QUERY_LIMIT) {
-      throw new HttpException('Too many questions. Please wait a moment and try again.', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'Too many questions. Please wait a moment and try again.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
     recent.push(now);
     this.queryHits.set(userId, recent);
@@ -233,9 +287,15 @@ export class DecisionForgeService {
       return new HttpException(detail, status);
     }
     if (!err?.response) {
-      return new HttpException('The decision service is temporarily unavailable.', HttpStatus.SERVICE_UNAVAILABLE);
+      return new HttpException(
+        'The decision service is temporarily unavailable.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
     }
-    return new HttpException(typeof detail === 'string' ? detail : fallback, HttpStatus.INTERNAL_SERVER_ERROR);
+    return new HttpException(
+      typeof detail === 'string' ? detail : fallback,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
   }
 
   /**
@@ -256,7 +316,12 @@ export class DecisionForgeService {
     await this.queryRepo.delete({ userId });
     await this.runRepo.delete({ userId });
     await this.policyRepo.delete({ userId });
-    await this.auditRepo.save({ eventType: 'WORKSPACE_CLEARED', actorId: userId, actorEmail: email, payload: {} });
+    await this.auditRepo.save({
+      eventType: 'WORKSPACE_CLEARED',
+      actorId: userId,
+      actorEmail: email,
+      payload: {},
+    });
     return { configured: false, datasetKey: null };
   }
 
@@ -279,7 +344,12 @@ export class DecisionForgeService {
 
   async getDatasets() {
     try {
-      return (await axios.get(`${this.aiUrl}/decision-forge/datasets`, { timeout: 10000, headers: this.serviceHeaders() })).data;
+      return (
+        await axios.get(`${this.aiUrl}/decision-forge/datasets`, {
+          timeout: 10000,
+          headers: this.serviceHeaders(),
+        })
+      ).data;
     } catch (err: any) {
       throw this.aiError(err, 'Dataset list unavailable');
     }
@@ -291,7 +361,12 @@ export class DecisionForgeService {
    * policy) so a demo starts from a known state. The
    * audit log is never deleted: the reset itself is recorded in it.
    */
-  async resetDemoData(userId: string, email: string, dataset?: string, clearHistory = false) {
+  async resetDemoData(
+    userId: string,
+    email: string,
+    dataset?: string,
+    clearHistory = false,
+  ) {
     const key = dataset || 'real';
     try {
       const res = await this.ai(userId).post('/reset-demo', { dataset: key });
@@ -312,7 +387,12 @@ export class DecisionForgeService {
         eventType: clearHistory ? 'DEMO_RESET' : 'DEMO_DATASET_LOADED',
         actorId: userId,
         actorEmail: email,
-        payload: { dataset: key, snapshotId: res.data.snapshot_id, count: res.data.count, historyCleared: clearHistory },
+        payload: {
+          dataset: key,
+          snapshotId: res.data.snapshot_id,
+          count: res.data.count,
+          historyCleared: clearHistory,
+        },
       });
       return res.data;
     } catch (err: any) {
@@ -324,18 +404,23 @@ export class DecisionForgeService {
     if (!file) {
       throw new HttpException('No file uploaded.', HttpStatus.BAD_REQUEST);
     }
-    const FormData = require('form-data');
     const form = new FormData();
     form.append('file', file.buffer, file.originalname);
 
     try {
-      const res = await this.ai(userId).post('/ingest/file', form, { headers: { ...form.getHeaders(), 'X-Workspace-Id': userId } });
+      const res = await this.ai(userId).post('/ingest/file', form, {
+        headers: { ...form.getHeaders(), 'X-Workspace-Id': userId },
+      });
 
       await this.auditRepo.save({
         eventType: 'DATASET_UPLOADED',
         actorId: userId,
         actorEmail: email,
-        payload: { filename: file.originalname, rows: res.data.total_rows, validation: res.data.validation_report },
+        payload: {
+          filename: file.originalname,
+          rows: res.data.total_rows,
+          validation: res.data.validation_report,
+        },
       });
 
       return res.data;
@@ -347,10 +432,15 @@ export class DecisionForgeService {
 
   async applyMapping(records: any[], userId: string, email: string) {
     if (!Array.isArray(records) || records.length === 0) {
-      throw new HttpException('No records provided to activate.', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'No records provided to activate.',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     try {
-      const res = await this.ai(userId).post('/ingest/apply-mapping', { records });
+      const res = await this.ai(userId).post('/ingest/apply-mapping', {
+        records,
+      });
       await this.saveWorkspaceState(userId, {
         datasetKey: 'custom',
         snapshotId: res.data.snapshot_id,
@@ -363,7 +453,11 @@ export class DecisionForgeService {
         eventType: 'DATASET_ACTIVATED',
         actorId: userId,
         actorEmail: email,
-        payload: { recordsCount: records.length, qualityScore: res.data.quality_score, snapshotId: res.data.snapshot_id },
+        payload: {
+          recordsCount: records.length,
+          qualityScore: res.data.quality_score,
+          snapshotId: res.data.snapshot_id,
+        },
       });
 
       return res.data;
@@ -379,26 +473,50 @@ export class DecisionForgeService {
     });
 
     if (!active) {
-      active = await this.policyRepo.save({ userId, version: 1, isActive: true, ...DEFAULT_POLICY });
+      active = await this.policyRepo.save({
+        userId,
+        version: 1,
+        isActive: true,
+        ...DEFAULT_POLICY,
+      });
     }
 
-    const history = await this.policyRepo.find({ where: { userId }, order: { version: 'DESC' }, take: 10 });
+    const history = await this.policyRepo.find({
+      where: { userId },
+      order: { version: 'DESC' },
+      take: 10,
+    });
     return { active, history };
   }
 
   async savePolicy(userId: string, email: string, body: any) {
     const weights = {
-      dealValueWeight: Number(body.dealValueWeight ?? DEFAULT_POLICY.dealValueWeight),
-      winProbabilityWeight: Number(body.winProbabilityWeight ?? DEFAULT_POLICY.winProbabilityWeight),
-      engagementWeight: Number(body.engagementWeight ?? DEFAULT_POLICY.engagementWeight),
+      dealValueWeight: Number(
+        body.dealValueWeight ?? DEFAULT_POLICY.dealValueWeight,
+      ),
+      winProbabilityWeight: Number(
+        body.winProbabilityWeight ?? DEFAULT_POLICY.winProbabilityWeight,
+      ),
+      engagementWeight: Number(
+        body.engagementWeight ?? DEFAULT_POLICY.engagementWeight,
+      ),
       recencyWeight: Number(body.recencyWeight ?? DEFAULT_POLICY.recencyWeight),
-      intentExternalWeight: Number(body.intentExternalWeight ?? DEFAULT_POLICY.intentExternalWeight),
-      highPriorityThreshold: Number(body.highPriorityThreshold ?? DEFAULT_POLICY.highPriorityThreshold),
-      mediumPriorityThreshold: Number(body.mediumPriorityThreshold ?? DEFAULT_POLICY.mediumPriorityThreshold),
+      intentExternalWeight: Number(
+        body.intentExternalWeight ?? DEFAULT_POLICY.intentExternalWeight,
+      ),
+      highPriorityThreshold: Number(
+        body.highPriorityThreshold ?? DEFAULT_POLICY.highPriorityThreshold,
+      ),
+      mediumPriorityThreshold: Number(
+        body.mediumPriorityThreshold ?? DEFAULT_POLICY.mediumPriorityThreshold,
+      ),
     };
 
     if (Object.values(weights).some((v) => !Number.isFinite(v) || v < 0)) {
-      throw new HttpException('Policy values must be non-negative numbers.', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Policy values must be non-negative numbers.',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const total =
@@ -415,7 +533,10 @@ export class DecisionForgeService {
       );
     }
 
-    const previous = await this.policyRepo.findOne({ where: { userId, isActive: true }, order: { version: 'DESC' } });
+    const previous = await this.policyRepo.findOne({
+      where: { userId, isActive: true },
+      order: { version: 'DESC' },
+    });
     if (previous) {
       await this.policyRepo.update({ id: previous.id }, { isActive: false });
     }
@@ -460,18 +581,19 @@ export class DecisionForgeService {
     try {
       const activePolicy = await this.getPolicy(userId);
       const p = activePolicy.active;
-      const body = policyOverride && Object.keys(policyOverride).length
-        ? policyOverride
-        : {
-            deal_value_weight: p.dealValueWeight,
-            win_probability_weight: p.winProbabilityWeight,
-            engagement_weight: p.engagementWeight,
-            recency_weight: p.recencyWeight,
-            intent_external_weight: p.intentExternalWeight,
-            high_priority_threshold: p.highPriorityThreshold,
-            medium_priority_threshold: p.mediumPriorityThreshold,
-            policy_version: `v${p.version}`,
-          };
+      const body =
+        policyOverride && Object.keys(policyOverride).length
+          ? policyOverride
+          : {
+              deal_value_weight: p.dealValueWeight,
+              win_probability_weight: p.winProbabilityWeight,
+              engagement_weight: p.engagementWeight,
+              recency_weight: p.recencyWeight,
+              intent_external_weight: p.intentExternalWeight,
+              high_priority_threshold: p.highPriorityThreshold,
+              medium_priority_threshold: p.mediumPriorityThreshold,
+              policy_version: `v${p.version}`,
+            };
 
       const res = await this.ai(userId).post('/decide/run', body);
       const data = res.data;
@@ -501,20 +623,40 @@ export class DecisionForgeService {
   }
 
   /** Natural-language question -> plan -> analytics -> RAG -> answer. The whole trail is stored for replay. */
-  async queryDecision(question: any, userId: string, email: string, preset?: string) {
+  async queryDecision(
+    question: any,
+    userId: string,
+    email: string,
+    preset?: string,
+  ) {
     const q = cleanText(question, MAX_QUESTION, 'Question');
     if (!q) {
-      throw new HttpException('A question is required.', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'A question is required.',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     this.checkQueryRate(userId);
     try {
-      const res = await this.ai(userId).post('/decisions/query', { question: q, preset });
+      const res = await this.ai(userId).post('/decisions/query', {
+        question: q,
+        preset,
+      });
       const data = res.data;
 
-      let runId: string | null = data.decision_run_id || null;
+      const runId: string | null = data.decision_run_id || null;
       if (runId && data.run_summary) {
-        await this.persistRun(userId, { ...data.run_summary, decision_run_id: runId, snapshot_id: data.snapshot_id,
-          dataset_key: data.dataset_key, data_snapshot: data.data_snapshot }, data.recommendations || []);
+        await this.persistRun(
+          userId,
+          {
+            ...data.run_summary,
+            decision_run_id: runId,
+            snapshot_id: data.snapshot_id,
+            dataset_key: data.dataset_key,
+            data_snapshot: data.data_snapshot,
+          },
+          data.recommendations || [],
+        );
       }
       const log = await this.queryRepo.save({
         userId,
@@ -523,7 +665,11 @@ export class DecisionForgeService {
         plan: data.plan,
         answer: data.answer,
         analytics: data.analytics,
-        rag: { status: data.rag?.status, message: data.rag?.message, evidence: (data.rag?.evidence || []).slice(0, 20) },
+        rag: {
+          status: data.rag?.status,
+          message: data.rag?.message,
+          evidence: (data.rag?.evidence || []).slice(0, 20),
+        },
         trace: data.trace,
         policyVersion: data.policy_version || undefined,
         snapshotId: data.snapshot_id,
@@ -535,12 +681,22 @@ export class DecisionForgeService {
         decisionRunId: runId || undefined,
         actorId: userId,
         actorEmail: email,
-        payload: { intent: data.intent, planner: data.plan?.planner, tools: data.plan?.analytics_tools, confidence: data.confidence },
+        payload: {
+          intent: data.intent,
+          planner: data.plan?.planner,
+          tools: data.plan?.analytics_tools,
+          confidence: data.confidence,
+        },
       });
       if (data.scenario?.simulation) {
         // A what-if asked in words is a simulation like a slider run: record its parameters and result the same way.
         const sim = data.scenario.simulation;
-        const levers = (data.scenario.levers || []).map((l: any) => ({ lever: l.lever, baseline: l.baseline, scenario: l.scenario, note: l.note }));
+        const levers = (data.scenario.levers || []).map((l: any) => ({
+          lever: l.lever,
+          baseline: l.baseline,
+          scenario: l.scenario,
+          note: l.note,
+        }));
         const delta = sim.delta_revenue_percent;
         await this.auditRepo.save({
           eventType: 'SIMULATION_RUN',
@@ -555,8 +711,9 @@ export class DecisionForgeService {
             deltaRevenuePercent: delta,
             utilization: sim.rep_capacity_utilization_percent,
             simulationId: sim.simulation_id,
-            message: `What-if question: ${(data.scenario.levers || []).map((l: any) => `${l.label} ${l.baseline} -> ${l.scenario}`).join(', ')} `
-              + `(expected value ${delta >= 0 ? '+' : ''}${delta}% vs baseline)`,
+            message:
+              `What-if question: ${(data.scenario.levers || []).map((l: any) => `${l.label} ${l.baseline} -> ${l.scenario}`).join(', ')} ` +
+              `(expected value ${delta >= 0 ? '+' : ''}${delta}% vs baseline)`,
           },
         });
       }
@@ -568,10 +725,17 @@ export class DecisionForgeService {
     }
   }
 
-  async fetchExternalContext(opportunityId: string, userId: string, email: string) {
+  async fetchExternalContext(
+    opportunityId: string,
+    userId: string,
+    email: string,
+  ) {
     try {
-      const res = await this.ai(userId).post(`/opportunities/${encodeURIComponent(opportunityId)}/fetch-context`);
-      if (res.data?.status === 'fetched') await this.recordFetched(userId, opportunityId, res.data);
+      const res = await this.ai(userId).post(
+        `/opportunities/${encodeURIComponent(opportunityId)}/fetch-context`,
+      );
+      if (res.data?.status === 'fetched')
+        await this.recordFetched(userId, opportunityId, res.data);
 
       await this.auditRepo.save({
         eventType: 'EXTERNAL_CONTEXT_FETCHED',
@@ -588,7 +752,8 @@ export class DecisionForgeService {
       if (!err?.response || err.response.status >= 500) {
         return {
           status: 'unavailable',
-          message: 'External context unavailable. Decision calculated from internal business data.',
+          message:
+            'External context unavailable. Decision calculated from internal business data.',
           signal: null,
         };
       }
@@ -620,18 +785,37 @@ export class DecisionForgeService {
   // ---- human approval -----------------------------------------------------------------
 
   /** The recommendation must exist in a run owned by THIS user; anything else looks like "not found". */
-  private async requireOwnedRecommendation(userId: string, recId: string, decisionRunId?: string) {
-    const runId = decisionRunId || /^REC-(DR-[A-Z0-9]+)-/.exec(recId || '')?.[1];
-    const run = runId ? await this.runRepo.findOne({ where: { decisionRunId: runId, userId } }) : null;
-    const rec = run?.recommendations?.find((r: any) => r.recommendation_id === recId);
+  private async requireOwnedRecommendation(
+    userId: string,
+    recId: string,
+    decisionRunId?: string,
+  ) {
+    const runId =
+      decisionRunId || /^REC-(DR-[A-Z0-9]+)-/.exec(recId || '')?.[1];
+    const run = runId
+      ? await this.runRepo.findOne({ where: { decisionRunId: runId, userId } })
+      : null;
+    const rec = run?.recommendations?.find(
+      (r: any) => r.recommendation_id === recId,
+    );
     if (!run || !rec) {
-      throw new HttpException('Recommendation not found.', HttpStatus.NOT_FOUND);
+      throw new HttpException(
+        'Recommendation not found.',
+        HttpStatus.NOT_FOUND,
+      );
     }
     return { run, rec };
   }
 
-  private async getOrCreateApproval(userId: string, recId: string, run: DecisionRun, rec: any) {
-    const existing = await this.approvalRepo.findOne({ where: { recommendationId: recId, userId } });
+  private async getOrCreateApproval(
+    userId: string,
+    recId: string,
+    run: DecisionRun,
+    rec: any,
+  ) {
+    const existing = await this.approvalRepo.findOne({
+      where: { recommendationId: recId, userId },
+    });
     if (existing) return existing;
     return this.approvalRepo.save({
       recommendationId: recId,
@@ -661,25 +845,48 @@ export class DecisionForgeService {
     });
   }
 
-  private async transition(approval: DecisionApproval, to: ApprovalStatus, userId: string, patch: Partial<DecisionApproval> = {}) {
+  private async transition(
+    approval: DecisionApproval,
+    to: ApprovalStatus,
+    userId: string,
+    patch: Partial<DecisionApproval> = {},
+  ) {
     if (!canTransition(approval.status, to)) {
       throw new HttpException(
         `This recommendation is already ${approval.status} and cannot move to ${to}.`,
         HttpStatus.CONFLICT,
       );
     }
-    const history = [...(approval.statusHistory || []), { from: approval.status, to, at: new Date().toISOString(), by: userId }];
-    await this.approvalRepo.update({ id: approval.id }, { ...patch, status: to, statusHistory: history });
+    const history = [
+      ...(approval.statusHistory || []),
+      { from: approval.status, to, at: new Date().toISOString(), by: userId },
+    ];
+    await this.approvalRepo.update(
+      { id: approval.id },
+      { ...patch, status: to, statusHistory: history },
+    );
     return this.approvalRepo.findOne({ where: { id: approval.id } });
   }
 
   async startReview(recId: string, body: any, userId: string, email: string) {
-    const { run, rec } = await this.requireOwnedRecommendation(userId, recId, body?.decisionRunId);
+    const { run, rec } = await this.requireOwnedRecommendation(
+      userId,
+      recId,
+      body?.decisionRunId,
+    );
     const approval = await this.getOrCreateApproval(userId, recId, run, rec);
-    const updated = approval.status === 'REVIEW' ? approval : await this.transition(approval, 'REVIEW', userId);
+    const updated =
+      approval.status === 'REVIEW'
+        ? approval
+        : await this.transition(approval, 'REVIEW', userId);
     await this.auditRepo.save({
-      eventType: 'REVIEW_STARTED', decisionRunId: run.decisionRunId, opportunityId: rec.opportunity_id,
-      companyName: rec.company_name, actorId: userId, actorEmail: email, payload: { recommendationId: recId },
+      eventType: 'REVIEW_STARTED',
+      decisionRunId: run.decisionRunId,
+      opportunityId: rec.opportunity_id,
+      companyName: rec.company_name,
+      actorId: userId,
+      actorEmail: email,
+      payload: { recommendationId: recId },
     });
     return updated;
   }
@@ -687,19 +894,34 @@ export class DecisionForgeService {
   async reviewAction(
     recId: string,
     action: 'APPROVED' | 'MODIFIED' | 'REJECTED',
-    body: { decisionRunId?: string; approvedAction?: string; reviewerNotes?: string } & Record<string, any>,
+    body: {
+      decisionRunId?: string;
+      approvedAction?: string;
+      reviewerNotes?: string;
+    } & Record<string, any>,
     userId: string,
     email: string,
   ) {
     // Only the recommendation id and the reviewer's own words come from the request. Company,
     // deal value and opportunity are read from the stored run -- a client cannot rewrite them.
-    const approvedAction = cleanText(body?.approvedAction, MAX_ACTION, 'Action');
+    const approvedAction = cleanText(
+      body?.approvedAction,
+      MAX_ACTION,
+      'Action',
+    );
     const reviewerNotes = cleanText(body?.reviewerNotes, MAX_NOTES, 'Comment');
     if (action === 'MODIFIED' && !approvedAction) {
-      throw new HttpException('Describe the modified action before saving.', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Describe the modified action before saving.',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    const { run, rec } = await this.requireOwnedRecommendation(userId, recId, body?.decisionRunId);
+    const { run, rec } = await this.requireOwnedRecommendation(
+      userId,
+      recId,
+      body?.decisionRunId,
+    );
     const approval = await this.getOrCreateApproval(userId, recId, run, rec);
     const updated = await this.transition(approval, action, userId, {
       approvedAction: approvedAction || rec.suggested_action || '',
@@ -729,17 +951,32 @@ export class DecisionForgeService {
     return updated;
   }
 
-  async convertToClient(recId: string, body: any, userId: string, email: string) {
-    const approval = await this.approvalRepo.findOne({ where: { recommendationId: recId, userId } });
+  async convertToClient(
+    recId: string,
+    body: any,
+    userId: string,
+    email: string,
+  ) {
+    const approval = await this.approvalRepo.findOne({
+      where: { recommendationId: recId, userId },
+    });
     if (!approval) {
-      throw new HttpException('Recommendation not found.', HttpStatus.NOT_FOUND);
+      throw new HttpException(
+        'Recommendation not found.',
+        HttpStatus.NOT_FOUND,
+      );
     }
     if (approval.status !== 'APPROVED' && approval.status !== 'MODIFIED') {
-      throw new HttpException('Only an approved (or modified) recommendation can be converted to a client.', HttpStatus.CONFLICT);
+      throw new HttpException(
+        'Only an approved (or modified) recommendation can be converted to a client.',
+        HttpStatus.CONFLICT,
+      );
     }
     const companyName = approval.companyName;
 
-    let client = await this.clientRepo.findOne({ where: { name: companyName, user_id: userId } });
+    let client = await this.clientRepo.findOne({
+      where: { name: companyName, user_id: userId },
+    });
     if (!client) {
       client = await this.clientRepo.save({
         name: companyName,
@@ -753,7 +990,10 @@ export class DecisionForgeService {
       });
     }
 
-    await this.approvalRepo.update({ id: approval.id }, { convertedClientId: client.id });
+    await this.approvalRepo.update(
+      { id: approval.id },
+      { convertedClientId: client.id },
+    );
 
     await this.auditRepo.save({
       eventType: 'CLIENT_CONVERTED',
@@ -761,7 +1001,11 @@ export class DecisionForgeService {
       companyName,
       actorId: userId,
       actorEmail: email,
-      payload: { clientId: client.id, clientName: client.name, dealValue: approval.dealValue },
+      payload: {
+        clientId: client.id,
+        clientName: client.name,
+        dealValue: approval.dealValue,
+      },
     });
 
     return {
@@ -774,17 +1018,28 @@ export class DecisionForgeService {
   }
 
   async getAuditLogs(userId: string) {
-    return this.auditRepo.find({ where: { actorId: userId }, order: { timestamp: 'DESC' }, take: 50 });
+    return this.auditRepo.find({
+      where: { actorId: userId },
+      order: { timestamp: 'DESC' },
+      take: 50,
+    });
   }
 
   async getApprovals(userId: string) {
-    return this.approvalRepo.find({ where: { userId }, order: { updatedAt: 'DESC' } });
+    return this.approvalRepo.find({
+      where: { userId },
+      order: { updatedAt: 'DESC' },
+    });
   }
 
   // ---- decisions, evidence, replay ------------------------------------------------------
 
   async listDecisions(userId: string) {
-    const runs = await this.runRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, take: 20 });
+    const runs = await this.runRepo.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      take: 20,
+    });
     return runs.map((r) => ({
       decisionRunId: r.decisionRunId,
       policyVersion: r.policyVersion,
@@ -798,7 +1053,9 @@ export class DecisionForgeService {
   }
 
   private async requireOwnedRun(runId: string, userId: string) {
-    const run = await this.runRepo.findOne({ where: { decisionRunId: runId, userId } });
+    const run = await this.runRepo.findOne({
+      where: { decisionRunId: runId, userId },
+    });
     if (!run) {
       throw new HttpException('Decision run not found', HttpStatus.NOT_FOUND);
     }
@@ -807,7 +1064,9 @@ export class DecisionForgeService {
 
   async getEvidence(runId: string, userId: string, opportunityId?: string) {
     const run = await this.requireOwnedRun(runId, userId);
-    const recs = (run.recommendations || []).filter((r: any) => !opportunityId || r.opportunity_id === opportunityId);
+    const recs = (run.recommendations || []).filter(
+      (r: any) => !opportunityId || r.opportunity_id === opportunityId,
+    );
     return {
       decisionRunId: run.decisionRunId,
       snapshotId: run.snapshotId,
@@ -829,23 +1088,97 @@ export class DecisionForgeService {
   /** Ordered, inspectable trail: question -> plan -> data snapshot -> analytics -> RAG -> evidence -> policy -> score -> recommendation -> approval. */
   async replayDecision(runId: string, userId: string) {
     const run = await this.requireOwnedRun(runId, userId);
-    const auditEvents = await this.auditRepo.find({ where: { decisionRunId: runId, actorId: userId }, order: { timestamp: 'ASC' } });
-    const approvals = await this.approvalRepo.find({ where: { decisionRunId: runId, userId }, order: { updatedAt: 'ASC' } });
-    const queries = await this.queryRepo.find({ where: { decisionRunId: runId, userId }, order: { createdAt: 'ASC' } });
+    const auditEvents = await this.auditRepo.find({
+      where: { decisionRunId: runId, actorId: userId },
+      order: { timestamp: 'ASC' },
+    });
+    const approvals = await this.approvalRepo.find({
+      where: { decisionRunId: runId, userId },
+      order: { updatedAt: 'ASC' },
+    });
+    const queries = await this.queryRepo.find({
+      where: { decisionRunId: runId, userId },
+      order: { createdAt: 'ASC' },
+    });
 
     const q = queries[0];
     const top = (run.recommendations || []).slice(0, 3);
     const replay = [
-      { step: 'question', detail: q ? { question: q.question } : { question: null, note: 'Run started from the Decision Center, not a typed question.' } },
+      {
+        step: 'question',
+        detail: q
+          ? { question: q.question }
+          : {
+              question: null,
+              note: 'Run started from the Decision Center, not a typed question.',
+            },
+      },
       { step: 'query_plan', detail: q?.plan ?? null },
-      { step: 'data_snapshot', detail: { snapshotId: run.snapshotId, datasetKey: run.datasetKey, dataSnapshot: run.dataSnapshot, recordsAnalyzed: run.recordsAnalyzed } },
-      { step: 'analytics', detail: q?.analytics ?? { pipelineTotal: run.pipelineTotalValue, weightedExpectedValue: run.weightedPipelineValue } },
-      { step: 'rag_results', detail: q?.rag ?? { notes: top.map((r: any) => ({ opportunityId: r.opportunity_id, notes: r.evidence_pack?.rag_notes })) } },
-      { step: 'evidence', detail: top.map((r: any) => ({ opportunityId: r.opportunity_id, evidencePack: r.evidence_pack })) },
-      { step: 'policy', detail: { policyVersion: run.policyVersion, policy: run.policySnapshot } },
-      { step: 'score', detail: top.map((r: any) => ({ opportunityId: r.opportunity_id, priorityScore: r.priority_score, factors: r.factors })) },
-      { step: 'recommendation', detail: top.map((r: any) => ({ opportunityId: r.opportunity_id, decisionClass: r.decision_class, action: r.suggested_action, confidence: r.confidence })) },
-      { step: 'approval', detail: approvals.map((a) => ({ opportunityId: a.opportunityId, status: a.status, notes: a.reviewerNotes, history: a.statusHistory })) },
+      {
+        step: 'data_snapshot',
+        detail: {
+          snapshotId: run.snapshotId,
+          datasetKey: run.datasetKey,
+          dataSnapshot: run.dataSnapshot,
+          recordsAnalyzed: run.recordsAnalyzed,
+        },
+      },
+      {
+        step: 'analytics',
+        detail: q?.analytics ?? {
+          pipelineTotal: run.pipelineTotalValue,
+          weightedExpectedValue: run.weightedPipelineValue,
+        },
+      },
+      {
+        step: 'rag_results',
+        detail: q?.rag ?? {
+          notes: top.map((r: any) => ({
+            opportunityId: r.opportunity_id,
+            notes: r.evidence_pack?.rag_notes,
+          })),
+        },
+      },
+      {
+        step: 'evidence',
+        detail: top.map((r: any) => ({
+          opportunityId: r.opportunity_id,
+          evidencePack: r.evidence_pack,
+        })),
+      },
+      {
+        step: 'policy',
+        detail: {
+          policyVersion: run.policyVersion,
+          policy: run.policySnapshot,
+        },
+      },
+      {
+        step: 'score',
+        detail: top.map((r: any) => ({
+          opportunityId: r.opportunity_id,
+          priorityScore: r.priority_score,
+          factors: r.factors,
+        })),
+      },
+      {
+        step: 'recommendation',
+        detail: top.map((r: any) => ({
+          opportunityId: r.opportunity_id,
+          decisionClass: r.decision_class,
+          action: r.suggested_action,
+          confidence: r.confidence,
+        })),
+      },
+      {
+        step: 'approval',
+        detail: approvals.map((a) => ({
+          opportunityId: a.opportunityId,
+          status: a.status,
+          notes: a.reviewerNotes,
+          history: a.statusHistory,
+        })),
+      },
     ];
 
     return { run, auditEvents, approvals, queries, replay };
@@ -854,31 +1187,59 @@ export class DecisionForgeService {
   // ---- dashboard summary ----------------------------------------------------------------
 
   async getSummary(userId: string, email: string) {
-    let run = await this.runRepo.findOne({ where: { userId }, order: { createdAt: 'DESC' } });
+    let run = await this.runRepo.findOne({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
     // Use the newest run that contains every recommendation (query runs keep only the top 10).
-    const runs = await this.runRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, take: 10 });
-    run = runs.find((r) => (r.recommendations || []).length >= (r.recordsAnalyzed || 0) && r.recordsAnalyzed > 0) || null;
+    const runs = await this.runRepo.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+      take: 10,
+    });
+    run =
+      runs.find(
+        (r) =>
+          (r.recommendations || []).length >= (r.recordsAnalyzed || 0) &&
+          r.recordsAnalyzed > 0,
+      ) || null;
     if (!run) {
       // Nothing is analysed for a user who has not chosen any data yet.
-      if (!(await this.getWorkspaceState(userId))) return { hasRun: false, needsData: true };
+      if (!(await this.getWorkspaceState(userId)))
+        return { hasRun: false, needsData: true };
       try {
         await this.runDecisionEngine(userId, email);
-        run = await this.runRepo.findOne({ where: { userId }, order: { createdAt: 'DESC' } });
+        run = await this.runRepo.findOne({
+          where: { userId },
+          order: { createdAt: 'DESC' },
+        });
       } catch {
         return { hasRun: false, message: 'Decision service unavailable.' };
       }
     }
     if (!run) return { hasRun: false };
 
-    const approvals = await this.approvalRepo.find({ where: { userId, decisionRunId: run.decisionRunId } });
-    const finalIds = new Set(approvals.filter((a) => FINAL_STATES.includes(a.status)).map((a) => a.recommendationId));
+    const approvals = await this.approvalRepo.find({
+      where: { userId, decisionRunId: run.decisionRunId },
+    });
+    const finalIds = new Set(
+      approvals
+        .filter((a) => FINAL_STATES.includes(a.status))
+        .map((a) => a.recommendationId),
+    );
     const recs: any[] = run.recommendations || [];
     const open = recs.filter((r) => !finalIds.has(r.recommendation_id));
-    const immediate = open.filter((r) => r.decision_class === 'IMMEDIATE_ACTION');
+    const immediate = open.filter(
+      (r) => r.decision_class === 'IMMEDIATE_ACTION',
+    );
     const stale = open.filter((r) => r.stale_data_warning);
     const review = open.filter((r) => r.review_required);
-    const attention = new Set([...immediate, ...stale, ...review].map((r) => r.recommendation_id));
-    const awaiting = approvals.filter((a) => ['DRAFT', 'REVIEW', 'MODIFIED', 'PENDING'].includes(a.status)).length;
+    const attention = new Set(
+      [...immediate, ...stale, ...review].map((r) => r.recommendation_id),
+    );
+    const awaiting = approvals.filter((a) =>
+      ['DRAFT', 'REVIEW', 'MODIFIED', 'PENDING'].includes(a.status),
+    ).length;
 
     return {
       hasRun: true,

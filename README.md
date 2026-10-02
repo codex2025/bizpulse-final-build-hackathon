@@ -15,7 +15,7 @@ and waits for a human to approve.
 **Contents:** [Project overview](#1-project-overview) · [Try it in 3 minutes](#2-try-it-in-3-minutes) ·
 [How it meets the brief](#3-how-it-meets-the-brief) · [Technologies used](#4-technologies-used) ·
 [Repository layout](#5-repository-layout) · [Setup and installation](#6-setup-and-installation) ·
-[How to run](#7-how-to-run-the-project) · [Your data](#8-your-data-the-csv-format) · [Tests](#9-tests) ·
+[How to run](#7-how-to-run-the-project) · [Your data](#8-your-data-the-csv-format) · [Tests and code quality](#9-tests-and-code-quality) ·
 [Configuration](#10-configuration) · [Deployment](#11-deployment) · [Limits](#12-limits-stated-plainly)
 
 ---
@@ -57,7 +57,7 @@ React + Vite  ──JWT──►  NestJS gateway (SQLite)  ──workspace id─
 
 ## 2. Try it in 3 minutes
 
-1. Open the [live app](https://bizpulse-app-rust.vercel.app) and choose **Sign up**. Email and password is enough (8+ characters). A short product tour starts by itself; use **Next** / **Back**, or skip it.
+1. Open the [live app](https://bizpulse-app-rust.vercel.app) and choose **Sign up**. Email and password is enough (8+ characters). On a laptop a short product tour starts by itself (use **Next** / **Back**, or skip it); on a phone it does not, and you can start it from Help or by asking the assistant.
 2. A new account is **empty**. Open **DecisionForge** in the sidebar. The *Start here* screen offers two ways in:
    - **Download sample CSV**, then upload it. You will see the column matching and the data-quality report before anything is used.
    - **No file? Use our sample dataset** if you would rather not handle a file. Nothing loads unless you click.
@@ -242,12 +242,15 @@ Data model: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
 
 ---
 
-## 9. Tests
+## 9. Tests and code quality
 
 ```bash
 cd ai-service && python -m pytest tests -q        # 289 tests: analytics, RAG, scoring, Twin, data quality, isolation, injection
 cd ai-service && python evals/run_eval.py         # 40-case workflow evaluation
-cd backend    && npx jest                         # 217 tests: approvals, replay, sign-in, workspace recovery, assistant
+cd ai-service && python -m ruff check .           # lint: undefined names, unused imports and variables
+cd backend    && npx jest                         # 222 tests: approvals, replay, sign-in, workspace recovery, assistant
+cd backend    && npx eslint "src/**/*.ts" --quiet # lint and formatting (Prettier): no errors
+cd frontend   && npx eslint . --quiet             # lint: no errors
 cd frontend   && npm test                         # 21 unit tests of the pure logic
 cd frontend   && npx tsc -b && npx vite build     # typecheck and build
 cd e2e        && npx playwright test              # UI audit on desktop and phone sizes (needs the stack running)
@@ -270,6 +273,7 @@ Every variable is optional for a local run except `JWT_SECRET` in production.
 | `AI_SERVICE_TOKEN` | backend and ai-service | Shared secret between the two services. When set, the AI service rejects requests without it | unset |
 | `DATABASE_URL` | backend | Postgres connection string. When set, the gateway uses Postgres instead of SQLite. Needed on serverless hosts, where several copies of the gateway run at once | unset |
 | `DATABASE_PATH` | backend | SQLite file (used when `DATABASE_URL` is unset). Put it on a persistent disk in production | `./finsight.db` |
+| `CORS_ORIGINS` | backend | Comma-separated browser origins allowed to call the API (the deployed frontend). Unset allows every origin, for local development | unset |
 | `FIREBASE_PROJECT_ID` | backend | Firebase project for Google sign-in. Empty turns Google sign-in off | empty |
 | `VITE_API_URL` | frontend | Gateway address | `http://localhost:3001/api` |
 | `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID` | frontend | Firebase web config (public identifiers, not secrets) | empty |
@@ -306,7 +310,8 @@ Settings for each service and the trade-offs: [`docs/DEPLOYMENT.md`](docs/DEPLOY
 - **What-if questions** understand a fixed set of levers (reps, contacts per day, minimum deal value, follow-up window, priority cutoff). Anything else gets a clear "can't simulate that".
 - **"Fetch fresh context"** reads a cached, cited snapshot, not a live web crawl.
 - **The assistant.** Without `OPENROUTER_API_KEY`, or when the free daily quota is used up, it routes by keywords, so unusual wording may land on the general help answer. Each question is answered on its own (it does not remember the previous one). Voice input needs a browser with speech recognition (Chrome, Edge, Safari); the browser, not this app, sends the audio to its speech service. In Firefox the microphone button is hidden and typing still works.
-- **Sign-in hardening** is not done: no email verification, password reset or rate limiting on sign-in.
+- **Sign-in hardening is partial.** Five wrong passwords for one address pause sign-in for that address for 15 minutes (counted per server copy, so it slows guessing rather than locking an account), responses carry security headers (`helmet`), and the API only accepts browser calls from the deployed frontend. There is no email verification or password reset, and the session token is kept in `localStorage`.
+- **Typing.** Request bodies in the gateway and the AI service's JSON are not fully typed: `any` is allowed there, and the lint rules that follow from it report as warnings (about 950), not errors.
 - **Not tested:** Python 3.11, Node 20 and 22, macOS and Linux, Docker.
 
 ---

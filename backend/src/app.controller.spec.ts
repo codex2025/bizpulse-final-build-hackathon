@@ -8,15 +8,27 @@ jest.mock('axios');
 const mockedGet = axios.get as jest.Mock;
 
 const build = (aiUrl?: string) =>
-  new AppController({} as never, { get: (_k: string, d: string) => aiUrl ?? d } as never);
+  new AppController(
+    {} as never,
+    { get: (_k: string, d: string) => aiUrl ?? d } as never,
+  );
 
 describe('AppController root', () => {
   it('reports a healthy gateway', async () => {
     const app = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService, { provide: ConfigService, useValue: { get: (_k: string, d: string) => d } }],
+      providers: [
+        AppService,
+        {
+          provide: ConfigService,
+          useValue: { get: (_k: string, d: string) => d },
+        },
+      ],
     }).compile();
-    expect(app.get(AppController).getHello()).toMatchObject({ status: 'healthy', name: 'Bizpulse Fintech Gateway API' });
+    expect(app.get(AppController).getHello()).toMatchObject({
+      status: 'healthy',
+      name: 'Bizpulse Fintech Gateway API',
+    });
   });
 });
 
@@ -30,7 +42,9 @@ describe('AppController service health', () => {
     expect(res.ai).toBe('up');
     expect(typeof res.aiLatencyMs).toBe('number');
     // A scheme-less Render hostport is normalised, and only /health is called.
-    expect(mockedGet).toHaveBeenCalledWith('http://ai-host:10000/health', { timeout: 2000 });
+    expect(mockedGet).toHaveBeenCalledWith('http://ai-host:10000/health', {
+      timeout: 2000,
+    });
   });
 
   it('reports the AI service down (never throws) when it cannot be reached', async () => {
@@ -45,7 +59,9 @@ describe('AppController service health', () => {
   });
 
   it('exposes no URL, version or credential in the response', async () => {
-    mockedGet.mockResolvedValue({ data: { status: 'healthy', version: '9.9.9' } });
+    mockedGet.mockResolvedValue({
+      data: { status: 'healthy', version: '9.9.9' },
+    });
     const res = await build('http://secret-host:8000').getServiceHealth();
     expect(JSON.stringify(res)).not.toMatch(/secret-host|9\.9\.9/);
   });

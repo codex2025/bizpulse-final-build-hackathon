@@ -19,7 +19,9 @@ import { firebaseVerifierProvider } from './firebase-token.verifier';
       useFactory: (config: ConfigService) => ({
         // Fails to start in production without a strong JWT_SECRET; random per process in development (see jwt-secret.ts).
         secret: resolveJwtSecret(config.get<string>('JWT_SECRET')),
-        signOptions: { expiresIn: (config.get<string>('JWT_EXPIRES_IN') || '7d') as any },
+        signOptions: {
+          expiresIn: (config.get<string>('JWT_EXPIRES_IN') || '7d') as any,
+        },
       }),
     }),
   ],

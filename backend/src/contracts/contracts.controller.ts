@@ -1,4 +1,15 @@
-import { Controller, Post, Get, Param, Body, Req, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  Req,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ContractsService } from './contracts.service';
@@ -12,7 +23,9 @@ export class ContractsController {
   @UseInterceptors(FileInterceptor('document'))
   analyzeContract(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
     if (!file) {
-      throw new BadRequestException('No contract document provided in multipart form data (field name: document)');
+      throw new BadRequestException(
+        'No contract document provided in multipart form data (field name: document)',
+      );
     }
     return this.contractsService.analyzeContract(file, req.user.userId);
   }
@@ -25,7 +38,13 @@ export class ContractsController {
     @Body('language') language: string,
     @Req() req: any,
   ) {
-    return this.contractsService.askQuestion(id, req.user.userId, question, topK || 4, language || 'en');
+    return this.contractsService.askQuestion(
+      id,
+      req.user.userId,
+      question,
+      topK || 4,
+      language || 'en',
+    );
   }
 
   @Get('languages')
@@ -39,9 +58,14 @@ export class ContractsController {
     @Body('target_language') targetLanguage: string,
   ) {
     if (!contractData || !targetLanguage) {
-      throw new BadRequestException('contract_data and target_language are required');
+      throw new BadRequestException(
+        'contract_data and target_language are required',
+      );
     }
-    return this.contractsService.translateContract(contractData, targetLanguage);
+    return this.contractsService.translateContract(
+      contractData,
+      targetLanguage,
+    );
   }
 
   @Get()

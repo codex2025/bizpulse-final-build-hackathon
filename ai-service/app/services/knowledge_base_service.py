@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from app.services.vector_store import ChromaVectorStore
 
 logger = logging.getLogger(__name__)

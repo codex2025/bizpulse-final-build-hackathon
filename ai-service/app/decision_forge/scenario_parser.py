@@ -241,7 +241,7 @@ _REP_SET = re.compile(
     rf"\b(?:only|just|with|have|has|had|having|use|using|run(?:ning)?|team\s+of|down\s+to|up\s+to|(?:reduce|cut|increase|grow|scale)\s+to|to)\s+"
     rf"(?:only\s+|just\s+)?(?P<n>{_NUM})\s+{_REP}\b")
 _REP_SET_TRAIL = re.compile(rf"\b(?P<n>{_NUM})\s+{_REP}\s+(?:only|in\s+total|total)\b")
-_REP_SCALE = re.compile(rf"\b(?P<w>double|triple|halve)\s+(?:the\s+|our\s+)?(?:sales\s+)?(?:team|reps?|headcount|sales\s*force)\b")
+_REP_SCALE = re.compile(r"\b(?P<w>double|triple|halve)\s+(?:the\s+|our\s+)?(?:sales\s+)?(?:team|reps?|headcount|sales\s*force)\b")
 _REP_MENTION = re.compile(rf"\b(?P<n>\d[\d,]*|{_WORDS})\s+{_REP}\b")
 _SCALE_FACTORS = {"double": 2.0, "triple": 3.0, "halve": 0.5}
 

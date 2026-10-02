@@ -1,6 +1,12 @@
 import { Logger, Provider } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createRemoteJWKSet, decodeJwt, errors as joseErrors, jwtVerify, JWTVerifyGetKey } from 'jose';
+import {
+  createRemoteJWKSet,
+  decodeJwt,
+  errors as joseErrors,
+  jwtVerify,
+  JWTVerifyGetKey,
+} from 'jose';
 
 /** Google's public keys for Firebase ID tokens (cached and refreshed by jose according to the response headers). */
 export const GOOGLE_SECURETOKEN_JWKS_URL =
@@ -24,7 +30,12 @@ export interface FirebaseIdentity {
   provider: string;
 }
 
-export type FirebaseTokenFailure = 'invalid' | 'expired' | 'email_unverified' | 'unavailable' | 'not_configured';
+export type FirebaseTokenFailure =
+  | 'invalid'
+  | 'expired'
+  | 'email_unverified'
+  | 'unavailable'
+  | 'not_configured';
 
 export class FirebaseTokenError extends Error {
   constructor(
@@ -54,14 +65,18 @@ function httpsUrl(value: unknown): string | undefined {
 
 /** A token problem (bad signature, wrong audience, expired...) versus the key service being unreachable. */
 function classify(err: unknown): FirebaseTokenError {
-  if (err instanceof joseErrors.JWTExpired) return new FirebaseTokenError('expired', 'token expired');
+  if (err instanceof joseErrors.JWTExpired)
+    return new FirebaseTokenError('expired', 'token expired');
   const infrastructure =
     err instanceof joseErrors.JWKSTimeout ||
     err instanceof joseErrors.JWKSInvalid ||
     (err instanceof joseErrors.JOSEError && err.code === 'ERR_JOSE_GENERIC') ||
     !(err instanceof joseErrors.JOSEError);
   return infrastructure
-    ? new FirebaseTokenError('unavailable', 'could not reach the Google key service')
+    ? new FirebaseTokenError(
+        'unavailable',
+        'could not reach the Google key service',
+      )
     : new FirebaseTokenError('invalid', 'token rejected');
 }
 
@@ -73,11 +88,17 @@ function classify(err: unknown): FirebaseTokenError {
 export class JwksFirebaseVerifier implements FirebaseTokenVerifier {
   constructor(
     private readonly projectId: string,
-    private readonly getKey: JWTVerifyGetKey = createRemoteJWKSet(new URL(GOOGLE_SECURETOKEN_JWKS_URL)),
+    private readonly getKey: JWTVerifyGetKey = createRemoteJWKSet(
+      new URL(GOOGLE_SECURETOKEN_JWKS_URL),
+    ),
   ) {}
 
   async verify(idToken: string): Promise<FirebaseIdentity> {
-    if (typeof idToken !== 'string' || idToken.length < 20 || idToken.length > MAX_TOKEN_LENGTH) {
+    if (
+      typeof idToken !== 'string' ||
+      idToken.length < 20 ||
+      idToken.length > MAX_TOKEN_LENGTH
+    ) {
       throw new FirebaseTokenError('invalid', 'malformed token');
     }
     let payload;
@@ -97,21 +118,31 @@ export class JwksFirebaseVerifier implements FirebaseTokenVerifier {
       throw new FirebaseTokenError('invalid', 'missing subject');
     }
     const now = Math.floor(Date.now() / 1000);
-    if (typeof payload.auth_time !== 'number' || payload.auth_time > now + CLOCK_TOLERANCE_SECONDS) {
+    if (
+      typeof payload.auth_time !== 'number' ||
+      payload.auth_time > now + CLOCK_TOLERANCE_SECONDS
+    ) {
       throw new FirebaseTokenError('invalid', 'bad auth_time');
     }
     const email = shortText(payload.email, 254);
-    if (!email || !email.includes('@')) throw new FirebaseTokenError('invalid', 'no email');
-    if (payload.email_verified !== true) throw new FirebaseTokenError('email_unverified', 'email not verified');
+    if (!email || !email.includes('@'))
+      throw new FirebaseTokenError('invalid', 'no email');
+    if (payload.email_verified !== true)
+      throw new FirebaseTokenError('email_unverified', 'email not verified');
 
-    const firebase = payload.firebase as { sign_in_provider?: unknown } | undefined;
+    const firebase = payload.firebase as
+      | { sign_in_provider?: unknown }
+      | undefined;
     return {
       uid,
       email: email.toLowerCase(),
       emailVerified: true,
       name: shortText(payload.name, 100),
       picture: httpsUrl(payload.picture),
-      provider: typeof firebase?.sign_in_provider === 'string' ? firebase.sign_in_provider : 'unknown',
+      provider:
+        typeof firebase?.sign_in_provider === 'string'
+          ? firebase.sign_in_provider
+          : 'unknown',
     };
   }
 }
@@ -128,7 +159,11 @@ export class EmulatorFirebaseVerifier implements FirebaseTokenVerifier {
   ) {}
 
   async verify(idToken: string): Promise<FirebaseIdentity> {
-    if (typeof idToken !== 'string' || idToken.length < 20 || idToken.length > MAX_TOKEN_LENGTH) {
+    if (
+      typeof idToken !== 'string' ||
+      idToken.length < 20 ||
+      idToken.length > MAX_TOKEN_LENGTH
+    ) {
       throw new FirebaseTokenError('invalid', 'malformed token');
     }
     let audience: unknown;
@@ -137,40 +172,58 @@ export class EmulatorFirebaseVerifier implements FirebaseTokenVerifier {
     } catch {
       throw new FirebaseTokenError('invalid', 'malformed token');
     }
-    if (audience !== this.projectId) throw new FirebaseTokenError('invalid', 'token is for another project');
+    if (audience !== this.projectId)
+      throw new FirebaseTokenError('invalid', 'token is for another project');
 
     let response: Response;
     try {
-      response = await this.fetchImpl(`http://${this.host}/identitytoolkit.googleapis.com/v1/accounts:lookup?key=emulator`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
+      response = await this.fetchImpl(
+        `http://${this.host}/identitytoolkit.googleapis.com/v1/accounts:lookup?key=emulator`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        },
+      );
     } catch {
-      throw new FirebaseTokenError('unavailable', 'the Firebase Auth emulator is not reachable');
+      throw new FirebaseTokenError(
+        'unavailable',
+        'the Firebase Auth emulator is not reachable',
+      );
     }
-    if (!response.ok) throw new FirebaseTokenError('invalid', 'token rejected by the emulator');
+    if (!response.ok)
+      throw new FirebaseTokenError('invalid', 'token rejected by the emulator');
     const user = ((await response.json()) as { users?: any[] })?.users?.[0];
     if (!user?.localId) throw new FirebaseTokenError('invalid', 'unknown user');
     const email = shortText(user.email, 254);
     if (!email) throw new FirebaseTokenError('invalid', 'no email');
-    if (user.emailVerified !== true) throw new FirebaseTokenError('email_unverified', 'email not verified');
-    const providers: string[] = (user.providerUserInfo || []).map((p: any) => p?.providerId).filter(Boolean);
+    if (user.emailVerified !== true)
+      throw new FirebaseTokenError('email_unverified', 'email not verified');
+    const providers: string[] = (user.providerUserInfo || [])
+      .map((p: any) => p?.providerId)
+      .filter(Boolean);
     return {
       uid: String(user.localId),
       email: email.toLowerCase(),
       emailVerified: true,
       name: shortText(user.displayName, 100),
       picture: httpsUrl(user.photoUrl),
-      provider: providers.includes('google.com') ? 'google.com' : providers[0] || 'unknown',
+      provider: providers.includes('google.com')
+        ? 'google.com'
+        : providers[0] || 'unknown',
     };
   }
 }
 
 /** Used when Google sign-in has not been configured: every attempt fails with a clear, non-401 reason. */
 export class NotConfiguredFirebaseVerifier implements FirebaseTokenVerifier {
-  async verify(): Promise<FirebaseIdentity> {
-    throw new FirebaseTokenError('not_configured', 'FIREBASE_PROJECT_ID is not set');
+  verify(): Promise<FirebaseIdentity> {
+    return Promise.reject(
+      new FirebaseTokenError(
+        'not_configured',
+        'FIREBASE_PROJECT_ID is not set',
+      ),
+    );
   }
 }
 
@@ -180,7 +233,9 @@ export interface FirebaseVerifierOptions {
   nodeEnv?: string;
 }
 
-export function createFirebaseVerifier(options: FirebaseVerifierOptions): FirebaseTokenVerifier {
+export function createFirebaseVerifier(
+  options: FirebaseVerifierOptions,
+): FirebaseTokenVerifier {
   const logger = new Logger('FirebaseAuth');
   const projectId = (options.projectId || '').trim();
   const emulatorHost = (options.emulatorHost || '').trim();
@@ -188,13 +243,22 @@ export function createFirebaseVerifier(options: FirebaseVerifierOptions): Fireba
   if (emulatorHost) {
     if (options.nodeEnv === 'production') {
       // The emulator accepts unsigned tokens: if this variable leaked into a real deployment, anyone could sign in as anyone.
-      throw new Error('FIREBASE_AUTH_EMULATOR_HOST is set while NODE_ENV=production; refusing to start.');
+      throw new Error(
+        'FIREBASE_AUTH_EMULATOR_HOST is set while NODE_ENV=production; refusing to start.',
+      );
     }
-    logger.warn(`Firebase Auth EMULATOR mode (${emulatorHost}): sign-in tokens are checked against the local emulator, not Google.`);
-    return new EmulatorFirebaseVerifier(emulatorHost, projectId || 'demo-bizpulse');
+    logger.warn(
+      `Firebase Auth EMULATOR mode (${emulatorHost}): sign-in tokens are checked against the local emulator, not Google.`,
+    );
+    return new EmulatorFirebaseVerifier(
+      emulatorHost,
+      projectId || 'demo-bizpulse',
+    );
   }
   if (!projectId) {
-    logger.warn('FIREBASE_PROJECT_ID is not set: Google sign-in is disabled. Password sign-in still works.');
+    logger.warn(
+      'FIREBASE_PROJECT_ID is not set: Google sign-in is disabled. Password sign-in still works.',
+    );
     return new NotConfiguredFirebaseVerifier();
   }
   return new JwksFirebaseVerifier(projectId);

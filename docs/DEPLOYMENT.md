@@ -71,20 +71,23 @@ better-sqlite3) is required for correctness on serverless.
 ## Vercel
 
 - **Frontend**: fine. Set `VITE_API_URL` in the project's build environment.
-- **Gateway** (`backend/vercel.json` and `backend/api/index.js`, which serves the compiled Nest app): `maxDuration` is 10 seconds. The first
-  request after a cold start (gateway boot, then a cold ai-service, then a workspace restore) can exceed that; raise it within your
-  plan's limit if you see 504s. Vercel's request body limit (about 4.5 MB) applies before the gateway's own 6 MB limit on
-  `ingest/apply-mapping`, so very large CSV activations fail there. See the serverless caveat above.
-- **AI service** (`ai-service/vercel.json` is `{}`): relies on Vercel's zero-config FastAPI detection. Not verified.
+- **Gateway** (`backend/vercel.json` and `backend/api/index.js`, which serves the compiled Nest app): this is how the live site runs.
+  Set `DATABASE_URL` to a Postgres connection string (the live site uses Neon). Vercel runs several copies of the function at once, and
+  with the default SQLite file each copy has its own database, so accounts and datasets go missing between requests. Also set
+  `JWT_SECRET`, `AI_SERVICE_URL`, `AI_SERVICE_TOKEN`, `CORS_ORIGINS` (the frontend's address), and optionally `FIREBASE_PROJECT_ID` and
+  `OPENROUTER_API_KEY`. `maxDuration` is 30 seconds and the region is pinned next to the database (`sin1`). Vercel's request body limit
+  (about 4.5 MB) applies before the gateway's own 6 MB limit on `ingest/apply-mapping`, so very large CSV activations fail there.
+- **AI service** (`ai-service/vercel.json`): Vercel's zero-config FastAPI detection, same region. Its per-user data is held in memory;
+  the gateway restores it from the database when a request lands on a copy that does not have it.
 
 ## Before you expose it publicly
 
 1. Set `JWT_SECRET` and `AI_SERVICE_TOKEN`.
 2. **There are no built-in accounts** (the old public demo logins were removed). Sign-up is open to anyone who can reach the frontend, by
    Google or by email and password; there is no invite list or approval step yet, no email verification or password reset for email
-   accounts, and no rate limiting on sign-in (backlog). See `docs/AUTHENTICATION.md`.
-3. CORS is `*` on both services. Tighten it if the frontend has a fixed origin.
-4. Rate limiting covers questions only (30 per minute per user). Uploads are limited to 2 MB, 5,000 rows and 60 columns.
+   accounts. Five wrong passwords for one address pause sign-in for that address for 15 minutes (per server copy). See `docs/AUTHENTICATION.md`.
+3. Set `CORS_ORIGINS` on the gateway to the frontend's address (unset allows every origin). The ai-service is called only by the gateway and is protected by `AI_SERVICE_TOKEN`.
+4. Rate limiting covers questions (30 per minute per user), the assistant (15 per minute per user) and wrong passwords. Uploads are limited to 2 MB, 5,000 rows and 60 columns.
 5. Nothing secret reaches the browser: the only public setting is `VITE_API_URL`.
 
 ## What was verified, and what was not

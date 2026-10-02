@@ -1,4 +1,10 @@
-import { Body, Controller, INestApplication, Module, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  INestApplication,
+  Module,
+  Post,
+} from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AddressInfo } from 'net';
 import { configureBodyLimits } from './body-limits';
@@ -13,7 +19,10 @@ class EchoController {
 
   @Post('decisions/query')
   query(@Body() body: any) {
-    return { received: body?.records?.length ?? -1, question: body?.question ?? null };
+    return {
+      received: body?.records?.length ?? -1,
+      question: body?.question ?? null,
+    };
   }
 }
 
@@ -21,7 +30,10 @@ class EchoController {
 class EchoModule {}
 
 const records = (count: number) =>
-  Array.from({ length: count }, (_, i) => ({ company_name: `Customer ${i}`, notes: 'x'.repeat(300) }));
+  Array.from({ length: count }, (_, i) => ({
+    company_name: `Customer ${i}`,
+    notes: 'x'.repeat(300),
+  }));
 
 describe('request body limits (real Nest bootstrap)', () => {
   let app: INestApplication;
@@ -34,13 +46,19 @@ describe('request body limits (real Nest bootstrap)', () => {
     await app.listen(0, '127.0.0.1');
     url = `http://127.0.0.1:${(app.getHttpServer().address() as AddressInfo).port}/api/decision-forge`;
   });
-  afterAll(async () => { await app.close(); });
+  afterAll(async () => {
+    await app.close();
+  });
 
   const post = (path: string, body: any) =>
-    fetch(`${url}/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    fetch(`${url}/${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
   it('accepts a multi-thousand-row upload on apply-mapping (this was a 413 before)', async () => {
-    const body = { records: records(3000) };                        // ~1 MB of JSON
+    const body = { records: records(3000) }; // ~1 MB of JSON
     expect(JSON.stringify(body).length).toBeGreaterThan(900_000);
     const res = await post('ingest/apply-mapping', body);
     expect(res.status).toBe(201);
@@ -48,11 +66,15 @@ describe('request body limits (real Nest bootstrap)', () => {
   });
 
   it('still rejects bodies over the scoped limit', async () => {
-    expect((await post('ingest/apply-mapping', { records: records(25000) })).status).toBe(413);   // ~8 MB
+    expect(
+      (await post('ingest/apply-mapping', { records: records(25000) })).status,
+    ).toBe(413); // ~8 MB
   });
 
   it('keeps the small default limit on every other route', async () => {
-    expect((await post('decisions/query', { records: records(1000) })).status).toBe(413);          // ~330 KB
+    expect(
+      (await post('decisions/query', { records: records(1000) })).status,
+    ).toBe(413); // ~330 KB
   });
 
   it('REGRESSION: every other route still receives its parsed JSON body', async () => {

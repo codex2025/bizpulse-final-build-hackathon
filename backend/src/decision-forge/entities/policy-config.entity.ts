@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('decision_policy_configs')
 export class DecisionPolicyConfig {
@@ -17,16 +23,16 @@ export class DecisionPolicyConfig {
   @Column({ name: 'deal_value_weight', type: 'float', default: 0.25 })
   dealValueWeight: number;
 
-  @Column({ name: 'win_probability_weight', type: 'float', default: 0.20 })
+  @Column({ name: 'win_probability_weight', type: 'float', default: 0.2 })
   winProbabilityWeight: number;
 
-  @Column({ name: 'engagement_weight', type: 'float', default: 0.20 })
+  @Column({ name: 'engagement_weight', type: 'float', default: 0.2 })
   engagementWeight: number;
 
   @Column({ name: 'recency_weight', type: 'float', default: 0.15 })
   recencyWeight: number;
 
-  @Column({ name: 'intent_external_weight', type: 'float', default: 0.20 })
+  @Column({ name: 'intent_external_weight', type: 'float', default: 0.2 })
   intentExternalWeight: number;
 
   @Column({ name: 'high_priority_threshold', type: 'float', default: 75.0 })

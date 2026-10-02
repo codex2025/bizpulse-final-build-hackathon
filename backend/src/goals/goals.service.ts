@@ -20,7 +20,9 @@ export class GoalsService {
   }
 
   async findOne(id: string, userId: string) {
-    const goal = await this.goalRepo.findOne({ where: { id, user_id: userId } });
+    const goal = await this.goalRepo.findOne({
+      where: { id, user_id: userId },
+    });
     if (!goal) throw new NotFoundException('Goal not found');
     return goal;
   }
@@ -32,9 +34,15 @@ export class GoalsService {
 
   async contribute(id: string, userId: string, amount: number) {
     const goal = await this.findOne(id, userId);
-    const newAmount = Math.min(goal.target_amount, goal.current_amount + amount);
+    const newAmount = Math.min(
+      goal.target_amount,
+      goal.current_amount + amount,
+    );
     const status = newAmount >= goal.target_amount ? 'completed' : 'active';
-    await this.goalRepo.update({ id, user_id: userId }, { current_amount: newAmount, status });
+    await this.goalRepo.update(
+      { id, user_id: userId },
+      { current_amount: newAmount, status },
+    );
     return this.findOne(id, userId);
   }
 
@@ -55,7 +63,8 @@ export class GoalsService {
       completed: completed.length,
       totalTargeted,
       totalSaved,
-      overallProgress: totalTargeted > 0 ? Math.round((totalSaved / totalTargeted) * 100) : 0,
+      overallProgress:
+        totalTargeted > 0 ? Math.round((totalSaved / totalTargeted) * 100) : 0,
       goals,
     };
   }

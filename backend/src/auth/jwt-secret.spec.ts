@@ -1,5 +1,10 @@
 import { randomBytes } from 'crypto';
-import { MIN_SECRET_LENGTH, isStrongSecret, resetDevelopmentSecret, resolveJwtSecret } from './jwt-secret';
+import {
+  MIN_SECRET_LENGTH,
+  isStrongSecret,
+  resetDevelopmentSecret,
+  resolveJwtSecret,
+} from './jwt-secret';
 
 const STRONG = 'k'.repeat(MIN_SECRET_LENGTH) + '-a-real-random-value';
 
@@ -14,12 +19,16 @@ describe('isStrongSecret', () => {
   });
 
   it.each([
-    [undefined], [''], ['   '], ['short'], ['x'.repeat(MIN_SECRET_LENGTH - 1)],
-    ['fallback_secret'],                                   // the value that used to be hard-coded
-    ['super_secret_jwt_key_bizpulse_2026'],                // the value in .env.example: public, so useless as a key
+    [undefined],
+    [''],
+    ['   '],
+    ['short'],
+    ['x'.repeat(MIN_SECRET_LENGTH - 1)],
+    ['fallback_secret'], // the value that used to be hard-coded
+    ['super_secret_jwt_key_bizpulse_2026'], // the value in .env.example: public, so useless as a key
     ['SUPER_SECRET_JWT_KEY_BIZPULSE_2026'],
     ['  super_secret_jwt_key_bizpulse_2026  '],
-    ['your_super_secret_jwt_key_here'],                    // the placeholder in backend/.env.example, copied unchanged
+    ['your_super_secret_jwt_key_here'], // the placeholder in backend/.env.example, copied unchanged
     ['please_change_me_to_something_random_and_long'],
     ['a-very-long-value-that-still-says-example-secret-key'],
     ['replace-this-with-a-random-value-of-32-plus-chars'],
@@ -34,10 +43,18 @@ describe('resolveJwtSecret', () => {
     expect(resolveJwtSecret(STRONG, 'development')).toBe(STRONG);
   });
 
-  it.each([[undefined], [''], ['fallback_secret'], ['super_secret_jwt_key_bizpulse_2026'], ['too-short']])(
+  it.each([
+    [undefined],
+    [''],
+    ['fallback_secret'],
+    ['super_secret_jwt_key_bizpulse_2026'],
+    ['too-short'],
+  ])(
     'REFUSES to start in production with %p (it used to fall back silently to a public string)',
     (value) => {
-      expect(() => resolveJwtSecret(value as any, 'production')).toThrow(/JWT_SECRET must be set/);
+      expect(() => resolveJwtSecret(value as any, 'production')).toThrow(
+        /JWT_SECRET must be set/,
+      );
     },
   );
 
@@ -49,7 +66,9 @@ describe('resolveJwtSecret', () => {
   });
 
   it('gives the auth module and the JWT strategy the SAME development secret (tokens must verify)', () => {
-    expect(resolveJwtSecret(undefined, 'development')).toBe(resolveJwtSecret('fallback_secret', 'test'));
+    expect(resolveJwtSecret(undefined, 'development')).toBe(
+      resolveJwtSecret('fallback_secret', 'test'),
+    );
   });
 
   it('does not repeat across processes: a fresh start gets a different secret', () => {

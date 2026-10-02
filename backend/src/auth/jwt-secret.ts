@@ -18,7 +18,8 @@ const KNOWN_WEAK = new Set([
 ]);
 
 /** Anything that reads like a placeholder someone forgot to replace ("your_...", "change_me", "..._here"). */
-const PLACEHOLDER_LIKE = /your[_-]|change[_-]?me|replace|placeholder|example|_here$/i;
+const PLACEHOLDER_LIKE =
+  /your[_-]|change[_-]?me|replace|placeholder|example|_here$/i;
 
 export const MIN_SECRET_LENGTH = 32;
 
@@ -26,7 +27,11 @@ let developmentSecret: string | undefined;
 
 export function isStrongSecret(value?: string): boolean {
   const secret = (value || '').trim();
-  return secret.length >= MIN_SECRET_LENGTH && !KNOWN_WEAK.has(secret.toLowerCase()) && !PLACEHOLDER_LIKE.test(secret);
+  return (
+    secret.length >= MIN_SECRET_LENGTH &&
+    !KNOWN_WEAK.has(secret.toLowerCase()) &&
+    !PLACEHOLDER_LIKE.test(secret)
+  );
 }
 
 /**
@@ -40,12 +45,15 @@ export function isStrongSecret(value?: string): boolean {
  *
  * The auth module and the JWT strategy both call this, and get the same value.
  */
-export function resolveJwtSecret(raw: string | undefined, nodeEnv: string | undefined = process.env.NODE_ENV): string {
+export function resolveJwtSecret(
+  raw: string | undefined,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): string {
   if (isStrongSecret(raw)) return (raw as string).trim();
   if (nodeEnv === 'production') {
     throw new Error(
       `JWT_SECRET must be set to a random value of at least ${MIN_SECRET_LENGTH} characters (not a placeholder) ` +
-        'when NODE_ENV=production. Generate one with: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"',
+        "when NODE_ENV=production. Generate one with: node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",
     );
   }
   if (!developmentSecret) {

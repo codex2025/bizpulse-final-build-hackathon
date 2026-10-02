@@ -958,7 +958,7 @@ export const ContractsPage: React.FC = () => {
             <select
               value={activeId || ''}
               onChange={(e) => setActiveId(e.target.value)}
-              className="text-sm font-bold text-slate-900 bg-transparent focus:outline-none cursor-pointer pr-4 hover:text-cobalt-600 transition-colors"
+              className="text-sm font-bold text-slate-900 bg-transparent focus:outline-none cursor-pointer py-1 pr-4 hover:text-cobalt-600 transition-colors"
             >
               {contracts.length === 0 ? (
                 <option value="">No contracts analyzed yet</option>

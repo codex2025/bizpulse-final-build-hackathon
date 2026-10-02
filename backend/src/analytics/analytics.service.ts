@@ -52,7 +52,8 @@ export class AnalyticsService {
     @InjectRepository(Invoice) private invoiceRepo: Repository<Invoice>,
     @InjectRepository(Expense) private expenseRepo: Repository<Expense>,
     @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(HealthScoreSnapshot) private snapshotRepo: Repository<HealthScoreSnapshot>,
+    @InjectRepository(HealthScoreSnapshot)
+    private snapshotRepo: Repository<HealthScoreSnapshot>,
   ) {}
 
   /**
@@ -65,44 +66,70 @@ export class AnalyticsService {
     const currentMonthStr = targetMonth || new Date().toISOString().slice(0, 7);
 
     // 1. Current Month Invoices
-    const paidInvoices = await this.invoiceRepo.find({ where: { user_id: userId, status: 'paid' } });
+    const paidInvoices = await this.invoiceRepo.find({
+      where: { user_id: userId, status: 'paid' },
+    });
     const currentMonthInvoices = paidInvoices.filter((inv) =>
       inv.issue_date?.toString().startsWith(currentMonthStr),
     );
     const currentMonthInvoiceRev = currentMonthInvoices.reduce(
-      (sum, inv) => sum + Number(inv.total_amount || 0), 0,
+      (sum, inv) => sum + Number(inv.total_amount || 0),
+      0,
     );
 
-    const pendingInvoices = await this.invoiceRepo.find({ where: { user_id: userId, status: 'pending' } });
-    const overdueInvoices = await this.invoiceRepo.find({ where: { user_id: userId, status: 'overdue' } });
-    const pendingAmount = pendingInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
-    const overdueAmount = overdueInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
+    const pendingInvoices = await this.invoiceRepo.find({
+      where: { user_id: userId, status: 'pending' },
+    });
+    const overdueInvoices = await this.invoiceRepo.find({
+      where: { user_id: userId, status: 'overdue' },
+    });
+    const pendingAmount = pendingInvoices.reduce(
+      (sum, inv) => sum + Number(inv.total_amount || 0),
+      0,
+    );
+    const overdueAmount = overdueInvoices.reduce(
+      (sum, inv) => sum + Number(inv.total_amount || 0),
+      0,
+    );
 
     // 2. Month-Scoped Expenses (data is never reset — filtered by month)
-    const allExpenses = await this.expenseRepo.find({ where: { user_id: userId } });
+    const allExpenses = await this.expenseRepo.find({
+      where: { user_id: userId },
+    });
     const currentMonthExpensesList = allExpenses.filter((exp) =>
       exp.expense_date?.toString().startsWith(currentMonthStr),
     );
     const currentMonthExpenseTotal = currentMonthExpensesList.reduce(
-      (sum, exp) => sum + Number(exp.amount || 0), 0,
+      (sum, exp) => sum + Number(exp.amount || 0),
+      0,
     );
 
     // 3. Persona-Adjusted Revenue
     let totalRevenue = 0;
-    let totalExpenses = currentMonthExpenseTotal;
+    const totalExpenses = currentMonthExpenseTotal;
 
     if (persona === 'employee' || persona === 'personal') {
-      totalRevenue = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
+      totalRevenue =
+        user?.monthly_income && user.monthly_income > 0
+          ? user.monthly_income
+          : 0;
     } else if (persona === 'self_employed') {
-      const baseline = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
-      totalRevenue = currentMonthInvoiceRev > 0 ? currentMonthInvoiceRev : baseline;
+      const baseline =
+        user?.monthly_income && user.monthly_income > 0
+          ? user.monthly_income
+          : 0;
+      totalRevenue =
+        currentMonthInvoiceRev > 0 ? currentMonthInvoiceRev : baseline;
     } else {
-      const baseline = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
-      totalRevenue = currentMonthInvoiceRev > 0 ? currentMonthInvoiceRev : baseline;
+      const baseline =
+        user?.monthly_income && user.monthly_income > 0
+          ? user.monthly_income
+          : 0;
+      totalRevenue =
+        currentMonthInvoiceRev > 0 ? currentMonthInvoiceRev : baseline;
     }
 
     const netProfit = totalRevenue - totalExpenses;
-    const cashFlow = await this.getCashFlow(userId);
 
     // 4. Compute persona-weighted health assessment
     const assessment = this.computeDetailedHealthAssessment(
@@ -115,7 +142,12 @@ export class AnalyticsService {
     );
 
     // An account with no income, expenses or invoices has nothing to score: say so instead of grading zeros.
-    if (totalRevenue === 0 && totalExpenses === 0 && pendingAmount === 0 && overdueAmount === 0) {
+    if (
+      totalRevenue === 0 &&
+      totalExpenses === 0 &&
+      pendingAmount === 0 &&
+      overdueAmount === 0
+    ) {
       return {
         currentMonth: currentMonthStr,
         totalRevenue: 0,
@@ -151,7 +183,14 @@ export class AnalyticsService {
     }
 
     // 7. Actionable insights
-    const insights = await this.getActionableInsights(userId, persona, totalRevenue, totalExpenses, currentMonthExpensesList, overdueAmount);
+    const insights = await this.getActionableInsights(
+      userId,
+      persona,
+      totalRevenue,
+      totalExpenses,
+      currentMonthExpensesList,
+      overdueAmount,
+    );
 
     return {
       currentMonth: currentMonthStr,
@@ -168,9 +207,19 @@ export class AnalyticsService {
       persona,
       insights: [
         {
-          title: 'Financial Health Score: ' + assessment.score + '/100 (' + assessment.statusLabel + ')',
+          title:
+            'Financial Health Score: ' +
+            assessment.score +
+            '/100 (' +
+            assessment.statusLabel +
+            ')',
           desc: assessment.biggestOpportunity,
-          type: assessment.score >= 75 ? 'positive' : assessment.score >= 55 ? 'warning' : 'danger',
+          type:
+            assessment.score >= 75
+              ? 'positive'
+              : assessment.score >= 55
+                ? 'warning'
+                : 'danger',
         },
         ...insights.slice(0, 2).map((i) => ({
           title: i.title,
@@ -185,8 +234,14 @@ export class AnalyticsService {
   /**
    * Upsert health score snapshot for a given month.
    */
-  private async upsertSnapshot(userId: string, month: string, assessment: DetailedHealthAssessment) {
-    const existing = await this.snapshotRepo.findOne({ where: { user_id: userId, month } });
+  private async upsertSnapshot(
+    userId: string,
+    month: string,
+    assessment: DetailedHealthAssessment,
+  ) {
+    const existing = await this.snapshotRepo.findOne({
+      where: { user_id: userId, month },
+    });
     const breakdown = {
       p1: assessment.components[0]?.score || 0,
       p2: assessment.components[1]?.score || 0,
@@ -197,9 +252,17 @@ export class AnalyticsService {
       savingsRate: assessment.metrics.savingsRate,
     };
     if (existing) {
-      await this.snapshotRepo.update({ id: existing.id }, { score: assessment.score, breakdown });
+      await this.snapshotRepo.update(
+        { id: existing.id },
+        { score: assessment.score, breakdown },
+      );
     } else {
-      const snap = this.snapshotRepo.create({ user_id: userId, month, score: assessment.score, breakdown });
+      const snap = this.snapshotRepo.create({
+        user_id: userId,
+        month,
+        score: assessment.score,
+        breakdown,
+      });
       await this.snapshotRepo.save(snap);
     }
   }
@@ -218,9 +281,19 @@ export class AnalyticsService {
   ): DetailedHealthAssessment {
     const savings = Math.max(0, income - expenses);
     const savingsRate = income > 0 ? Math.round((savings / income) * 100) : 0;
-    const expenseRatio = income > 0 ? (expenses / income) : (expenses > 0 ? 1 : 0);
+    const expenseRatio = income > 0 ? expenses / income : expenses > 0 ? 1 : 0;
 
-    const essentialCategories = ['rent', 'housing', 'utilities', 'bills', 'groceries', 'office', 'legal', 'emi', 'insurance'];
+    const essentialCategories = [
+      'rent',
+      'housing',
+      'utilities',
+      'bills',
+      'groceries',
+      'office',
+      'legal',
+      'emi',
+      'insurance',
+    ];
     let essentialExpenses = 0;
     let discretionaryExpenses = 0;
 
@@ -238,11 +311,14 @@ export class AnalyticsService {
       discretionaryExpenses = Math.round(expenses * 0.35);
     }
 
-    const discretionaryRatio = expenses > 0 ? (discretionaryExpenses / expenses) : 0.2;
-    const emergencyCushionMonths = essentialExpenses > 0
-      ? parseFloat((savings * 3.5 / essentialExpenses).toFixed(1))
-      : 3.5;
-    const debtToIncomeRatio = income > 0 && totalDebt > 0 ? totalDebt / (income * 12) : 0;
+    const discretionaryRatio =
+      expenses > 0 ? discretionaryExpenses / expenses : 0.2;
+    const emergencyCushionMonths =
+      essentialExpenses > 0
+        ? parseFloat(((savings * 3.5) / essentialExpenses).toFixed(1))
+        : 3.5;
+    const debtToIncomeRatio =
+      income > 0 && totalDebt > 0 ? totalDebt / (income * 12) : 0;
 
     // ============================================================
     // PILLAR CALCULATIONS (now persona-weighted)
@@ -252,8 +328,8 @@ export class AnalyticsService {
     let p1 = 0;
     if (expenseRatio > 1.0) p1 = 5;
     else if (expenseRatio > 0.85) p1 = 12;
-    else if (expenseRatio > 0.70) p1 = 18;
-    else if (expenseRatio > 0.50) p1 = 24;
+    else if (expenseRatio > 0.7) p1 = 18;
+    else if (expenseRatio > 0.5) p1 = 24;
     else p1 = 28;
 
     // Pillar 2: Savings Rate
@@ -267,14 +343,14 @@ export class AnalyticsService {
     // Pillar 3: Spending Behavior & Discretionary Control
     let p3 = 0;
     if (discretionaryExpenses > essentialExpenses * 1.5) p3 = 6;
-    else if (discretionaryRatio > 0.50) p3 = 10;
+    else if (discretionaryRatio > 0.5) p3 = 10;
     else if (overdueAmount > 0) p3 = 12;
     else p3 = 18;
 
     // Pillar 4: Essential vs Discretionary Balance
     let p4 = 0;
-    if (discretionaryRatio <= 0.30) p4 = 14;
-    else if (discretionaryRatio <= 0.50) p4 = 10;
+    if (discretionaryRatio <= 0.3) p4 = 14;
+    else if (discretionaryRatio <= 0.5) p4 = 10;
     else p4 = 5;
 
     // Pillar 5: Emergency Cushion
@@ -291,41 +367,82 @@ export class AnalyticsService {
 
     if (persona === 'employee') {
       // Salaried: debt burden matters most; income is stable so weight savings and debt more
-      const debtPenalty = debtToIncomeRatio > 4 ? -10 : debtToIncomeRatio > 2 ? -5 : 0;
-      totalScore = Math.min(100, Math.max(10, p1 + p2 + p3 + p4 + p5 + debtPenalty));
+      const debtPenalty =
+        debtToIncomeRatio > 4 ? -10 : debtToIncomeRatio > 2 ? -5 : 0;
+      totalScore = Math.min(
+        100,
+        Math.max(10, p1 + p2 + p3 + p4 + p5 + debtPenalty),
+      );
     } else if (persona === 'self_employed') {
       // Freelancer: income volatility matters; overdue invoices are especially harmful
-      const overdueImpact = overdueAmount > income * 0.5 ? -8 : overdueAmount > income * 0.2 ? -4 : 0;
+      const overdueImpact =
+        overdueAmount > income * 0.5
+          ? -8
+          : overdueAmount > income * 0.2
+            ? -4
+            : 0;
       const freelancePillar = emergencyCushionMonths >= 3 ? 5 : -5; // bonus runway pillar
-      totalScore = Math.min(100, Math.max(10, p1 + p2 + p3 + p4 + p5 + overdueImpact + freelancePillar));
+      totalScore = Math.min(
+        100,
+        Math.max(10, p1 + p2 + p3 + p4 + p5 + overdueImpact + freelancePillar),
+      );
     } else if (persona === 'business') {
       // Business: overdue/receivables and cash flow consistency are paramount
-      const receivablesPenalty = overdueAmount > income * 0.4 ? -8 : overdueAmount > income * 0.15 ? -4 : 0;
-      const marginBonus = expenseRatio < 0.60 ? 5 : 0;
-      totalScore = Math.min(100, Math.max(10, p1 + p2 + p3 + p4 + p5 + receivablesPenalty + marginBonus));
+      const receivablesPenalty =
+        overdueAmount > income * 0.4
+          ? -8
+          : overdueAmount > income * 0.15
+            ? -4
+            : 0;
+      const marginBonus = expenseRatio < 0.6 ? 5 : 0;
+      totalScore = Math.min(
+        100,
+        Math.max(10, p1 + p2 + p3 + p4 + p5 + receivablesPenalty + marginBonus),
+      );
     } else {
       // Personal: savings discipline dominates
       const savingsBonus = savingsRate >= 30 ? 5 : 0;
-      totalScore = Math.min(100, Math.max(10, p1 + p2 + p3 + p4 + p5 + savingsBonus));
+      totalScore = Math.min(
+        100,
+        Math.max(10, p1 + p2 + p3 + p4 + p5 + savingsBonus),
+      );
     }
 
     let statusLabel = 'Healthy';
     let statusColor: 'emerald' | 'amber' | 'rose' = 'emerald';
-    if (totalScore >= 90) { statusLabel = 'Excellent'; statusColor = 'emerald'; }
-    else if (totalScore >= 75) { statusLabel = 'Healthy'; statusColor = 'emerald'; }
-    else if (totalScore >= 60) { statusLabel = 'Fair'; statusColor = 'amber'; }
-    else if (totalScore >= 40) { statusLabel = 'At Risk'; statusColor = 'amber'; }
-    else { statusLabel = 'Critical'; statusColor = 'rose'; }
+    if (totalScore >= 90) {
+      statusLabel = 'Excellent';
+      statusColor = 'emerald';
+    } else if (totalScore >= 75) {
+      statusLabel = 'Healthy';
+      statusColor = 'emerald';
+    } else if (totalScore >= 60) {
+      statusLabel = 'Fair';
+      statusColor = 'amber';
+    } else if (totalScore >= 40) {
+      statusLabel = 'At Risk';
+      statusColor = 'amber';
+    } else {
+      statusLabel = 'Critical';
+      statusColor = 'rose';
+    }
 
     // Persona-specific pillar names
-    const pillar1Name = persona === 'business' ? 'Revenue vs Operating Costs'
-      : persona === 'self_employed' ? 'Billing vs Freelance Burn'
-      : persona === 'employee' ? 'Salary vs Living Expenses'
-      : 'Income vs Spending';
+    const pillar1Name =
+      persona === 'business'
+        ? 'Revenue vs Operating Costs'
+        : persona === 'self_employed'
+          ? 'Billing vs Freelance Burn'
+          : persona === 'employee'
+            ? 'Salary vs Living Expenses'
+            : 'Income vs Spending';
 
-    const pillar3Name = persona === 'business' ? 'Cash Flow Behavior'
-      : persona === 'self_employed' ? 'Income Volatility Control'
-      : 'Spending Behavior';
+    const pillar3Name =
+      persona === 'business'
+        ? 'Cash Flow Behavior'
+        : persona === 'self_employed'
+          ? 'Income Volatility Control'
+          : 'Spending Behavior';
 
     const components: ScoreComponent[] = [
       {
@@ -349,9 +466,10 @@ export class AnalyticsService {
         score: p3,
         maxScore: 18,
         weight: '18%',
-        description: overdueAmount > 0
-          ? `₹${overdueAmount.toLocaleString('en-IN')} in overdue receivables detected.`
-          : 'Predictable recurring baseline with no overdue items.',
+        description:
+          overdueAmount > 0
+            ? `₹${overdueAmount.toLocaleString('en-IN')} in overdue receivables detected.`
+            : 'Predictable recurring baseline with no overdue items.',
         status: p3 >= 14 ? 'positive' : p3 >= 9 ? 'warning' : 'danger',
       },
       {
@@ -373,22 +491,47 @@ export class AnalyticsService {
     ];
 
     const helpingFactors: string[] = [];
-    if (savingsRate >= 20) helpingFactors.push(`Strong savings rate of ${savingsRate}% exceeds recommended benchmarks.`);
-    if (emergencyCushionMonths >= 3) helpingFactors.push(`Liquid buffer covers ${emergencyCushionMonths} months of essential needs.`);
-    if (expenseRatio < 0.65) helpingFactors.push(`Healthy income surplus with ₹${savings.toLocaleString('en-IN')} net/mo.`);
-    if (helpingFactors.length === 0) helpingFactors.push(`Current savings of ₹${savings.toLocaleString('en-IN')}/mo is a positive foundation.`);
+    if (savingsRate >= 20)
+      helpingFactors.push(
+        `Strong savings rate of ${savingsRate}% exceeds recommended benchmarks.`,
+      );
+    if (emergencyCushionMonths >= 3)
+      helpingFactors.push(
+        `Liquid buffer covers ${emergencyCushionMonths} months of essential needs.`,
+      );
+    if (expenseRatio < 0.65)
+      helpingFactors.push(
+        `Healthy income surplus with ₹${savings.toLocaleString('en-IN')} net/mo.`,
+      );
+    if (helpingFactors.length === 0)
+      helpingFactors.push(
+        `Current savings of ₹${savings.toLocaleString('en-IN')}/mo is a positive foundation.`,
+      );
 
     const hurtingFactors: string[] = [];
-    if (discretionaryRatio > 0.40) hurtingFactors.push(`Non-essential spending is ${(discretionaryRatio * 100).toFixed(0)}% of total outflows — above the 35% healthy threshold.`);
-    if (overdueAmount > 0) hurtingFactors.push(`₹${overdueAmount.toLocaleString('en-IN')} in delayed receivables is impacting cash flow stability.`);
-    if (expenseRatio > 0.80) hurtingFactors.push(`Expense ratio of ${(expenseRatio * 100).toFixed(0)}% leaves a dangerously thin margin.`);
-    if (hurtingFactors.length === 0) hurtingFactors.push('Minor lifestyle inflation creeping — consider quarterly budget reviews.');
+    if (discretionaryRatio > 0.4)
+      hurtingFactors.push(
+        `Non-essential spending is ${(discretionaryRatio * 100).toFixed(0)}% of total outflows — above the 35% healthy threshold.`,
+      );
+    if (overdueAmount > 0)
+      hurtingFactors.push(
+        `₹${overdueAmount.toLocaleString('en-IN')} in delayed receivables is impacting cash flow stability.`,
+      );
+    if (expenseRatio > 0.8)
+      hurtingFactors.push(
+        `Expense ratio of ${(expenseRatio * 100).toFixed(0)}% leaves a dangerously thin margin.`,
+      );
+    if (hurtingFactors.length === 0)
+      hurtingFactors.push(
+        'Minor lifestyle inflation creeping — consider quarterly budget reviews.',
+      );
 
-    const biggestOpportunity = savingsRate < 30
-      ? `Boosting your savings rate from ${savingsRate}% to 30% by cutting ₹${Math.round(income * 0.05).toLocaleString('en-IN')}/mo in discretionary spending could add +7 points to your score.`
-      : overdueAmount > 0
-      ? `Recovering ₹${overdueAmount.toLocaleString('en-IN')} in overdue receivables would improve your cash flow health and add +5 points.`
-      : 'Maintain your current savings discipline and consider allocating your surplus into liquid FD or index funds.';
+    const biggestOpportunity =
+      savingsRate < 30
+        ? `Boosting your savings rate from ${savingsRate}% to 30% by cutting ₹${Math.round(income * 0.05).toLocaleString('en-IN')}/mo in discretionary spending could add +7 points to your score.`
+        : overdueAmount > 0
+          ? `Recovering ₹${overdueAmount.toLocaleString('en-IN')} in overdue receivables would improve your cash flow health and add +5 points.`
+          : 'Maintain your current savings discipline and consider allocating your surplus into liquid FD or index funds.';
 
     // Real snapshots are loaded by caller; default fallback used only in isolation
     const historicalTrend = [
@@ -415,9 +558,13 @@ export class AnalyticsService {
         essentialExpenses,
         discretionaryExpenses,
         emergencyCushionMonths,
-        topCategory: expenseList.length > 0
-          ? expenseList.reduce((a, b) => Number(a.amount) > Number(b.amount) ? a : b, expenseList[0]).category
-          : 'Rent / Workspace',
+        topCategory:
+          expenseList.length > 0
+            ? expenseList.reduce(
+                (a, b) => (Number(a.amount) > Number(b.amount) ? a : b),
+                expenseList[0],
+              ).category
+            : 'Rent / Workspace',
       },
     };
   }
@@ -433,7 +580,9 @@ export class AnalyticsService {
     currentExpenses: Expense[],
     overdueAmount: number,
   ): Promise<ActionableInsight[]> {
-    const allExpenses = await this.expenseRepo.find({ where: { user_id: userId } });
+    const allExpenses = await this.expenseRepo.find({
+      where: { user_id: userId },
+    });
 
     // Build category spending for current month
     const currentCatMap: Record<string, number> = {};
@@ -450,7 +599,10 @@ export class AnalyticsService {
 
     const historicExpenses = allExpenses.filter((e) => {
       const d = e.expense_date?.toString() || '';
-      return d >= threeMonthsAgo.toISOString().slice(0, 10) && !d.startsWith(currentMonthStr);
+      return (
+        d >= threeMonthsAgo.toISOString().slice(0, 10) &&
+        !d.startsWith(currentMonthStr)
+      );
     });
 
     const historicCatMap: Record<string, number[]> = {};
@@ -469,7 +621,9 @@ export class AnalyticsService {
       const monthlyAvg = hist.reduce((s, v) => s + v, 0) / 3;
       if (monthlyAvg > 0 && currentAmt > monthlyAvg * 1.25) {
         const overage = Math.round(currentAmt - monthlyAvg);
-        const pctIncrease = Math.round(((currentAmt - monthlyAvg) / monthlyAvg) * 100);
+        const pctIncrease = Math.round(
+          ((currentAmt - monthlyAvg) / monthlyAvg) * 100,
+        );
         const scoreImpact = pctIncrease > 50 ? 5 : 3;
         insights.push({
           title: `${cat} Spending Spike Detected`,
@@ -496,9 +650,10 @@ export class AnalyticsService {
     }
 
     // 3. Savings rate opportunity
-    const savingsRate = income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
+    const savingsRate =
+      income > 0 ? Math.round(((income - expenses) / income) * 100) : 0;
     if (savingsRate < 20 && income > 0) {
-      const targetSavings = Math.round(income * 0.20);
+      const targetSavings = Math.round(income * 0.2);
       const gap = Math.round(targetSavings - (income - expenses));
       if (gap > 0) {
         insights.push({
@@ -516,7 +671,10 @@ export class AnalyticsService {
     if (persona === 'self_employed') {
       insights.push({
         title: 'Freelance Income Buffer Tip',
-        insight: 'Maintaining a 3-month income buffer in a liquid account shields you from client payment delays. Based on your current income, aim for ₹' + Math.round(income * 3).toLocaleString('en-IN') + ' in your emergency fund.',
+        insight:
+          'Maintaining a 3-month income buffer in a liquid account shields you from client payment delays. Based on your current income, aim for ₹' +
+          Math.round(income * 3).toLocaleString('en-IN') +
+          ' in your emergency fund.',
         potentialSaving: 0,
         scoreImpact: 4,
         priority: 'medium',
@@ -527,7 +685,7 @@ export class AnalyticsService {
         insights.push({
           title: 'High Operating Cost Ratio',
           insight: `Operating costs are ${Math.round((expenses / income) * 100)}% of revenue. Industry-healthy businesses target below 70%. Identify top 2 expense categories for reduction.`,
-          potentialSaving: Math.round(expenses - income * 0.70),
+          potentialSaving: Math.round(expenses - income * 0.7),
           scoreImpact: 7,
           priority: 'high',
           type: 'danger',
@@ -549,19 +707,29 @@ export class AnalyticsService {
   async getForecast(userId: string) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     const persona = user?.persona_type || 'business';
-    const income = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
+    const income =
+      user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
 
     const now = new Date();
     const currentMonthStr = now.toISOString().slice(0, 7);
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysInMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+    ).getDate();
     const dayOfMonth = now.getDate();
     const daysRemaining = daysInMonth - dayOfMonth;
 
-    const allExpenses = await this.expenseRepo.find({ where: { user_id: userId } });
+    const allExpenses = await this.expenseRepo.find({
+      where: { user_id: userId },
+    });
     const currentMonthExpenses = allExpenses.filter((e) =>
       e.expense_date?.toString().startsWith(currentMonthStr),
     );
-    const totalSpentSoFar = currentMonthExpenses.reduce((s, e) => s + Number(e.amount), 0);
+    const totalSpentSoFar = currentMonthExpenses.reduce(
+      (s, e) => s + Number(e.amount),
+      0,
+    );
 
     const dailyBurnRate = dayOfMonth > 0 ? totalSpentSoFar / dayOfMonth : 0;
     const projectedAdditionalSpend = dailyBurnRate * daysRemaining;
@@ -587,7 +755,10 @@ export class AnalyticsService {
     const budgetAlerts = Object.entries(categoryBudgets)
       .map(([cat, budget]) => {
         const currentSpend = categoryMap[cat] || 0;
-        const projectedMonthlySpend = dayOfMonth > 0 ? (currentSpend / dayOfMonth) * daysInMonth : currentSpend;
+        const projectedMonthlySpend =
+          dayOfMonth > 0
+            ? (currentSpend / dayOfMonth) * daysInMonth
+            : currentSpend;
         const projectedOverrun = projectedMonthlySpend - budget;
         return {
           category: cat.charAt(0).toUpperCase() + cat.slice(1),
@@ -602,7 +773,8 @@ export class AnalyticsService {
 
     const overrunAlerts = budgetAlerts.filter((a) => !a.onTrack);
 
-    const forecastConfidence: 'high' | 'medium' | 'low' = dayOfMonth >= 15 ? 'high' : dayOfMonth >= 7 ? 'medium' : 'low';
+    const forecastConfidence: 'high' | 'medium' | 'low' =
+      dayOfMonth >= 15 ? 'high' : dayOfMonth >= 7 ? 'medium' : 'low';
 
     return {
       persona,
@@ -616,20 +788,25 @@ export class AnalyticsService {
       projectedAdditionalSpend: Math.round(projectedAdditionalSpend),
       projectedTotalSpend: Math.round(projectedTotalSpend),
       projectedMonthEndBalance: Math.round(projectedMonthEndBalance),
-      projectedSavingsRate: income > 0 ? Math.round((projectedMonthEndBalance / income) * 100) : 0,
+      projectedSavingsRate:
+        income > 0 ? Math.round((projectedMonthEndBalance / income) * 100) : 0,
       budgetAlerts,
       overrunAlerts,
       forecastConfidence,
-      summary: projectedMonthEndBalance >= 0
-        ? `At your current spending rate, you're projected to have ₹${Math.round(projectedMonthEndBalance).toLocaleString('en-IN')} remaining at month-end.`
-        : `⚠️ At your current rate, you may exceed your income by ₹${Math.round(Math.abs(projectedMonthEndBalance)).toLocaleString('en-IN')} by month-end.`,
+      summary:
+        projectedMonthEndBalance >= 0
+          ? `At your current spending rate, you're projected to have ₹${Math.round(projectedMonthEndBalance).toLocaleString('en-IN')} remaining at month-end.`
+          : `⚠️ At your current rate, you may exceed your income by ₹${Math.round(Math.abs(projectedMonthEndBalance)).toLocaleString('en-IN')} by month-end.`,
     };
   }
 
   /**
    * Multi-Timeframe Visualizations Query
    */
-  async getComprehensiveVisualizations(userId: string, query: { timeframe?: string; startDate?: string; endDate?: string } = {}) {
+  async getComprehensiveVisualizations(
+    userId: string,
+    query: { timeframe?: string; startDate?: string; endDate?: string } = {},
+  ) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     const persona = user?.persona_type || 'business';
 
@@ -663,7 +840,9 @@ export class AnalyticsService {
     const startStr = startDate.toISOString().split('T')[0];
     const endStr = endDate.toISOString().split('T')[0];
 
-    const allExpenses = await this.expenseRepo.find({ where: { user_id: userId } });
+    const allExpenses = await this.expenseRepo.find({
+      where: { user_id: userId },
+    });
     const filteredExpenses = allExpenses.filter((e) => {
       const d = e.expense_date?.toString() || '';
       return d >= startStr && d <= endStr;
@@ -671,46 +850,69 @@ export class AnalyticsService {
 
     const categoryMap: Record<string, number> = {};
     for (const exp of filteredExpenses) {
-      const cat = exp.category ? (exp.category.charAt(0).toUpperCase() + exp.category.slice(1)) : 'Other';
+      const cat = exp.category
+        ? exp.category.charAt(0).toUpperCase() + exp.category.slice(1)
+        : 'Other';
       categoryMap[cat] = (categoryMap[cat] || 0) + Number(exp.amount || 0);
     }
 
-
     const totalSpent = Object.values(categoryMap).reduce((s, v) => s + v, 0);
-    const monthsCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (30 * 24 * 60 * 60 * 1000)));
-    const baselineMonthlyIncome = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
+    const monthsCount = Math.max(
+      1,
+      Math.round(
+        (endDate.getTime() - startDate.getTime()) / (30 * 24 * 60 * 60 * 1000),
+      ),
+    );
+    const baselineMonthlyIncome =
+      user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
     const totalIncome = baselineMonthlyIncome * monthsCount;
 
     const categoryHorizontal = Object.entries(categoryMap)
       .map(([cat, amount]) => {
         let subCategories: Array<{ name: string; amount: number }> = [];
-        if (cat.toLowerCase().includes('food') || cat.toLowerCase().includes('groceries')) {
+        if (
+          cat.toLowerCase().includes('food') ||
+          cat.toLowerCase().includes('groceries')
+        ) {
           subCategories = [
-            { name: 'Supermarket Groceries', amount: Math.round(amount * 0.55) },
-            { name: 'Dining Out & Cafes', amount: Math.round(amount * 0.30) },
+            {
+              name: 'Supermarket Groceries',
+              amount: Math.round(amount * 0.55),
+            },
+            { name: 'Dining Out & Cafes', amount: Math.round(amount * 0.3) },
             { name: 'Online Food Delivery', amount: Math.round(amount * 0.15) },
           ];
-        } else if (cat.toLowerCase().includes('software') || cat.toLowerCase().includes('tools')) {
+        } else if (
+          cat.toLowerCase().includes('software') ||
+          cat.toLowerCase().includes('tools')
+        ) {
           subCategories = [
-            { name: 'Cloud Infrastructure', amount: Math.round(amount * 0.50) },
-            { name: 'Productivity & Design', amount: Math.round(amount * 0.30) },
-            { name: 'AI API Credits', amount: Math.round(amount * 0.20) },
+            { name: 'Cloud Infrastructure', amount: Math.round(amount * 0.5) },
+            { name: 'Productivity & Design', amount: Math.round(amount * 0.3) },
+            { name: 'AI API Credits', amount: Math.round(amount * 0.2) },
           ];
-        } else if (cat.toLowerCase().includes('rent') || cat.toLowerCase().includes('housing')) {
+        } else if (
+          cat.toLowerCase().includes('rent') ||
+          cat.toLowerCase().includes('housing')
+        ) {
           subCategories = [
             { name: 'Base Lease / Rent', amount: Math.round(amount * 0.85) },
-            { name: 'Maintenance & Facility', amount: Math.round(amount * 0.15) },
+            {
+              name: 'Maintenance & Facility',
+              amount: Math.round(amount * 0.15),
+            },
           ];
         } else {
           subCategories = [
-            { name: 'Regular Dispatches', amount: Math.round(amount * 0.70) },
-            { name: 'Incidental / Misc', amount: Math.round(amount * 0.30) },
+            { name: 'Regular Dispatches', amount: Math.round(amount * 0.7) },
+            { name: 'Incidental / Misc', amount: Math.round(amount * 0.3) },
           ];
         }
         return {
           category: cat,
           amount,
-          percentage: totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0,
+          percentage:
+            totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0,
           subCategories,
         };
       })
@@ -725,27 +927,68 @@ export class AnalyticsService {
     let spendingOverTime: any[] = [];
     if (timeframe === '1m') {
       spendingOverTime = [
-        { period: 'Week 1', spending: Math.round(totalSpent * 0.22), budgetLimit: Math.round(totalIncome * 0.25 / 1.5) },
-        { period: 'Week 2', spending: Math.round(totalSpent * 0.28), budgetLimit: Math.round(totalIncome * 0.25 / 1.5) },
-        { period: 'Week 3', spending: Math.round(totalSpent * 0.32), budgetLimit: Math.round(totalIncome * 0.25 / 1.5), isHigh: true },
-        { period: 'Week 4', spending: Math.round(totalSpent * 0.18), budgetLimit: Math.round(totalIncome * 0.25 / 1.5) },
+        {
+          period: 'Week 1',
+          spending: Math.round(totalSpent * 0.22),
+          budgetLimit: Math.round((totalIncome * 0.25) / 1.5),
+        },
+        {
+          period: 'Week 2',
+          spending: Math.round(totalSpent * 0.28),
+          budgetLimit: Math.round((totalIncome * 0.25) / 1.5),
+        },
+        {
+          period: 'Week 3',
+          spending: Math.round(totalSpent * 0.32),
+          budgetLimit: Math.round((totalIncome * 0.25) / 1.5),
+          isHigh: true,
+        },
+        {
+          period: 'Week 4',
+          spending: Math.round(totalSpent * 0.18),
+          budgetLimit: Math.round((totalIncome * 0.25) / 1.5),
+        },
       ];
     } else {
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      spendingOverTime = Array.from({ length: Math.min(12, monthsCount) }, (_, i) => {
-        const d = new Date();
-        d.setMonth(now.getMonth() - (monthsCount - 1 - i));
-        const mName = monthNames[d.getMonth()] + ' ' + d.getFullYear().toString().slice(2);
-        return {
-          period: mName,
-          spending: Math.round(totalSpent / monthsCount * (0.9 + (i % 3) * 0.1)),
-          budgetLimit: Math.round(baselineMonthlyIncome * 0.65),
-        };
-      });
+      const monthNames = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      spendingOverTime = Array.from(
+        { length: Math.min(12, monthsCount) },
+        (_, i) => {
+          const d = new Date();
+          d.setMonth(now.getMonth() - (monthsCount - 1 - i));
+          const mName =
+            monthNames[d.getMonth()] +
+            ' ' +
+            d.getFullYear().toString().slice(2);
+          return {
+            period: mName,
+            spending: Math.round(
+              (totalSpent / monthsCount) * (0.9 + (i % 3) * 0.1),
+            ),
+            budgetLimit: Math.round(baselineMonthlyIncome * 0.65),
+          };
+        },
+      );
     }
 
     const budgetVsActual = categoryHorizontal.slice(0, 6).map((cat, idx) => {
-      const targetBudget = idx % 2 === 0 ? Math.round(cat.amount * 1.2) : Math.round(cat.amount * 0.85);
+      const targetBudget =
+        idx % 2 === 0
+          ? Math.round(cat.amount * 1.2)
+          : Math.round(cat.amount * 0.85);
       const isOver = cat.amount > targetBudget;
       const variance = Math.abs(cat.amount - targetBudget);
       return {
@@ -754,14 +997,37 @@ export class AnalyticsService {
         budget: targetBudget,
         isOver,
         variance,
-        statusText: isOver ? `₹${variance.toLocaleString('en-IN')} Over` : `₹${variance.toLocaleString('en-IN')} Saved`,
+        statusText: isOver
+          ? `₹${variance.toLocaleString('en-IN')} Over`
+          : `₹${variance.toLocaleString('en-IN')} Saved`,
       };
     });
 
     const categoryMonthlyStacked = [
-      { month: 'Jun', Housing: 18000, Food: 10500, Software: 5500, Transport: 3800, Utilities: 3600 },
-      { month: 'Jul', Housing: 18000, Food: 11200, Software: 6000, Transport: 4200, Utilities: 3900 },
-      { month: 'Aug', Housing: 18000, Food: 12000, Software: 6500, Transport: 4500, Utilities: 4000 },
+      {
+        month: 'Jun',
+        Housing: 18000,
+        Food: 10500,
+        Software: 5500,
+        Transport: 3800,
+        Utilities: 3600,
+      },
+      {
+        month: 'Jul',
+        Housing: 18000,
+        Food: 11200,
+        Software: 6000,
+        Transport: 4200,
+        Utilities: 3900,
+      },
+      {
+        month: 'Aug',
+        Housing: 18000,
+        Food: 12000,
+        Software: 6500,
+        Transport: 4500,
+        Utilities: 4000,
+      },
     ];
 
     const retainedSavings = Math.max(0, totalIncome - totalSpent);
@@ -769,17 +1035,22 @@ export class AnalyticsService {
       grossIncome: totalIncome,
       totalExpenses: totalSpent,
       retainedSavings,
-      savingsPercentage: totalIncome > 0 ? Math.round((retainedSavings / totalIncome) * 100) : 0,
+      savingsPercentage:
+        totalIncome > 0 ? Math.round((retainedSavings / totalIncome) * 100) : 0,
       categories: categoryHorizontal.slice(0, 5),
     };
 
     // Real anomaly detection from actual data
     const currentMonthStr = now.toISOString().slice(0, 7);
-    const currentMonthExpenses = allExpenses.filter((e) => e.expense_date?.toString().startsWith(currentMonthStr));
+    const currentMonthExpenses = allExpenses.filter((e) =>
+      e.expense_date?.toString().startsWith(currentMonthStr),
+    );
     const prevMonthExpenses = allExpenses.filter((e) => {
       const prev = new Date();
       prev.setMonth(now.getMonth() - 1);
-      return e.expense_date?.toString().startsWith(prev.toISOString().slice(0, 7));
+      return e.expense_date
+        ?.toString()
+        .startsWith(prev.toISOString().slice(0, 7));
     });
 
     const prevCatMap: Record<string, number> = {};
@@ -803,7 +1074,11 @@ export class AnalyticsService {
         amount: amt,
         averageAmount: prevCatMap[cat],
         factor: `${(amt / prevCatMap[cat]).toFixed(1)}x`,
-        date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        date: new Date().toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }),
         reason: 'Significantly higher than last month.',
       }))
       .slice(0, 3);
@@ -812,10 +1087,31 @@ export class AnalyticsService {
     const fallbackAnomalies = spendingAnomalies;
 
     const timeOfDay = [
-      { period: 'Morning (6am - 12pm)', amount: Math.round(totalSpent * 0.18), count: 8 * monthsCount, icon: 'sun' },
-      { period: 'Afternoon (12pm - 5pm)', amount: Math.round(totalSpent * 0.28), count: 12 * monthsCount, icon: 'coffee' },
-      { period: 'Evening (5pm - 10pm)', amount: Math.round(totalSpent * 0.44), count: 19 * monthsCount, icon: 'moon', peak: true },
-      { period: 'Night (10pm - 6am)', amount: Math.round(totalSpent * 0.10), count: 4 * monthsCount, icon: 'sparkles' },
+      {
+        period: 'Morning (6am - 12pm)',
+        amount: Math.round(totalSpent * 0.18),
+        count: 8 * monthsCount,
+        icon: 'sun',
+      },
+      {
+        period: 'Afternoon (12pm - 5pm)',
+        amount: Math.round(totalSpent * 0.28),
+        count: 12 * monthsCount,
+        icon: 'coffee',
+      },
+      {
+        period: 'Evening (5pm - 10pm)',
+        amount: Math.round(totalSpent * 0.44),
+        count: 19 * monthsCount,
+        icon: 'moon',
+        peak: true,
+      },
+      {
+        period: 'Night (10pm - 6am)',
+        amount: Math.round(totalSpent * 0.1),
+        count: 4 * monthsCount,
+        icon: 'sparkles',
+      },
     ];
 
     const dailyHeatmap = Array.from({ length: 30 }, (_, i) => {
@@ -867,11 +1163,25 @@ export class AnalyticsService {
     deltaDiscretionaryCut?: number;
     deltaSavingsBoost?: number;
   }) {
-    const adjIncome = (params.currentIncome || 150000) + (params.deltaIncome || 0);
-    const adjExpenses = Math.max(10000, (params.currentExpenses || 45000) - (params.deltaDiscretionaryCut || 0));
+    const adjIncome =
+      (params.currentIncome || 150000) + (params.deltaIncome || 0);
+    const adjExpenses = Math.max(
+      10000,
+      (params.currentExpenses || 45000) - (params.deltaDiscretionaryCut || 0),
+    );
 
-    const baselineAssessment = this.computeDetailedHealthAssessment(params.persona || 'employee', params.currentIncome || 150000, params.currentExpenses || 45000, 0);
-    const projectedAssessment = this.computeDetailedHealthAssessment(params.persona || 'employee', adjIncome, adjExpenses, 0);
+    const baselineAssessment = this.computeDetailedHealthAssessment(
+      params.persona || 'employee',
+      params.currentIncome || 150000,
+      params.currentExpenses || 45000,
+      0,
+    );
+    const projectedAssessment = this.computeDetailedHealthAssessment(
+      params.persona || 'employee',
+      adjIncome,
+      adjExpenses,
+      0,
+    );
 
     const scoreDiff = projectedAssessment.score - baselineAssessment.score;
 
@@ -881,63 +1191,89 @@ export class AnalyticsService {
       scoreDiff,
       projectedSavingsRate: projectedAssessment.metrics.savingsRate,
       projectedMonthlySurplus: projectedAssessment.metrics.monthlySavings,
-      summary: scoreDiff > 0
-        ? `Improving your parameters would boost your Financial Health Score by +${scoreDiff} points (from ${baselineAssessment.score} to ${projectedAssessment.score})!`
-        : `Your projected score remains steady at ${projectedAssessment.score}/100.`,
+      summary:
+        scoreDiff > 0
+          ? `Improving your parameters would boost your Financial Health Score by +${scoreDiff} points (from ${baselineAssessment.score} to ${projectedAssessment.score})!`
+          : `Your projected score remains steady at ${projectedAssessment.score}/100.`,
     };
   }
 
   async getCashFlow(userId: string) {
-    const invoices = await this.invoiceRepo.find({ where: { user_id: userId, status: 'paid' } });
-    const expenses = await this.expenseRepo.find({ where: { user_id: userId } });
+    const invoices = await this.invoiceRepo.find({
+      where: { user_id: userId, status: 'paid' },
+    });
+    const expenses = await this.expenseRepo.find({
+      where: { user_id: userId },
+    });
 
-    const monthlyData: Record<string, { month: string; revenue: number; expenses: number }> = {};
+    const monthlyData: Record<
+      string,
+      { month: string; revenue: number; expenses: number }
+    > = {};
 
     for (const inv of invoices) {
       const key = inv.issue_date?.toString().slice(0, 7);
       if (!key) continue;
-      if (!monthlyData[key]) monthlyData[key] = { month: key, revenue: 0, expenses: 0 };
+      if (!monthlyData[key])
+        monthlyData[key] = { month: key, revenue: 0, expenses: 0 };
       monthlyData[key].revenue += Number(inv.total_amount);
     }
 
     for (const exp of expenses) {
       const key = exp.expense_date?.toString().slice(0, 7);
       if (!key) continue;
-      if (!monthlyData[key]) monthlyData[key] = { month: key, revenue: 0, expenses: 0 };
+      if (!monthlyData[key])
+        monthlyData[key] = { month: key, revenue: 0, expenses: 0 };
       monthlyData[key].expenses += Number(exp.amount);
     }
 
-    return Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
+    return Object.values(monthlyData).sort((a, b) =>
+      a.month.localeCompare(b.month),
+    );
   }
 
   async getExpenseBreakdown(userId: string) {
-    const expenses = await this.expenseRepo.find({ where: { user_id: userId } });
+    const expenses = await this.expenseRepo.find({
+      where: { user_id: userId },
+    });
     const breakdown: Record<string, number> = {};
     for (const exp of expenses) {
-      const cat = exp.category ? (exp.category.charAt(0).toUpperCase() + exp.category.slice(1)) : 'Other';
+      const cat = exp.category
+        ? exp.category.charAt(0).toUpperCase() + exp.category.slice(1)
+        : 'Other';
       breakdown[cat] = (breakdown[cat] || 0) + Number(exp.amount);
     }
-    return Object.entries(breakdown).map(([category, amount]) => ({ category, amount }));
+    return Object.entries(breakdown).map(([category, amount]) => ({
+      category,
+      amount,
+    }));
   }
 
   async getAdvancedMetrics(userId: string) {
-    const invoices = await this.invoiceRepo.find({ where: { user_id: userId, status: 'paid' }, relations: ['client'] });
-    const expenses = await this.expenseRepo.find({ where: { user_id: userId } });
-
+    const invoices = await this.invoiceRepo.find({
+      where: { user_id: userId, status: 'paid' },
+      relations: ['client'],
+    });
     const clientRevenue: Record<string, { name: string; revenue: number }> = {};
     for (const inv of invoices) {
       if (!inv.client) continue;
       const id = inv.client.id;
-      if (!clientRevenue[id]) clientRevenue[id] = { name: inv.client.name, revenue: 0 };
+      if (!clientRevenue[id])
+        clientRevenue[id] = { name: inv.client.name, revenue: 0 };
       clientRevenue[id].revenue += Number(inv.total_amount);
     }
-    const topClients = Object.values(clientRevenue).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+    const topClients = Object.values(clientRevenue)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
 
     const cashFlow = await this.getCashFlow(userId);
     const trends = cashFlow.map((cf) => ({
       ...cf,
       profit: cf.revenue - cf.expenses,
-      margin: cf.revenue > 0 ? Math.round(((cf.revenue - cf.expenses) / cf.revenue) * 100) : 0,
+      margin:
+        cf.revenue > 0
+          ? Math.round(((cf.revenue - cf.expenses) / cf.revenue) * 100)
+          : 0,
     }));
 
     return { topClients, trends };

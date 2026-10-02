@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   HttpException,
+  HttpStatus,
   Inject,
   Injectable,
   Logger,
@@ -14,8 +15,15 @@ import * as bcrypt from 'bcryptjs';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
 import { pickProfileFields } from '../users/profile-fields';
-import { FIREBASE_TOKEN_VERIFIER, FirebaseTokenError } from './firebase-token.verifier';
-import type { FirebaseIdentity, FirebaseTokenVerifier } from './firebase-token.verifier';
+import { LoginThrottle } from './login-throttle';
+import {
+  FIREBASE_TOKEN_VERIFIER,
+  FirebaseTokenError,
+} from './firebase-token.verifier';
+import type {
+  FirebaseIdentity,
+  FirebaseTokenVerifier,
+} from './firebase-token.verifier';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -39,6 +47,7 @@ function isUniqueViolation(err: any): boolean {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private dummyHash?: Promise<string>;
+  private readonly throttle = new LoginThrottle();
 
   constructor(
     private usersService: UsersService,
@@ -50,10 +59,26 @@ export class AuthService {
 
   async login(email: string, pass: string) {
     const normalized = cleanEmail(email);
-    const user = normalized ? await this.usersService.findByEmail(normalized) : null;
+    const wait = normalized ? this.throttle.retryAfterSeconds(normalized) : 0;
+    if (wait > 0) {
+      throw new HttpException(
+        `Too many wrong passwords for this address. Try again in ${Math.ceil(wait / 60)} minutes.`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    const user = normalized
+      ? await this.usersService.findByEmail(normalized)
+      : null;
     // Always run one bcrypt comparison, so an unknown address costs the same as a wrong password.
-    const matches = await bcrypt.compare(typeof pass === 'string' ? pass : '', user?.password || (await this.dummy()));
-    if (!user || !matches) throw new UnauthorizedException('Invalid credentials');
+    const matches = await bcrypt.compare(
+      typeof pass === 'string' ? pass : '',
+      user?.password || (await this.dummy()),
+    );
+    if (!user || !matches) {
+      if (normalized) this.throttle.recordFailure(normalized);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    this.throttle.recordSuccess(user.email);
     return this.session(user);
   }
 
@@ -62,15 +87,20 @@ export class AuthService {
     if (!email) throw new BadRequestException('Enter a valid email address.');
     const password = dto?.password;
     if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
-      throw new BadRequestException(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      throw new BadRequestException(
+        `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      );
     }
     if (password.length > MAX_PASSWORD_LENGTH) {
-      throw new BadRequestException(`Password must be at most ${MAX_PASSWORD_LENGTH} characters.`);
+      throw new BadRequestException(
+        `Password must be at most ${MAX_PASSWORD_LENGTH} characters.`,
+      );
     }
     // Only profile fields are taken from the body: never id, firebase_uid, auth_provider or email_verified.
     const profile = pickProfileFields(dto, { requireName: true });
 
-    if (await this.usersService.findByEmail(email)) throw new ConflictException('Email already exists');
+    if (await this.usersService.findByEmail(email))
+      throw new ConflictException('Email already exists');
     let user: User;
     try {
       user = await this.usersService.create({
@@ -82,7 +112,8 @@ export class AuthService {
         email_verified: false,
       });
     } catch (err) {
-      if (isUniqueViolation(err)) throw new ConflictException('Email already exists');
+      if (isUniqueViolation(err))
+        throw new ConflictException('Email already exists');
       throw err;
     }
     return this.session(user, true);
@@ -98,7 +129,8 @@ export class AuthService {
    */
   async googleAuth(dto: any) {
     const idToken = typeof dto?.idToken === 'string' ? dto.idToken.trim() : '';
-    if (!idToken) throw new BadRequestException('A Google sign-in token is required.');
+    if (!idToken)
+      throw new BadRequestException('A Google sign-in token is required.');
     const identity = await this.verifyIdentity(idToken);
     const { user, isNew } = await this.resolveGoogleUser(identity, dto);
     return this.session(user, isNew);
@@ -108,7 +140,9 @@ export class AuthService {
     try {
       const identity = await this.verifier.verify(idToken);
       if (identity.provider !== 'google.com') {
-        this.logger.warn(`Rejected a sign-in that used the "${identity.provider}" provider`);
+        this.logger.warn(
+          `Rejected a sign-in that used the "${identity.provider}" provider`,
+        );
         throw new UnauthorizedException('Only Google sign-in is supported.');
       }
       return identity;
@@ -117,33 +151,60 @@ export class AuthService {
       if (err instanceof FirebaseTokenError) {
         switch (err.failure) {
           case 'not_configured':
-            throw new ServiceUnavailableException('Google sign-in is not configured on this server.');
+            throw new ServiceUnavailableException(
+              'Google sign-in is not configured on this server.',
+            );
           case 'unavailable':
-            throw new ServiceUnavailableException('Google sign-in is temporarily unavailable. Please try again.');
+            throw new ServiceUnavailableException(
+              'Google sign-in is temporarily unavailable. Please try again.',
+            );
           case 'expired':
-            throw new UnauthorizedException('Your Google sign-in expired. Please try again.');
+            throw new UnauthorizedException(
+              'Your Google sign-in expired. Please try again.',
+            );
           case 'email_unverified':
-            throw new UnauthorizedException('Your Google account email address is not verified.');
+            throw new UnauthorizedException(
+              'Your Google account email address is not verified.',
+            );
           default:
             this.logger.warn(`Rejected a Firebase ID token: ${err.message}`);
-            throw new UnauthorizedException('Google sign-in could not be verified. Please try again.');
+            throw new UnauthorizedException(
+              'Google sign-in could not be verified. Please try again.',
+            );
         }
       }
-      this.logger.error(`Unexpected error while verifying a sign-in token: ${(err as Error).message}`);
-      throw new ServiceUnavailableException('Google sign-in is temporarily unavailable. Please try again.');
+      this.logger.error(
+        `Unexpected error while verifying a sign-in token: ${(err as Error).message}`,
+      );
+      throw new ServiceUnavailableException(
+        'Google sign-in is temporarily unavailable. Please try again.',
+      );
     }
   }
 
-  private async resolveGoogleUser(identity: FirebaseIdentity, dto: any, attempt = 0): Promise<{ user: User; isNew: boolean }> {
+  private async resolveGoogleUser(
+    identity: FirebaseIdentity,
+    dto: any,
+    attempt = 0,
+  ): Promise<{ user: User; isNew: boolean }> {
     const byUid = await this.usersService.findByFirebaseUid(identity.uid);
-    if (byUid) return { user: await this.refreshFromIdentity(byUid, identity), isNew: false };
+    if (byUid)
+      return {
+        user: await this.refreshFromIdentity(byUid, identity),
+        isNew: false,
+      };
 
     const byEmail = await this.usersService.findByEmail(identity.email);
     if (byEmail) {
       if (byEmail.firebase_uid && byEmail.firebase_uid !== identity.uid) {
-        throw new ConflictException('This email address is already linked to a different Google account.');
+        throw new ConflictException(
+          'This email address is already linked to a different Google account.',
+        );
       }
-      return { user: await this.linkGoogleIdentity(byEmail, identity), isNew: false };
+      return {
+        user: await this.linkGoogleIdentity(byEmail, identity),
+        isNew: false,
+      };
     }
 
     // The optional choices made during sign-up apply to a NEW account only; a returning person never has them rewritten.
@@ -166,30 +227,46 @@ export class AuthService {
       return { user, isNew: true };
     } catch (err) {
       // Two first sign-ins racing (a double click): the loser finds the winner's row instead of failing.
-      if (isUniqueViolation(err) && attempt === 0) return this.resolveGoogleUser(identity, dto, 1);
+      if (isUniqueViolation(err) && attempt === 0)
+        return this.resolveGoogleUser(identity, dto, 1);
       throw err;
     }
   }
 
   /** An existing account whose email a Google account has just proven ownership of. */
-  private async linkGoogleIdentity(existing: User, identity: FirebaseIdentity): Promise<User> {
-    const patch: Partial<User> = { firebase_uid: identity.uid, auth_provider: 'google', email_verified: true };
-    if (!existing.avatar_url && identity.picture) patch.avatar_url = identity.picture;
-    if (!existing.full_name?.trim() && identity.name) patch.full_name = identity.name;
+  private async linkGoogleIdentity(
+    existing: User,
+    identity: FirebaseIdentity,
+  ): Promise<User> {
+    const patch: Partial<User> = {
+      firebase_uid: identity.uid,
+      auth_provider: 'google',
+      email_verified: true,
+    };
+    if (!existing.avatar_url && identity.picture)
+      patch.avatar_url = identity.picture;
+    if (!existing.full_name?.trim() && identity.name)
+      patch.full_name = identity.name;
     if (existing.auth_provider !== 'google') {
       // This account was created with a password and its email was never verified: someone could have registered a
       // stranger's address in advance. Now that the real owner has proven the address through Google, the old
       // password is retired so it cannot be used to get into the account afterwards.
       patch.password = await this.unusablePasswordHash();
     }
-    this.logger.log(`Linked a Google identity to existing account ${existing.id}`);
+    this.logger.log(
+      `Linked a Google identity to existing account ${existing.id}`,
+    );
     return (await this.usersService.update(existing.id, patch)) ?? existing;
   }
 
   /** A returning Google user: fill in blanks from Google, never overwrite what the person set themselves. */
-  private async refreshFromIdentity(user: User, identity: FirebaseIdentity): Promise<User> {
+  private async refreshFromIdentity(
+    user: User,
+    identity: FirebaseIdentity,
+  ): Promise<User> {
     const patch: Partial<User> = {};
-    if (!user.avatar_url && identity.picture) patch.avatar_url = identity.picture;
+    if (!user.avatar_url && identity.picture)
+      patch.avatar_url = identity.picture;
     if (!user.email_verified) patch.email_verified = true;
     if (!Object.keys(patch).length) return user;
     return (await this.usersService.update(user.id, patch)) ?? user;

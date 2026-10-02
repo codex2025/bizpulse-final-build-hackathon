@@ -17,7 +17,9 @@ export class InvoicesService {
 
   async create(userId: string, dto: any) {
     const subtotal = (dto.items || []).reduce(
-      (sum: number, item: any) => sum + Number(item.quantity) * Number(item.unit_price), 0
+      (sum: number, item: any) =>
+        sum + Number(item.quantity) * Number(item.unit_price),
+      0,
     );
     const gst_rate = dto.gst_rate ?? 18;
     const gst_amount = subtotal * (gst_rate / 100);
@@ -56,7 +58,10 @@ export class InvoicesService {
   }
 
   findOne(id: string, userId: string) {
-    return this.repo.findOne({ where: { id, user_id: userId }, relations: ['client', 'items'] });
+    return this.repo.findOne({
+      where: { id, user_id: userId },
+      relations: ['client', 'items'],
+    });
   }
 
   async update(id: string, userId: string, dto: any) {

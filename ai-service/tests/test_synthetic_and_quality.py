@@ -1,8 +1,6 @@
 """Phase 1-2: deterministic synthetic dataset and the data-quality engine / ingestion path."""
 import hashlib
-import io
 import json
-import re
 from datetime import datetime, timezone
 
 import pytest

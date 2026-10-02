@@ -1,7 +1,7 @@
 import os
-import json
+import logging
 import uuid
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 from pydantic import BaseModel
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from app.services.document_parser import DocumentParser
@@ -15,6 +15,8 @@ from app.services.knowledge_base_service import KnowledgeBaseService
 from app.models.simulation_models import SimulationInput
 
 from app.services.translation_service import translation_service, SUPPORTED_LANGUAGES
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 parser = DocumentParser()

@@ -33,24 +33,43 @@ import { AppService } from './app.service';
     // DATABASE_URL (a Postgres connection string) selects a shared database. Serverless hosts run several
     // copies of this gateway at once; with SQLite each copy has its own file, so an account or dataset saved
     // on one copy is missing on the next request. Without DATABASE_URL the local SQLite file below is used.
-    TypeOrmModule.forRoot(process.env.DATABASE_URL ? {
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL) ? false : { rejectUnauthorized: false },
-      extra: { max: 3 },   // few connections per copy: many copies share one database
-      autoLoadEntities: true,
-      synchronize: true,
-    } : {
-      type: 'better-sqlite3',
-      // DATABASE_PATH puts the SQLite file on a persistent volume (for example a mounted disk); without
-      // it, Vercel only has /tmp, which is wiped between cold starts, and `synchronize: true` recreates an EMPTY
-      // schema. Nothing is seeded: there are no built-in accounts, every user signs up (Google or email).
-      // Accounts, runs, approvals, policy and each user's recoverable workspace state live in this one file.
-      database: process.env.DATABASE_PATH || (process.env.VERCEL ? '/tmp/finsight.db' : join(process.cwd(), 'finsight.db')),
-      autoLoadEntities: true,
-      synchronize: true,
-    }),
-    TypeOrmModule.forFeature([User, Client, Invoice, InvoiceItem, Expense, Goal, WealthItem, HealthScoreSnapshot]),
+    TypeOrmModule.forRoot(
+      process.env.DATABASE_URL
+        ? {
+            type: 'postgres',
+            url: process.env.DATABASE_URL,
+            ssl: /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL)
+              ? false
+              : { rejectUnauthorized: false },
+            extra: { max: 3 }, // few connections per copy: many copies share one database
+            autoLoadEntities: true,
+            synchronize: true,
+          }
+        : {
+            type: 'better-sqlite3',
+            // DATABASE_PATH puts the SQLite file on a persistent volume (for example a mounted disk); without
+            // it, Vercel only has /tmp, which is wiped between cold starts, and `synchronize: true` recreates an EMPTY
+            // schema. Nothing is seeded: there are no built-in accounts, every user signs up (Google or email).
+            // Accounts, runs, approvals, policy and each user's recoverable workspace state live in this one file.
+            database:
+              process.env.DATABASE_PATH ||
+              (process.env.VERCEL
+                ? '/tmp/finsight.db'
+                : join(process.cwd(), 'finsight.db')),
+            autoLoadEntities: true,
+            synchronize: true,
+          },
+    ),
+    TypeOrmModule.forFeature([
+      User,
+      Client,
+      Invoice,
+      InvoiceItem,
+      Expense,
+      Goal,
+      WealthItem,
+      HealthScoreSnapshot,
+    ]),
     AuthModule,
     UsersModule,
     InvoicesModule,
@@ -68,4 +87,3 @@ import { AppService } from './app.service';
   providers: [AppService],
 })
 export class AppModule {}
-

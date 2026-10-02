@@ -13,7 +13,10 @@ export class ExpensesService {
   }
 
   findAll(userId: string) {
-    return this.repo.find({ where: { user_id: userId }, order: { expense_date: 'DESC' } });
+    return this.repo.find({
+      where: { user_id: userId },
+      order: { expense_date: 'DESC' },
+    });
   }
 
   findOne(id: string, userId: string) {
@@ -36,14 +39,17 @@ export class ExpensesService {
    * Only 'expense' type records are imported into expenses table.
    */
   async bulkCreate(userId: string, transactions: any[]) {
-    const expenseItems = transactions.filter((t) => t.type === 'expense' || !t.type);
+    const expenseItems = transactions.filter(
+      (t) => t.type === 'expense' || !t.type,
+    );
     const created = expenseItems.map((t) =>
       this.repo.create({
         user_id: userId,
         category: t.category || 'Other',
         description: t.description || t.narration || '',
         amount: Math.abs(Number(t.amount)),
-        expense_date: t.expense_date || t.date || new Date().toISOString().split('T')[0],
+        expense_date:
+          t.expense_date || t.date || new Date().toISOString().split('T')[0],
       }),
     );
     const saved = await this.repo.save(created);

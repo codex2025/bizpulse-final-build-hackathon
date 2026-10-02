@@ -34,11 +34,14 @@ export class AnalyticsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.analyticsService.getComprehensiveVisualizations(req.user.userId, {
-      timeframe,
-      startDate,
-      endDate,
-    });
+    return this.analyticsService.getComprehensiveVisualizations(
+      req.user.userId,
+      {
+        timeframe,
+        startDate,
+        endDate,
+      },
+    );
   }
 
   @Get('what-if')

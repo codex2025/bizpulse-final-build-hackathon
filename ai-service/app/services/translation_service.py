@@ -1,8 +1,7 @@
-import re
 import json
 import logging
 import requests
-from typing import Dict, Any, List
+from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 from app.config import settings
 

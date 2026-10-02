@@ -39,7 +39,7 @@ export const DecisionStream: React.FC = () => {
         {!workspace.isLoading && !workspace.configured && (
           <li className="text-xs text-slate-500 font-medium" data-testid="decision-stream-empty">
             No sales data yet.{' '}
-            <button type="button" onClick={() => navigate('/decision-forge')} className="font-bold text-violet-700 hover:underline cursor-pointer">
+            <button type="button" onClick={() => navigate('/decision-forge')} className="inline-block py-1 font-bold text-violet-700 hover:underline cursor-pointer">
               Add your opportunities in DecisionForge
             </button>{' '}
             to see ranked recommendations here.
