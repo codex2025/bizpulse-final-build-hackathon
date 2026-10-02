@@ -50,7 +50,7 @@ def test_api_returns_no_simulation_for_a_non_loan():
 
 
 def test_loans_still_get_the_loan_analysis():
-    sample = (__import__("pathlib").Path(__file__).resolve().parents[2] / "sample_contract.txt").read_bytes()
+    sample = (__import__("pathlib").Path(__file__).resolve().parents[1] / "test_data" / "sample_contract.txt").read_bytes()
     res = client.post("/analyze/contract", files={"file": ("sample_contract.txt", sample, "text/plain")}, data={"contract_id": "test-loan-still"})
     body = res.json()
     assert res.status_code == 200

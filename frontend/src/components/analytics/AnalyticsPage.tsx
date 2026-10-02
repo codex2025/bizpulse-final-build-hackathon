@@ -14,6 +14,7 @@ import { Topbar } from '../common/Topbar';
 import { AnimatedNumber } from '../common/AnimatedNumber';
 import { analyticsService } from '../../services/analyticsService';
 import { contractService } from '../../services/contractService';
+import { useDecisionWorkspace } from '../../hooks/useDecisionWorkspace';
 import { decisionForgeService } from '../../services/decisionForgeService';
 import { usePersona } from '../../context/PersonaContext';
 import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
@@ -118,9 +119,11 @@ export const AnalyticsPage: React.FC = () => {
       });
   }, [contracts]);
 
+  const decisionWorkspace = useDecisionWorkspace();
   const { data: decisionsData, isLoading: loadingDecisions } = useQuery({
     queryKey: ['decisions-analytics'],
     queryFn: () => decisionForgeService.runDecisions(),
+    enabled: decisionWorkspace.configured,
   });
 
   // Start of the selected window, used by the tabs that read raw ledger rows.
@@ -157,10 +160,11 @@ export const AnalyticsPage: React.FC = () => {
 
   const topClients = advanced?.topClients || [];
   const incomeFlow = visData?.incomeFlow;
-  const grossIncome = incomeFlow?.grossIncome || 220000;
-  const totalExpenses = incomeFlow?.totalExpenses || 45000;
-  const retainedSavings = incomeFlow?.retainedSavings || (grossIncome - totalExpenses);
-  const savingsPct = incomeFlow?.savingsPercentage || Math.round((retainedSavings / grossIncome) * 100);
+  // No stand-in figures: an account with no ledger entries reads zero.
+  const grossIncome = incomeFlow?.grossIncome ?? 0;
+  const totalExpenses = incomeFlow?.totalExpenses ?? 0;
+  const retainedSavings = incomeFlow?.retainedSavings ?? (grossIncome - totalExpenses);
+  const savingsPct = incomeFlow?.savingsPercentage ?? (grossIncome > 0 ? Math.round((retainedSavings / grossIncome) * 100) : 0);
 
   const windowMonths =
     timeframe === 'custom'
@@ -231,7 +235,7 @@ export const AnalyticsPage: React.FC = () => {
               <AnimatedNumber value={totalExpenses} formatFn={(v) => '₹' + Math.round(v).toLocaleString('en-IN')} />
             </span>
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-rose-700 mt-1 font-mono tabular-nums">
-              <span>{Math.round((totalExpenses / grossIncome) * 100)}% of gross revenue</span>
+              <span>{grossIncome > 0 ? `${Math.round((totalExpenses / grossIncome) * 100)}% of gross revenue` : 'No inflow recorded yet'}</span>
             </div>
           </div>
         </motion.div>

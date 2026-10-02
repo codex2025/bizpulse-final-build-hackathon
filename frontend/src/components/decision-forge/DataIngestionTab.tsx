@@ -6,6 +6,8 @@ import type { DatasetKey } from '../../services/decisionForgeService';
 interface DataIngestionTabProps {
   onDatasetUpdated: () => void;
   activeDataset?: string;
+  /** Empty workspace: only the upload flow is shown, nothing about an active dataset. */
+  firstRun?: boolean;
 }
 
 const ISSUE_LABEL: Record<string, string> = {
@@ -71,7 +73,7 @@ interface IngestionQualityReport {
   issue_counts?: Record<string, number>;
 }
 
-export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpdated, activeDataset }) => {
+export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpdated, activeDataset, firstRun = false }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [uploadResult, setUploadResult] = useState<IngestionUploadResult | null>(null);
@@ -91,7 +93,8 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
   };
 
   useEffect(() => {
-    loadCurrentQuality();
+    if (!firstRun) loadCurrentQuality();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,8 +160,8 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
       {/* Upload & Seed Container */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Upload Card */}
-        <div className="md:col-span-2 bg-white/90 backdrop-blur-sm p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
+        <div className={`${firstRun ? 'md:col-span-3' : 'md:col-span-2'} bg-white/90 backdrop-blur-sm p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4`}>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h3 className="text-base font-bold text-slate-900">CRM Data Ingestion & Auto-Mapper</h3>
               <p className="text-xs text-slate-500">
@@ -197,7 +200,7 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
           </div>
 
           {/* Deterministic demo datasets */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
+          {!firstRun && <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
             <span>
               Active dataset: <strong className="text-slate-800">{activeDataset || '—'}</strong>
               {activeDataset && activeDataset !== 'real' ? ' (synthetic)' : ''}
@@ -222,11 +225,11 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
                 Load synthetic 500+ dataset
               </button>
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* Data Quality Scorecard -- reflects the ACTIVE dataset, computed live */}
-        <div className="bg-white/90 backdrop-blur-sm p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+        {!firstRun && <div className="bg-white/90 backdrop-blur-sm p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -282,7 +285,7 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
               ))}
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Validation report for the file just uploaded */}
@@ -311,7 +314,7 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
       )}
 
       {/* Issues in the ACTIVE dataset: shown, never hidden. They lower decision confidence. */}
-      <div className="bg-white/90 rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+      {!firstRun && <div className="bg-white/90 rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h4 className="text-sm font-bold text-slate-900">Data quality issues ({qualityReport?.issues_total ?? issues.length})</h4>
@@ -371,7 +374,7 @@ export const DataIngestionTab: React.FC<DataIngestionTabProps> = ({ onDatasetUpd
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Auto-Mapping Proposal Table -- requires explicit activation before it affects decisions */}
       {uploadResult?.mapping_proposal && (

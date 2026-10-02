@@ -303,3 +303,24 @@ describe('demo reset', () => {
     expect(runs.rows).toHaveLength(1);
   });
 });
+
+describe('empty start: nothing is analysed until the user chooses data', () => {
+  it('a user with no dataset and no runs is not configured, and the summary does not run the engine', async () => {
+    const { svc } = await setup();
+    expect(await svc.getWorkspaceStatus('user-new')).toEqual({ configured: false, datasetKey: null });
+    expect(await svc.getSummary('user-new', 'n@x.com')).toEqual({ hasRun: false, needsData: true });
+    expect(svc.aiCalls).toHaveLength(0);
+  });
+
+  it('loading a dataset configures the workspace; Start Over empties it but keeps the audit log', async () => {
+    const { svc, runs, audit } = await setup();
+    svc.aiResponses['/reset-demo'] = { dataset_key: 'real', snapshot_id: 's1', state_fingerprint: 'fp1', count: 12 };
+    await svc.resetDemoData('user-a', 'a@x.com', 'real');
+    expect(await svc.getWorkspaceStatus('user-a')).toEqual({ configured: true, datasetKey: 'real' });
+
+    expect(await svc.clearWorkspace('user-a', 'a@x.com')).toEqual({ configured: false, datasetKey: null });
+    expect(await svc.getWorkspaceStatus('user-a')).toEqual({ configured: false, datasetKey: null });
+    expect(runs.rows.filter((r: any) => r.userId === 'user-a')).toHaveLength(0);
+    expect(audit.rows.map((r: any) => r.eventType)).toContain('WORKSPACE_CLEARED');
+  });
+});

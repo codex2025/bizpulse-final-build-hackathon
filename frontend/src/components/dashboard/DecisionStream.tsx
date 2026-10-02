@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Radio } from 'lucide-react';
 import { Card, CardTitle, CardDescription } from '../common/Card';
+import { useDecisionWorkspace } from '../../hooks/useDecisionWorkspace';
 import { decisionForgeService } from '../../services/decisionForgeService';
 
 const CLASS_STYLE: Record<string, string> = {
@@ -14,9 +15,11 @@ const CLASS_STYLE: Record<string, string> = {
 /** The latest DecisionForge recommendations with a one-click path to review and approve them. */
 export const DecisionStream: React.FC = () => {
   const navigate = useNavigate();
+  const workspace = useDecisionWorkspace();
   const { data, isError, isLoading } = useQuery({
     queryKey: ['decisions-analytics'],
     queryFn: () => decisionForgeService.runDecisions(),
+    enabled: workspace.configured,
     staleTime: 30_000,
     retry: false,
     refetchInterval: 60_000,
@@ -33,6 +36,15 @@ export const DecisionStream: React.FC = () => {
         <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><Radio size={12} className="animate-pulse" /> Live</span>
       </div>
       <ul className="mt-3 space-y-2">
+        {!workspace.isLoading && !workspace.configured && (
+          <li className="text-xs text-slate-500 font-medium" data-testid="decision-stream-empty">
+            No sales data yet.{' '}
+            <button type="button" onClick={() => navigate('/decision-forge')} className="font-bold text-violet-700 hover:underline cursor-pointer">
+              Add your opportunities in DecisionForge
+            </button>{' '}
+            to see ranked recommendations here.
+          </li>
+        )}
         {isLoading && <li className="text-xs text-slate-400 font-medium">Loading decisions…</li>}
         {isError && <li className="text-xs text-slate-500 font-medium">Decision service is unavailable right now.</li>}
         {top.map((r) => (

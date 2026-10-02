@@ -1,183 +1,319 @@
-# Bizpulse / DecisionForge
+# Bizpulse — an AI Decision Engine for Business Data
 
-AI Build Challenge 2026 — **PS-04 Data / Business Intelligence: AI Decision Engine for Business Data.**
+**Build Fast with AI · AI Build Challenge 2026 · PS-04 Data / Business Intelligence**
 
-Bizpulse is a business workspace (invoicing, expenses, contracts, analytics). Its **DecisionForge AI** module turns
-scattered CRM data into **answers, analytics, evidence-backed decisions, explainable recommendations and human-approved
-actions** for one concrete persona and task:
+Bizpulse answers one question for a B2B sales team: **which deals should we work on first, why, and what should we do about each one?**
+It checks the data, calculates with code, retrieves the notes that support each recommendation, lets you simulate alternatives,
+and waits for a human to approve.
 
-> **B2B sales manager — "Which opportunities should our team prioritize right now, why do they matter, and what should we do?"**
+| | |
+|---|---|
+| **Live app** | https://bizpulse-app-rust.vercel.app |
+| **Scan to open** | <img src="docs/bizpulse-live-qr.png" width="140" alt="QR code for the live app"> |
+| **Source** | https://github.com/codex2025/bizpulse-final-build-hackathon |
 
-## The problem and the approach
+**Contents:** [Project overview](#1-project-overview) · [Try it in 3 minutes](#2-try-it-in-3-minutes) ·
+[How it meets the brief](#3-how-it-meets-the-brief) · [Technologies used](#4-technologies-used) ·
+[Repository layout](#5-repository-layout) · [Setup and installation](#6-setup-and-installation) ·
+[How to run](#7-how-to-run-the-project) · [Your data](#8-your-data-the-csv-format) · [Tests](#9-tests) ·
+[Configuration](#10-configuration) · [Deployment](#11-deployment) · [Limits](#12-limits-stated-plainly)
 
-CRM data is scattered, duplicated and stale, and teams still decide by gut feeling. DecisionForge:
+---
 
-1. **Checks the data first.** Missing, invalid, conflicting, duplicate and stale records are detected and shown — never silently fixed. They lower the decision's confidence.
-2. **Understands the question.** A deterministic intent planner (optionally an LLM constrained to a fixed intent list) maps it to a plan, and only the tools that plan needs are run.
-3. **Calculates with code, not a model.** All arithmetic is in deterministic analytics tools; each result carries its source, snapshot time and formula.
-4. **Retrieves evidence.** Rep notes are chunked, indexed and retrieved with full source references; if nothing is relevant the answer is "Insufficient evidence."
-5. **Decides by a versioned policy.** A configurable weighted score with a visible factor breakdown, a confidence value and warnings.
-6. **Lets you test alternatives.** Decision Twin recomputes on a copy of the data, respects rep capacity, and lists its assumptions. Use the sliders, or just ask: *"What happens if we add two sales reps?"* The numbers are read from your sentence by deterministic code, checked against the Twin's limits (never rounded to something it accepts) and shown as baseline vs scenario.
-7. **Keeps a human in control.** Draft → Review → Approve / Modify / Reject, with a frozen evidence snapshot, and a step-by-step replay of why.
+## 1. Project overview
 
-The LLM is optional and never the source of truth: the whole system works with no API key.
+### The task we were given
 
-## Architecture
+> **PS-04: AI Decision Engine for Business Data.** Build a system that uses **RAG over business data**, **data analytics agents**
+> and **decision-making agents** to turn scattered business data into decisions a person can trust.
+
+### What we built
+
+CRM data is scattered, duplicated and stale, and teams still decide by gut feeling. Bizpulse's **DecisionForge** module takes a list
+of sales opportunities and runs them through seven steps:
+
+1. **Checks the data first.** Missing, invalid, conflicting, duplicate and stale records are found and shown, never silently fixed. They lower the confidence of the decision.
+2. **Understands the question.** A rules-based planner maps a plain-English question to a fixed list of intents and runs only the tools that question needs.
+3. **Calculates with code, not a model.** All arithmetic is in analytics functions. Each result carries its source, snapshot time and formula.
+4. **Retrieves evidence.** Sales notes are chunked, indexed and retrieved with their source record. If nothing relevant exists, the answer is "Insufficient evidence."
+5. **Decides by a versioned policy.** A weighted score with a visible factor breakdown, a confidence value and warnings.
+6. **Simulates alternatives.** The Decision Twin recomputes on a copy of the data. Use the sliders or ask in words: *"What happens if we add two sales reps?"*
+7. **Keeps a human in control.** Draft → Review → Approve / Modify / Reject, with a frozen evidence snapshot and a step-by-step replay of how the decision was made.
+
+**The language model is optional and never the source of truth.** The whole system runs with no API key, no database server and
+no internet access.
+
+Bizpulse also contains invoicing, expenses, contract review, analytics, goals and net-worth pages. They are part of the product,
+but DecisionForge is the submission for this brief.
 
 ```
-React + Vite (5173) --JWT--> NestJS gateway (3001, SQLite) --workspace header--> FastAPI ai-service (8000)
-   Decision Center · Twin · Data Quality · Evidence & Audit     runs, approvals, audit,        planner · analytics · RAG ·
-                                                                policy, replay                 engine · twin · per-user data
+React + Vite  ──JWT──►  NestJS gateway (SQLite)  ──workspace id──►  FastAPI ai-service
+ Get started · Decision Center      runs, approvals, policy,            planner · analytics · RAG ·
+ Decision Twin · Data Quality       audit log, replay,                  decision engine · Decision Twin
+ Evidence & Audit                   sign-in                             (per-user data, in memory)
 ```
 
-Details, status of every component, and known limits: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORGE_ARCHITECTURE.md).
-What was found in the original codebase and what changed: [`docs/CODEBASE_AUDIT.md`](docs/CODEBASE_AUDIT.md).
+---
 
-## Datasets
+## 2. Try it in 3 minutes
 
-| Key | What | Use |
+1. Open the [live app](https://bizpulse-app-rust.vercel.app) and choose **Sign up**. Email and password is enough (8+ characters). A short product tour starts by itself; use **Next** / **Back**, or skip it.
+2. A new account is **empty**. Open **DecisionForge** in the sidebar. The *Start here* screen offers two ways in:
+   - **Download sample CSV**, then upload it. You will see the column matching and the data-quality report before anything is used.
+   - **No file? Use our sample dataset** if you would rather not handle a file. Nothing loads unless you click.
+   - **Start Over** (top right, once data is loaded) returns to the empty start screen.
+3. **Decision Center:** ask *"Which opportunities should we prioritize today?"* and read the ranked list. Open **View Evidence** on the top deal to see the score formula, the factors and the cited notes.
+4. **Decision Twin:** move the sliders (sales reps, contacts per day, minimum deal value), or ask *"What happens if we add two sales reps?"* to compare baseline and scenario.
+5. **Review & Approve** a recommendation, then open **Evidence & Audit → Replay** to see every step that produced it.
+
+The exact numbers to expect at each step: [`docs/DECISIONFORGE_DEMO.md`](docs/DECISIONFORGE_DEMO.md).
+
+> The live gateway keeps its database on the host's temporary disk, so an account can disappear after the host restarts.
+> If a sign-in stops working, sign up again; it takes a few seconds.
+
+---
+
+## 3. How it meets the brief
+
+| The brief asks for | What we built | Where it is in the code |
 |---|---|---|
-| `real` (default) | 12 real companies that publicly announced new plants/expansions, with cited sources. Public facts are marked **SOURCED**; deal value, win probability etc. are our **ESTIMATES**, each with its basis | Credibility: click through to real citations |
-| `synthetic` | 520 generated opportunities, 2,240 activities, 646 notes, 120 customers, 12 reps; fixed seed; planted test cases A–H; fictional names, no URLs or emails | Scale, data-quality handling, evaluation, Decision Twin capacity story |
-| `legacy` | 8 fictional flat records | Fallback |
+| **RAG over business data** | Sales notes are chunked, indexed and retrieved per opportunity with source ids, a relevance floor, and "Insufficient evidence" when nothing fits | `ai-service/app/decision_forge/rag_service.py`, `intent.py` |
+| **Data analytics agents** | Eight analytics tools (pipeline summary, expected value, stale deals, rep capacity and more), chosen by a planner from a fixed intent list; every number comes from code | `ai-service/app/decision_forge/analytics.py`, `planner.py`, `query_pipeline.py` |
+| **Decision-making agents** | A versioned scoring policy combines the metrics, the evidence and the data quality into a ranked recommendation with reasons, confidence and warnings | `ai-service/app/decision_forge/decision_engine.py`, `policies.py`, `schemas.py` |
+| Messy real-world data | Upload a CSV; columns are matched automatically; missing, duplicate, stale and invalid records are reported before the data is used | `ai-service/app/decision_forge/schema_mapper.py`, `quality_engine.py`; `frontend/src/components/decision-forge/GetStarted.tsx`, `DataIngestionTab.tsx` |
+| Explainable results | Evidence pack: score formula, factor breakdown, cited notes, fact / estimate labels | `frontend/src/components/decision-forge/EvidenceDrawer.tsx`, `DecisionCenterTab.tsx` |
+| What-if analysis | Decision Twin: baseline and scenario run through the same model; what-if questions in words are parsed by code and refused if out of range | `ai-service/app/decision_forge/decision_twin.py`, `scenario_parser.py`; `frontend/.../DecisionTwinTab.tsx` |
+| Human in the loop | Approval state machine with ownership checks; nothing is acted on without an explicit approval | `backend/src/decision-forge/decision-forge.service.ts`; `frontend/.../ApprovalModal.tsx` |
+| Audit and replay | Every run, question, approval and dataset change is logged; a run can be replayed step by step | `backend/src/decision-forge/`, `frontend/.../AuditTrailTab.tsx` |
+| Safety | Notes are treated as data, never as instructions; the model cannot query the database or supply a number; each user's data is isolated | `ai-service/app/decision_forge/planner.py` (the model sees only the question), `workspace.py` (per-user data), `security.py` (service token) |
+| Evaluation | 40 scripted cases (25 representative, 15 adversarial) scored for success, grounding, determinism and recovery | `ai-service/evals/`, [`docs/AI_EVALUATION.md`](docs/AI_EVALUATION.md) |
 
-See [`ai-service/data/README-data-provenance.md`](ai-service/data/README-data-provenance.md) (real data methodology and sources) and
-[`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
+Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORGE_ARCHITECTURE.md).
 
-## Run locally
+---
 
-Prerequisites: Python 3.11+ (3.12 tested) and **Node 20.19+ or 22.12+** (24 tested; NestJS 11 and Vite 8 do not run on Node 18). No API key, database server or internet access is required.
+## 4. Technologies used
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS, TanStack Query, React Router, Recharts, Framer Motion |
+| API gateway | NestJS 11 (Node.js, TypeScript), TypeORM, SQLite (`better-sqlite3`), Passport JWT |
+| AI service | Python, FastAPI, Pydantic, Uvicorn; PyMuPDF / pdfplumber / python-docx for contract files |
+| Retrieval (RAG) | In-process index with hashed bag-of-words vectors and a lexical rerank; no external vector database |
+| Language model | Optional. OpenAI (`gpt-4o-mini`) may classify a question into a fixed intent; off by default, rules planner otherwise |
+| Sign-in | Google through Firebase Authentication (ID token verified on the gateway with `jose`), or email and password (`bcryptjs`) |
+| Tests | pytest, Jest + Supertest, Vitest, Playwright |
+| Hosting | Vercel (frontend, gateway and AI service as three projects); `render.yaml` for Render |
+
+---
+
+## 5. Repository layout
+
+```
+.
+├── README.md                  you are here
+├── frontend/                  React app
+│   ├── src/components/
+│   │   ├── decision-forge/    the DecisionForge screens (start screen, Decision Center, Twin, Data Quality, Audit)
+│   │   ├── dashboard/ billing/ expenses/ contracts/ analytics/ goals/ wealth/ settings/
+│   │   ├── auth/ landing/ tour/ common/
+│   ├── src/services/          API clients (decisionForgeService.ts, authService.ts, ...)
+│   └── public/sample-data/    crm_opportunities_sample.csv (the sample file the app offers)
+├── backend/                   NestJS gateway
+│   └── src/
+│       ├── decision-forge/    runs, approvals, policy, audit, replay, workspace recovery
+│       ├── auth/ users/       Google and email sign-in
+│       └── analytics/ invoices/ expenses/ clients/ contracts/ goals/ wealth/
+├── ai-service/                FastAPI service
+│   ├── app/decision_forge/    planner, analytics, RAG, decision engine, Decision Twin, data quality
+│   ├── app/routers/ services/ contract analysis and simulators
+│   ├── data/                  the sample dataset and where every fact in it comes from
+│   ├── tests/                 pytest suite
+│   └── evals/                 the 40-case workflow evaluation
+├── e2e/                       Playwright UI audit and Google sign-in checks
+├── scripts/smoke_demo.py      end-to-end check of a running stack (local or deployed)
+├── docs/                      architecture, data model, evaluation, demo script, deployment, authentication
+└── render.yaml                deployment blueprint for Render
+```
+
+`CLAUDE.md` is the working brief and progress log used while building with an AI coding assistant.
+
+---
+
+## 6. Setup and installation
+
+**You need:** Python 3.11 or newer (3.12 tested) and Node.js 20.19+ or 22.12+ (24 tested). No API key, database server or Docker.
 
 ```bash
-# 1. ai-service  (http://localhost:8000, docs at /docs)
-cd ai-service
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt
-cp .env.example .env                                   # optional
-uvicorn app.main:app --port 8000
-
-# 2. backend gateway  (http://localhost:3001/api)
-cd backend
-npm install
-cp .env.example .env                                   # set JWT_SECRET (and FIREBASE_PROJECT_ID for Google sign-in)
-npm run start:dev                                      # local SQLite file, created EMPTY: no built-in accounts
-
-# 3. frontend  (http://localhost:5173)
-cd frontend
-npm install
-cp .env.example .env                                   # optional: the Firebase web config for Google sign-in
-npm run dev
+git clone https://github.com/codex2025/bizpulse-final-build-hackathon.git
+cd bizpulse-final-build-hackathon
 ```
 
-### Signing in
+**AI service**
 
-There are **no built-in accounts** (the old public `demo@bizpulse.com` / `demo123` login is gone). Open `http://localhost:5173/register` and
-**sign up with Google** (once Firebase is configured, below) or with **email and password** (8+ characters). A new account starts empty;
-DecisionForge loads its own dataset for every user, so the DecisionForge demo works from the first sign-in.
+```bash
+cd ai-service
+python -m venv .venv
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+```
 
-### Google sign-in (Firebase)
+**Gateway**
 
-You need a Firebase project (free plan is enough): enable **Authentication > Sign-in method > Google**, add a **Web app** and copy its config into
-`frontend/.env` (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`) and the same project id
-into `backend/.env` as `FIREBASE_PROJECT_ID`, then restart both servers. `localhost` is an authorised domain by default; add your deployed domain
-under *Authentication > Settings > Authorized domains*. Until the values are set the Google button is shown disabled, with an explanation.
+```bash
+cd backend
+npm install
+cp .env.example .env                 # Windows: copy .env.example .env
+```
 
-Nothing secret is stored on the server: the gateway verifies each Firebase ID token against Google's public keys (signature, project, expiry, verified
-email, Google provider) and answers with its own session. Step-by-step setup, how accounts are created and linked, the threat model, and how to test the
-whole flow **without a Google account** using the Firebase Auth emulator: [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) and [`e2e/README.md`](e2e/README.md).
+Open `backend/.env` and set `JWT_SECRET` to any long random string, so that restarting the gateway does not sign you out.
 
-The repository's `docker-compose.yml` does **not** work as it stands (`ai-service/Dockerfile` is empty and the gateway and frontend
-have no Dockerfile, and it starts a Postgres and a Redis that nothing uses). Use the commands above; fixing Docker is on the backlog.
+**Frontend**
 
-## Environment variables
+```bash
+cd frontend
+npm install
+cp .env.example .env                 # optional: only needed for Google sign-in
+```
+
+Google sign-in is optional. Without the Firebase values the Google button is shown disabled and email sign-up works as normal.
+To turn it on with your own Firebase project, follow [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md).
+
+---
+
+## 7. How to run the project
+
+Start the three services in three terminals, in this order:
+
+```bash
+# Terminal 1: AI service  → http://localhost:8000  (API docs at /docs)
+cd ai-service && python -m uvicorn app.main:app --port 8000
+
+# Terminal 2: gateway     → http://localhost:3001/api
+cd backend && npm run start:dev
+
+# Terminal 3: frontend    → http://localhost:5173
+cd frontend && npm run dev
+```
+
+Then open **http://localhost:5173/register**, create an account, and follow [Try it in 3 minutes](#2-try-it-in-3-minutes).
+
+There are **no built-in accounts**; the database is created empty on first start.
+
+To check that everything is wired together:
+
+```bash
+python scripts/smoke_demo.py         # signs up its own account and walks the whole decision flow over HTTP
+```
+
+---
+
+## 8. Your data: the CSV format
+
+One row per sales opportunity. Column names are matched loosely ("Account", "Amount" and "Rep" also work), and you review the
+matching before the data is used. Limits: 2 MB, 5,000 rows, UTF-8 text.
+
+| Column | What goes in it | Needed |
+|---|---|---|
+| Company Name | Who the deal is with | Core |
+| Deal Value | Amount in USD, for example `340000` | Core |
+| Win Probability | `0.85` or `85%` | Core |
+| Stage | For example `Proposal Review` | Recommended |
+| Last Contact Date | `YYYY-MM-DD`; old dates are flagged as stale | Recommended |
+| Engagement Score | 0 to 100 | Recommended |
+| Owner | Sales rep, used for the capacity calculation | Recommended |
+| Sales Notes | Free text. This is the evidence the engine retrieves and cites | Recommended |
+| Opportunity ID, Contact Name, Industry, Location | Optional detail | Optional |
+
+A file is accepted when the company column and at least three other columns are recognised. A blank cell is reported as
+*missing*; it is never filled in with a guess.
+
+**Sample files**
+
+| File | What it is |
+|---|---|
+| [`frontend/public/sample-data/crm_opportunities_sample.csv`](frontend/public/sample-data/crm_opportunities_sample.csv) | 40 fictional deals in the format above, including a duplicate, a missing probability, a stale deal and an invalid amount, so the data-quality report has something to show. The app's **Download sample CSV** button serves this file. |
+| [`ai-service/data/real_industrial_crm.json`](ai-service/data/real_industrial_crm.json) | The one-click sample dataset: 12 real companies that publicly announced new plants, each fact with its source. Deal value and win probability are our estimates and are labelled as such. Method and sources: [`ai-service/data/README-data-provenance.md`](ai-service/data/README-data-provenance.md). |
+| Synthetic dataset (generated in code) | 520 opportunities with a fixed seed, used for scale, tests and the Decision Twin capacity story. `ai-service/app/decision_forge/synthetic.py` |
+| [`ai-service/test_data/`](ai-service/test_data/) | Sample loan agreements for the Contracts page. |
+
+Data model: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
+
+---
+
+## 9. Tests
+
+```bash
+cd ai-service && python -m pytest tests -q        # 289 tests: analytics, RAG, scoring, Twin, data quality, isolation, injection
+cd ai-service && python evals/run_eval.py         # 40-case workflow evaluation
+cd backend    && npx jest                         # 205 tests: approvals, replay, sign-in, workspace recovery
+cd frontend   && npm test                         # 21 unit tests of the pure logic
+cd frontend   && npx tsc -b && npx vite build     # typecheck and build
+cd e2e        && npx playwright test              # UI audit on desktop and phone sizes (needs the stack running)
+python scripts/smoke_demo.py                      # end-to-end check over HTTP (add --gateway <url>/api for a deployed stack)
+```
+
+Evaluation results on the 40 cases: success 1.00, hallucination 0.00, determinism 1.00, data accuracy 1.00, recovery 1.00.
+Method and per-case detail: [`docs/AI_EVALUATION.md`](docs/AI_EVALUATION.md).
+
+---
+
+## 10. Configuration
+
+Every variable is optional for a local run except `JWT_SECRET` in production.
 
 | Variable | Where | Purpose | Default |
 |---|---|---|---|
-| `AI_SERVICE_URL` | backend | ai-service address: a full URL, or just `host:port` (a missing scheme is read as `http://`) | `http://localhost:8000` |
-| `AI_SERVICE_TOKEN` | backend **and** ai-service | Shared secret; when set, ai-service rejects requests without it | unset (off) |
-| `JWT_SECRET` | backend | Signs session tokens. **Required in production**: the server refuses to start without a strong, non-placeholder value (32+ characters). In development a random key is used when it is empty, so restarts sign everyone out | empty |
-| `FIREBASE_PROJECT_ID` | backend | Firebase project id for Google sign-in (must match `VITE_FIREBASE_PROJECT_ID`). Empty = Google sign-in off, email sign-in still works | empty |
-| `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID` | frontend build | The Firebase web app config (public identifiers, not secrets). Empty = the Google button is disabled | empty |
-| `DATABASE_PATH` | backend | SQLite file for runs, approvals, policy and each user's recoverable workspace state. Put it on a persistent volume in production | `./finsight.db` (`/tmp/finsight.db` on Vercel) |
-| `OPENAI_API_KEY` | ai-service | Enables the optional LLM query planner | unset (rules planner) |
-| `DECISION_PLANNER_MODEL` | ai-service | Planner model | `gpt-4o-mini` |
+| `JWT_SECRET` | backend | Signs session tokens. Production refuses to start without a strong value (32+ characters). In development a random key is used when it is empty | empty |
+| `AI_SERVICE_URL` | backend | Address of the AI service (full URL or `host:port`) | `http://localhost:8000` |
+| `AI_SERVICE_TOKEN` | backend and ai-service | Shared secret between the two services. When set, the AI service rejects requests without it | unset |
+| `DATABASE_PATH` | backend | SQLite file. Put it on a persistent disk in production | `./finsight.db` |
+| `FIREBASE_PROJECT_ID` | backend | Firebase project for Google sign-in. Empty turns Google sign-in off | empty |
 | `VITE_API_URL` | frontend | Gateway address | `http://localhost:3001/api` |
+| `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID` | frontend | Firebase web config (public identifiers, not secrets) | empty |
+| `OPENAI_API_KEY` | ai-service | Turns on the optional language-model question planner | unset |
+| `DECISION_PLANNER_MODEL` | ai-service | Planner model | `gpt-4o-mini` |
 
-## Tests
+---
+
+## 11. Deployment
+
+The live site runs as three Vercel projects: the frontend, the gateway (`backend/vercel.json`) and the AI service
+(`ai-service/vercel.json`). `render.yaml` describes the same stack as two long-running services on Render, which is the better
+fit because the gateway's database then lives on a real disk.
+
+After any deployment, the acceptance check is:
 
 ```bash
-cd ai-service && python -m pytest tests -q        # 284 tests
-cd backend    && npx jest                          # 199 tests (includes 21 that boot the whole gateway over HTTP)
-cd frontend   && npx tsc -b && npx vite build      # typecheck + build (no UI test suite yet)
-cd ai-service && python evals/run_eval.py          # workflow evaluation (40 cases, per-metric report)
-python scripts/smoke_demo.py                       # HTTP walk of the demo against a running stack, local or deployed (34 checks; 36 with --ai --ai-token)
-cd e2e && node google-signin.emulator.js           # Google sign-in in a real browser via the Firebase Auth emulator (see e2e/README.md)
+python scripts/smoke_demo.py --gateway https://<your-gateway>/api
 ```
 
-Coverage highlights: data quality and ingestion (valid/invalid/oversized/binary uploads, duplicates, stale, missing),
-deterministic analytics, RAG (relevance floor, no cross-record citation, outage), scoring and policy versioning,
-missing-data penalty and confidence, Decision Twin (no mutation, capacity limits, correct delta), what-if questions in words
-(extraction table, bounds never clamped, ambiguity and conflicts, agreement with an independent recomputation, injection),
-the LLM planner (validation, single retry, fallback, injection), tenant isolation (dataset, RAG, fetch state, API, gateway
-ownership), recovery of a user's workspace after an ai-service restart (dataset, uploaded CSV, fetched context), approval state
-machine, replay, prompt injection, demo-reset repeatability, and authentication (real RS256 Firebase-style tokens against every
-rule and known attack, account creation and linking, no seeded accounts, no forged sessions, startup guards; some in a real browser).
-Method and results of the evaluation: [`docs/AI_EVALUATION.md`](docs/AI_EVALUATION.md).
+Settings for each service and the trade-offs: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
-## Demo
+---
 
-A repeatable 3-minute script with the exact numbers to expect: [`docs/DECISIONFORGE_DEMO.md`](docs/DECISIONFORGE_DEMO.md).
+## 12. Limits, stated plainly
 
-## API
+- **Storage on the live site is temporary.** The gateway uses SQLite on the host's temporary disk, so accounts, runs and approvals can be lost when the host restarts, and two server instances do not share data. A persistent disk or Postgres fixes this.
+- **Google sign-in** was verified end to end against the Firebase Auth emulator in a real browser, not with a real Google account on the live site. Email sign-up always works.
+- **Retrieval** uses hashed bag-of-words vectors with a lexical rerank, so it matches on wording rather than meaning.
+- **The language-model planner** was tested only with a fake client; no API key was available. The rules planner is what runs.
+- **What-if questions** understand a fixed set of levers (reps, contacts per day, minimum deal value, follow-up window, priority cutoff). Anything else gets a clear "can't simulate that".
+- **"Fetch fresh context"** reads a cached, cited snapshot, not a live web crawl.
+- **Sign-in hardening** is not done: no email verification, password reset or rate limiting on sign-in.
+- **Not tested:** Python 3.11, Node 20 and 22, macOS and Linux, Docker.
 
-Sign-in (public):
+---
 
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `/api/auth/register` | Email + password sign-up (`email`, `password` 8-72 characters, `full_name`, optional profile fields) |
-| POST | `/api/auth/login` | Email + password sign-in |
-| POST | `/api/auth/google` | Google sign-up **and** sign-in: body `{ "idToken": <Firebase ID token> }` plus optional profile choices for a new account. Identity comes only from the verified token |
+## More documentation
 
-All return `{ access_token, user, is_new_user }`. Everything below needs `Authorization: Bearer <access_token>`.
-
-### DecisionForge (`/api/decision-forge/...`)
-
-| Method | Path | Purpose |
-|---|---|---|
-| POST | `decisions/query` | Question → plan → analytics → RAG → answer (with trace). A what-if ("what if we add two reps?") runs the Decision Twin and returns a `scenario` block with baseline vs scenario |
-| POST | `decide/run` | Ranked recommendations with evidence packs |
-| GET | `decisions`, `decisions/:runId`, `decisions/:runId/evidence` | History, replay, evidence |
-| POST | `recommendations/:id/review \| approve \| modify \| reject` | Human approval state machine |
-| POST | `recommendations/:id/convert-to-client` | Explicit action, only after approval |
-| POST | `twin/simulate` | Decision Twin scenario |
-| GET | `dataset`, `quality`, `datasets`, `summary` | Data, issues, dataset list, dashboard counts |
-| POST | `ingest/file`, `ingest/apply-mapping` | Validate then activate a CSV |
-| POST | `reset-demo` | Reload a dataset; `clearHistory: true` also resets runs/approvals/policy (audit log is kept) |
-| GET/POST | `policy` | Versioned scoring policy |
-| POST | `opportunities/:id/fetch-context` | Optional cited external context (cached snapshot) |
-| GET | `audit`, `approvals` | Audit log and reviews |
-
-## Limits, stated plainly
-
-- Retrieval uses hashed bag-of-words embeddings unless `sentence-transformers` is installed; the LLM planner has been tested with a fake client but not against a real model (no key was available).
-- Datasets and RAG indexes live in the ai-service's memory, but a user's chosen dataset, uploaded CSV and fetched-context choices are saved by the gateway and rebuilt on demand after an ai-service restart (checked by restarting it against the running stack). That recovery is only as durable as the gateway's SQLite file: on a host that wipes the disk (Vercel `/tmp`, Render's free plan) a restart of the gateway itself still resets everything. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
-- What-if questions understand a fixed set of levers (reps, contacts per day, minimum deal value, follow-up window, priority cutoff) in ordinary wording; anything else gets a clear "can't simulate that", not a guess. The Twin's response-window and focus multipliers are stated assumptions, and an answer says when a change comes only from them.
-- "Fetch fresh context" uses a cached, cited snapshot — not a live crawl — and its relevance weight is a modeled value that the UI labels.
-- Estimates in the real dataset are ours, labelled as such; the synthetic dataset is entirely generated.
-- Rate limiting is per user on questions only (none on sign-in); the ai-service token is optional and off by default locally.
-- Sign-in limits: no email verification or password reset for email accounts, sessions cannot be revoked before their 7 days are up, and the token lives in `localStorage`. Google sign-in was verified end to end only against the Firebase Auth **emulator** (fake Google accounts, real browser); a real Google account against your real Firebase project is the one step left for you. See [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md).
-- The finance dashboard (not DecisionForge) assumes a baseline monthly income (₹2,20,000 business, ₹1,50,000 otherwise) for an account that has entered none, so a brand-new account sees revenue figures it never had. Pre-existing; it was hidden while a seeded demo user always had data.
-- Developed and tested on Windows with Python 3.12 and Node 24. A clean install (pinned `requirements-dev.txt`, `npm ci`) of a copy of the working tree was built and tested, and the compiled gateway was run in production mode with the service token enforced. Not exercised: Python 3.11, Node 20/22, macOS/Linux, `docker compose`, the Vercel/Render deployments, mobile layouts, accessibility tooling.
-
-## Deployment
-
-Recommended: two long-running services (the gateway and the ai-service) plus a static frontend. What was verified locally, what still has to
-be confirmed on a real host, the settings each service needs, and the trade-offs of serverless are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
-`python scripts/smoke_demo.py --gateway https://<your-gateway>/api` is the acceptance test after deploying.
-
-## Repository map
-
-`frontend/` React app · `backend/` NestJS gateway · `ai-service/` FastAPI (`app/decision_forge/` is DecisionForge;
-`tests/`, `evals/`) · `e2e/` Google sign-in checks against the Firebase Auth emulator · `scripts/` smoke test · `docs/` audit,
-architecture, data model, evaluation, demo, deployment, authentication · the remaining modules (invoices, expenses, contracts,
-wealth, goals) are the original Bizpulse application and were not changed, apart from the sign-in path (`auth/`, `users/`) and the dashboard greeting.
+| Document | What it covers |
+|---|---|
+| [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORGE_ARCHITECTURE.md) | Components, data flow, status of each part |
+| [`docs/DECISIONFORGE_DEMO.md`](docs/DECISIONFORGE_DEMO.md) | The demo script with expected numbers |
+| [`docs/AI_EVALUATION.md`](docs/AI_EVALUATION.md) | Evaluation method and results |
+| [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) | Entities and datasets |
+| [`docs/AUTHENTICATION.md`](docs/AUTHENTICATION.md) | Sign-in design, Firebase setup, threat model |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Hosting options and settings |
+| [`docs/CODEBASE_AUDIT.md`](docs/CODEBASE_AUDIT.md) | What the original codebase had and what changed |
+| `http://localhost:8000/docs` | Interactive API reference for the AI service (when running locally) |

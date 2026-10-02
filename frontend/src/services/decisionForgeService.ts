@@ -234,6 +234,17 @@ export interface ApprovalItem {
 }
 
 export const decisionForgeService = {
+  /** Has this user chosen data for the engine yet (an upload or an explicitly loaded sample)? */
+  async getWorkspace(): Promise<{ configured: boolean; datasetKey: string | null }> {
+    const res = await api.get('/decision-forge/workspace');
+    return res.data;
+  },
+
+  async clearWorkspace(): Promise<{ configured: boolean; datasetKey: string | null }> {
+    const res = await api.post('/decision-forge/workspace/clear');
+    return res.data;
+  },
+
   async getDataset() {
     const res = await api.get('/decision-forge/dataset');
     return res.data;

@@ -72,7 +72,9 @@ class SchemaMapper:
                     if val is None or str(val).strip() == "":
                         continue
                     try:
-                        clean_num = re.sub(r"[^\d.]", "", str(val))
+                        # Keep a leading minus: a negative amount is an error to report, not something to turn positive.
+                        text = str(val).strip()
+                        clean_num = ("-" if text.startswith("-") else "") + re.sub(r"[^\d.]", "", text)
                         num_val = float(clean_num) if clean_num else 0.0
                         if canonical_field == "win_probability" and num_val > 1.0:
                             num_val = num_val / 100.0  # normalize 85% -> 0.85

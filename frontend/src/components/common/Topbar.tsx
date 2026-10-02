@@ -130,32 +130,8 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
     },
   ];
 
-  const notifications = [
-    {
-      id: '1',
-      title: 'Overdue Invoice #INV-103',
-      desc: 'Acme Corp ($12,500) exceeded 30-day payment term.',
-      time: '15m ago',
-      type: 'danger',
-      link: '/billing',
-    },
-    {
-      id: '2',
-      title: 'Contract Covenant Flagged',
-      desc: 'Late fee penalty (4.5%) in Master Service Agreement.',
-      time: '1h ago',
-      type: 'warning',
-      link: '/contracts',
-    },
-    {
-      id: '3',
-      title: 'DecisionForge Insight',
-      desc: '$45k working capital buffer recommended.',
-      time: '3h ago',
-      type: 'primary',
-      link: '/decision-forge',
-    },
-  ];
+  // No notification feed exists yet, so the list is empty rather than filled with examples.
+  const notifications: Array<{ id: string; title: string; desc: string; time: string; type: string; link: string }> = [];
 
   return (
     <header className="sticky top-0 z-20 flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-slate-200/80 bg-white/98 backdrop-blur-sm select-none">
@@ -300,7 +276,7 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
             className="relative w-8 h-8 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 hover:text-ink-900 transition-colors cursor-pointer"
           >
             <Bell size={14} />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-cobalt-500 rounded-full ring-1 ring-white" />
+            {notifications.length > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-cobalt-500 rounded-full ring-1 ring-white" />}
           </button>
 
           <AnimatePresence>
@@ -315,11 +291,14 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
                 <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100">
                   <span className="text-xs font-bold text-ink-900">Notifications</span>
                   <span className="text-[10px] font-semibold text-cobalt-600 bg-cobalt-50 px-1.5 py-0.5 rounded border border-cobalt-100">
-                    3 new
+                    {notifications.length} new
                   </span>
                 </div>
 
                 <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                  {notifications.length === 0 && (
+                    <p className="p-4 text-xs text-slate-500 text-center">No notifications yet.</p>
+                  )}
                   {notifications.map((item) => (
                     <Link
                       key={item.id}

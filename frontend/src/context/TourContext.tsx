@@ -184,8 +184,9 @@ export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsOpen(false);
     localStorage.setItem(TOUR_STORAGE_KEY, 'completed');
     setHasCompletedTour(true);
-    if (location.pathname !== '/') {
-      navigate('/');
+    // The tour ends where a new user should begin: adding data to the decision engine.
+    if (location.pathname !== '/decision-forge') {
+      navigate('/decision-forge');
     }
   }, [location.pathname, navigate]);
 

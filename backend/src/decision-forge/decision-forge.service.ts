@@ -238,6 +238,28 @@ export class DecisionForgeService {
     return new HttpException(typeof detail === 'string' ? detail : fallback, HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
+  /**
+   * Whether this user has chosen data for the decision engine (an upload or an explicitly loaded
+   * sample). Until then the UI shows a "get started" screen and nothing is analysed for them.
+   */
+  async getWorkspaceStatus(userId: string) {
+    const state = await this.getWorkspaceState(userId);
+    if (state) return { configured: true, datasetKey: state.datasetKey };
+    const runs = await this.runRepo.count({ where: { userId } });
+    return { configured: runs > 0, datasetKey: null };
+  }
+
+  /** Back to an empty start: forgets the chosen data, runs, approvals, query logs and saved policy. The audit log is kept. */
+  async clearWorkspace(userId: string, email: string) {
+    await this.workspaceRepo.delete({ userId });
+    await this.approvalRepo.delete({ userId });
+    await this.queryRepo.delete({ userId });
+    await this.runRepo.delete({ userId });
+    await this.policyRepo.delete({ userId });
+    await this.auditRepo.save({ eventType: 'WORKSPACE_CLEARED', actorId: userId, actorEmail: email, payload: {} });
+    return { configured: false, datasetKey: null };
+  }
+
   async getDataset(userId: string) {
     try {
       return (await this.ai(userId).get('/dataset')).data;
@@ -837,6 +859,8 @@ export class DecisionForgeService {
     const runs = await this.runRepo.find({ where: { userId }, order: { createdAt: 'DESC' }, take: 10 });
     run = runs.find((r) => (r.recommendations || []).length >= (r.recordsAnalyzed || 0) && r.recordsAnalyzed > 0) || null;
     if (!run) {
+      // Nothing is analysed for a user who has not chosen any data yet.
+      if (!(await this.getWorkspaceState(userId))) return { hasRun: false, needsData: true };
       try {
         await this.runDecisionEngine(userId, email);
         run = await this.runRepo.findOne({ where: { userId }, order: { createdAt: 'DESC' } });

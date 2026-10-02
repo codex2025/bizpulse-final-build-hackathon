@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
-SAMPLE = Path(__file__).resolve().parents[2] / "sample_contract.txt"
+SAMPLE = Path(__file__).resolve().parents[1] / "test_data" / "sample_contract.txt"
 
 
 def test_simulation_results_echo_the_terms_they_were_derived_from():

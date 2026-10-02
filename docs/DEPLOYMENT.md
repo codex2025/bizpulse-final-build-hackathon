@@ -66,7 +66,7 @@ better-sqlite3) is required for correctness on serverless.
 5. Run the smoke test:
    `python scripts/smoke_demo.py --gateway https://<gateway>.onrender.com/api --ai https://<ai-service>.onrender.com --ai-token <token>`.
 6. On the free plan both services spin down when idle and take a while to wake; open the app a couple of minutes before a demo and
-   click **Reset Demo Dataset** first. For persistence attach a disk to the gateway and set `DATABASE_PATH` to a path on it.
+   load the sample dataset from the DecisionForge *Start here* screen first. For persistence attach a disk to the gateway and set `DATABASE_PATH` to a path on it.
 
 ## Vercel
 
@@ -109,8 +109,8 @@ better-sqlite3) is required for correctness on serverless.
   (CORS from a real origin).
 - Google sign-in against a **real** Firebase project and a real Google account, and from a deployed origin (it was verified end to end against
   the Firebase Auth emulator only: `docs/AUTHENTICATION.md`).
-- Docker: `ai-service/Dockerfile` is empty, the gateway and frontend have none, and `docker-compose.yml` starts an unused Postgres and Redis and
-  needs env files that do not exist. It cannot work as it stands (Docker Desktop was not running here, so a rewrite could not be tested).
+- Docker: there are no Dockerfiles. The old `docker-compose.yml` and the empty `ai-service/Dockerfile` never worked and were removed;
+  run the three services with the commands in the README.
 - Node 20 and 22, Python 3.11, macOS and Linux.
 
 ## Troubleshooting
@@ -120,5 +120,5 @@ better-sqlite3) is required for correctness on serverless.
 | Gateway returns 503 "The decision service is temporarily unavailable" | ai-service down or still waking; check `AI_SERVICE_URL`; retry |
 | Gateway logs 401 from the ai-service | `AI_SERVICE_TOKEN` differs between the two services |
 | 413 when activating a CSV | request body over the limit (Vercel about 4.5 MB, gateway 6 MB on that route) |
-| Numbers differ from `docs/DECISIONFORGE_DEMO.md` | click **Reset Demo Dataset** (it also restores the default policy) |
+| Numbers differ from `docs/DECISIONFORGE_DEMO.md` | click **Start Over**, then load the dataset again (this also restores the default policy) |
 | After a restart the app still shows the dataset you chose | expected: the workspace was restored; the audit log shows `WORKSPACE_RESTORED` |

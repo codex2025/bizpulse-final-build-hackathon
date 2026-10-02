@@ -23,8 +23,11 @@ import { EvidenceDrawer } from './EvidenceDrawer';
 import { ApprovalModal } from './ApprovalModal';
 import { PolicyModal } from './PolicyModal';
 import { StageStepper, deriveStages } from './StageStepper';
+import { GetStarted } from './GetStarted';
+import { useQueryClient } from '@tanstack/react-query';
+import { useDecisionWorkspace } from '../../hooks/useDecisionWorkspace';
 import { decisionForgeService } from '../../services/decisionForgeService';
-import type { DatasetKey, DecisionRunData, RecommendationItem } from '../../services/decisionForgeService';
+import type { DecisionRunData, RecommendationItem } from '../../services/decisionForgeService';
 import { usePrefersReducedMotion, EASE_FINANCIAL } from '../../utils/motion';
 
 export interface ScoreFlash {
@@ -37,6 +40,8 @@ export const DecisionForgePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const prefersReducedMotion = usePrefersReducedMotion();
+  const queryClient = useQueryClient();
+  const workspace = useDecisionWorkspace();
   const [activeTab, setActiveTab] = useState<'evaluator' | 'center' | 'twin' | 'ingestion' | 'audit'>('evaluator');
   const [decisionData, setDecisionData] = useState<DecisionRunData | null>(null);
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
@@ -78,11 +83,21 @@ export const DecisionForgePage: React.FC = () => {
     }
   };
 
+  // Nothing is analysed until the user has chosen data (an upload or the sample they asked for).
   useEffect(() => {
+    if (!workspace.configured) return;
     fetchDecisions();
     refreshApprovals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [workspace.configured]);
+
+  const refreshEverything = () =>
+    queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('decision') });
+
+  const handleDataReady = async (msg: string) => {
+    await refreshEverything();
+    showNotification(msg);
+  };
 
   // Opening the approval dialog moves the recommendation DRAFT -> REVIEW (best effort).
   const handleOpenApproval = (item: RecommendationItem) => {
@@ -93,22 +108,22 @@ export const DecisionForgePage: React.FC = () => {
       .catch(() => undefined);
   };
 
-  const handleResetDemo = async (dataset: DatasetKey = (decisionData?.dataset_key as DatasetKey) || 'real') => {
-    if (!window.confirm('Reset the demo? This reloads the dataset and clears your decision runs and approvals. The audit log is kept.')) {
+  const handleStartOver = async () => {
+    if (!window.confirm('Start over? This removes your dataset, decision runs and approvals. The audit log is kept.')) {
       return;
     }
     setIsLoading(true);
     try {
-      await decisionForgeService.resetDemoData(dataset, true);
+      await decisionForgeService.clearWorkspace();
       setApprovalStatus({});
       setScoreFlash(null);
-      await fetchDecisions();
-      showNotification(dataset === 'synthetic'
-        ? 'Synthetic B2B dataset (520 opportunities) loaded & analyzed.'
-        : 'Real cited dataset loaded & analyzed.');
+      setDecisionData(null);
+      setSelectedOpportunityId(null);
+      setActiveTab('evaluator');
+      await refreshEverything();
     } catch (err: unknown) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const msg = (err as any)?.message || 'Failed to reset demo dataset';
+      const msg = (err as any)?.message || 'Could not clear the workspace';
       alert(msg);
     } finally {
       setIsLoading(false);
@@ -190,8 +205,10 @@ export const DecisionForgePage: React.FC = () => {
         </div>
       )}
 
+      {!workspace.isLoading && !workspace.configured && <GetStarted onReady={handleDataReady} />}
+
       {/* Flagship Header & Action Bar */}
-      <div
+      {workspace.configured && <div
         data-tour="decision-progression"
         className="relative overflow-hidden bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/90 p-6 shadow-[0_4px_24px_-4px_rgba(16,24,47,0.06)] space-y-5"
       >
@@ -229,13 +246,13 @@ export const DecisionForgePage: React.FC = () => {
               <span>Policy Weights</span>
             </button>
             <button
-              onClick={() => handleResetDemo()}
+              onClick={handleStartOver}
               disabled={isLoading}
               className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer border border-slate-200 shadow-2xs hover:border-slate-300"
-              title="Reset the demo dataset (clears runs and approvals)"
+              title="Remove this dataset, its runs and approvals, and start again with an empty workspace"
             >
               <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-              <span>Reset Demo Dataset</span>
+              <span>Start Over</span>
             </button>
             <button
               onClick={fetchDecisions}
@@ -330,10 +347,10 @@ export const DecisionForgePage: React.FC = () => {
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {/* Tab Panels */}
-      <AnimatePresence mode="wait">
+      {workspace.configured && <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}
           initial={!prefersReducedMotion ? { opacity: 0, y: 4 } : false}
@@ -374,6 +391,7 @@ export const DecisionForgePage: React.FC = () => {
               activeDataset={decisionData?.dataset_key}
               onDatasetUpdated={() => {
                 fetchDecisions();
+                refreshEverything();
                 showNotification('Dataset activated and analyzed.');
               }}
             />
@@ -381,7 +399,7 @@ export const DecisionForgePage: React.FC = () => {
 
           {activeTab === 'audit' && <AuditTrailTab />}
         </motion.div>
-      </AnimatePresence>
+      </AnimatePresence>}
 
       {/* Evidence Side Drawer */}
       <EvidenceDrawer

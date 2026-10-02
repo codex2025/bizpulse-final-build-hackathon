@@ -13,6 +13,9 @@ export class FakeRepo<T extends Record<string, any>> {
     const rows = [...this.rows].reverse().filter((r) => this.matches(r, where)).map((r) => ({ ...r }));
     return take ? rows.slice(0, take) : rows;
   }
+  async count({ where = {} }: { where?: Record<string, any> } = {}) {
+    return this.rows.filter((r) => this.matches(r, where)).length;
+  }
   async save(entity: any) {
     const row = { id: `id-${++this.seq}`, createdAt: new Date(), updatedAt: new Date(), ...entity };
     this.rows.push(row);

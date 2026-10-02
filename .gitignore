@@ -63,3 +63,6 @@ Thumbs.db
 # Playwright output
 e2e/test-results/
 e2e/playwright-report/
+
+# Screenshots from the screen-ratio sweep
+e2e/ratio-shots/

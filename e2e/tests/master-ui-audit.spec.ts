@@ -381,6 +381,45 @@ test.describe('Sample enterprise workspace (opt-in)', () => {
   });
 });
 
+test.describe('DecisionForge first run (no data until the user adds it)', () => {
+  test('TC-15 a new account sees the start screen; uploading the sample CSV leads to ranked decisions', async ({ browser }) => {
+    const fresh = await registerThrowaway('business', false);
+    const ctx = await browser.newContext({ viewport: { width: 1536, height: 730 } });
+    await signIn(ctx, fresh);
+    const page = await ctx.newPage();
+
+    // The dashboard analyses nothing and says where to add data.
+    await open(page, '/');
+    await expect(page.getByTestId('decision-stream-empty')).toBeVisible();
+
+    await open(page, '/decision-forge');
+    const start = page.getByTestId('df-get-started');
+    await expect(start).toBeVisible();
+    await expect(page.getByText(/Evaluating Opportunity/i)).toHaveCount(0);
+    await expect(page.getByTestId('use-sample-dataset')).toBeVisible();
+
+    // The sample file the page offers is the one we upload.
+    const href = await page.getByTestId('download-sample-csv').getAttribute('href');
+    const csv = await (await page.request.get(APP + href)).body();
+    expect(csv.toString('utf8').split('\n')[0]).toContain('Company Name');
+    await start.locator('input[type=file]').first().setInputFiles({ name: 'crm_opportunities_sample.csv', mimeType: 'text/csv', buffer: csv });
+
+    // Problems in the file are reported before anything is used.
+    await expect(page.getByText(/Validation report/i)).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: /Confirm & Activate Dataset/i }).click();
+
+    await expect(start).toBeHidden({ timeout: 60_000 });
+    await expect(page.getByText(/Evaluating Opportunity/i)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('selected-opportunity-score')).toBeVisible();
+
+    // Start over returns to an empty workspace.
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: /Start Over/i }).click();
+    await expect(page.getByTestId('df-get-started')).toBeVisible({ timeout: 30_000 });
+    await ctx.close();
+  });
+});
+
 test.describe('Every screen: geometry and errors', () => {
   for (const route of ROUTES) {
     test(`TC-08 ${route} has no sideways scroll and no console errors`, async ({ page }) => {

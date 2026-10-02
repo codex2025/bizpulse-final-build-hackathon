@@ -22,6 +22,16 @@ const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 export class DecisionForgeController {
   constructor(private readonly dfService: DecisionForgeService) {}
 
+  @Get('workspace')
+  getWorkspace(@Req() req: any) {
+    return this.dfService.getWorkspaceStatus(req.user.userId);
+  }
+
+  @Post('workspace/clear')
+  clearWorkspace(@Req() req: any) {
+    return this.dfService.clearWorkspace(req.user.userId, req.user.email);
+  }
+
   @Get('dataset')
   getDataset(@Req() req: any) {
     return this.dfService.getDataset(req.user.userId);

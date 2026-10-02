@@ -114,6 +114,12 @@ export const ProductTour: React.FC = () => {
       Math.min(computedTop, Math.max(PADDING, viewportHeight - CARD_HEIGHT - PADDING))
     );
 
+    // If the card still has to sit on top of a large target, move it to the right edge so the
+    // target's main (left-aligned) content and buttons stay visible.
+    const coversTarget =
+      computedTop < bottom && computedTop + CARD_HEIGHT > top && computedLeft < right && computedLeft + CARD_WIDTH > left;
+    if (coversTarget) computedLeft = Math.max(PADDING, viewportWidth - CARD_WIDTH - PADDING);
+
     return {
       type: 'positioned' as const,
       style: {
@@ -352,7 +358,7 @@ export const ProductTour: React.FC = () => {
                   onClick={isLastStep ? finishTour : nextStep}
                   rightIcon={isLastStep ? <CheckCircle2 size={12} /> : <ChevronRight size={12} />}
                 >
-                  {isLastStep ? 'Explore Dashboard' : currentStep.primaryActionLabel || 'Next'}
+                  {currentStep.primaryActionLabel || (isLastStep ? 'Finish' : 'Next')}
                 </Button>
               </div>
             </div>

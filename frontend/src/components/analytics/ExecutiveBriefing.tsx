@@ -31,11 +31,16 @@ export const ExecutiveBriefing: React.FC<Props> = ({
   contractEmiPerMonth,
 }) => {
   const outflowRatio = grossIncome > 0 ? Math.round((totalExpenses / grossIncome) * 100) : 0;
+  const empty = grossIncome === 0 && totalExpenses === 0;
   const sentences: string[] = [
-    `Over ${windowLabel}, inflow was ${inr(grossIncome)} against outflows of ${inr(totalExpenses)} (${outflowRatio}% of inflow), leaving ${inr(retainedSavings)} retained (${savingsPct}%).`,
+    empty
+      ? `No invoices or expenses are recorded for ${windowLabel} yet. Add some under Invoicing or Expenses and this briefing will summarise them.`
+      : `Over ${windowLabel}, inflow was ${inr(grossIncome)} against outflows of ${inr(totalExpenses)} (${outflowRatio}% of inflow), leaving ${inr(retainedSavings)} retained (${savingsPct}%).`,
   ];
 
-  if (retainedSavings < 0) sentences.push('Outflows exceed inflows in this window, so cash is being drawn down; review the largest expense categories first.');
+  if (empty) {
+    // nothing to assess
+  } else if (retainedSavings < 0) sentences.push('Outflows exceed inflows in this window, so cash is being drawn down; review the largest expense categories first.');
   else if (outflowRatio >= 80) sentences.push('Outflows take most of the inflow, which leaves a thin buffer for a slow month.');
   else if (savingsPct >= 30) sentences.push('The retained share is healthy; consider whether surplus cash is working (deposits, debt reduction or growth spend).');
 

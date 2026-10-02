@@ -6,7 +6,7 @@ This section records what has actually been built, verified and decided, and wha
 standing target architecture and execution policy. **Where they differ, the repository and this section win.**
 Update this section at the end of every work session (date, commits, test counts, backlog).
 
-- **Last updated:** 2026-10-01 (fourth work session: branch merge + UI blueprint)
+- **Last updated:** 2026-10-02 (sixth work session: empty start for new users, repo cleanup, README as the submission narrative)
 - **Branch / remote:** `praveen` → `hackathon` (`github.com/codex2025/bizpulse-final-build-hackathon`)
 - **Verified at:** committed and pushed to `hackathon/praveen` at the end of the session (`git log --oneline -14`). Baseline `bc2efcf`; after it, session 2 (workspace recovery, what-if in words, CSV body-limit fix, deployment groundwork) and session 3 (sign-in: no seeded accounts, Google sign-in through Firebase, `e2e/`, this file renamed from `CLAUDE(1).md`).
 - **Session 4:** merged the teammate's UI branch (`Shyamalan`: design system, 7-step evaluator, tour, new pages) into `praveen` and pushed the result to `hackathon/main` (owner-authorised, once) and `hackathon/praveen`; conflicts in `AuthPage`, `DashboardPage`, `DecisionForgePage`, `DataIngestionTab`, `AuditTrailTab`, `decisionForgeService` were resolved by keeping the teammate's layout and re-applying this branch's behaviour (Google sign-in without a demo box, dataset switching, approval badges, replay view). Then the UI blueprint work, see "UI blueprint status" below.
@@ -14,13 +14,15 @@ Update this section at the end of every work session (date, commits, test counts
 
 - **Session 5 (2026-10-02):** real Firebase project `build-fast-with-ai-49713` wired into `frontend/.env`, `backend/.env` and the Vercel envs (Google button enabled on the live site; a real Google sign-in is still untried and the Vercel domain must be added to Firebase *Authorized domains*). Screen-ratio sweep `e2e/ratio-sweep.mjs` (9 viewports x 10 routes): fixed truncated metric-card labels, small tap targets, unnamed password toggle. Deployed all three Vercel projects: frontend https://bizpulse-app-rust.vercel.app, gateway https://bizpulse-backend-two.vercel.app/api, ai-service https://bizpulse-ai-service.vercel.app; smoke test 33/33 live. QR code: `docs/bizpulse-live-qr.png`. **Caveat:** gateway SQLite is in `/tmp` per Vercel instance, so email+password accounts can vanish; Google sign-in recreates the account.
 
+- **Session 6 (2026-10-02, submission prep):** a new account now starts **empty everywhere**. DecisionForge opens on a *Start here* screen (`frontend/src/components/decision-forge/GetStarted.tsx`): download the sample CSV (`frontend/public/sample-data/crm_opportunities_sample.csv`, 40 fictional deals with planted quality issues), upload and review it, or click the labelled one-click sample (the real cited dataset). The gateway reports `GET /decision-forge/workspace` (`configured` = a saved workspace state or any run) and `POST /decision-forge/workspace/clear` (**Start Over**, replaces the old Reset Demo Dataset button); `getSummary` no longer runs the engine for a user with no data. `useDecisionWorkspace` gates the dashboard stream, the dashboard dataset query and the analytics decisions query. Removed every invented figure found for an empty account: baseline income, fake spending categories, fake cash-flow months and expense breakdown (`analytics.service.ts`; the health score is `null` with `hasData: false`), the analytics page fallbacks (220000 / 45000), the default contract-obligation and pipeline cards, and the hardcoded Topbar notifications. The CSV normaliser keeps a leading minus, so a negative amount is reported as invalid instead of being turned positive. Mobile: `Layout.tsx` gives every page `min-w-0`; Sidebar/Topbar show the signed-in user (`useCurrentUser`); the tour card is solid white, sized to the screen, rewritten in plain words, starts with DecisionForge and ends on the start screen. Repo cleanup: deleted the stale root guides, the broken Docker files, the setup scripts, the duplicate root `data/` and the boilerplate READMEs; `sample_contract.txt` moved to `ai-service/test_data/`. `README.md` is now the submission narrative (overview, 3-minute path, brief-to-code map, technologies, setup, run, CSV format, tests, limits). E2E helper `registerThrowaway(persona, withSampleData = true)` loads the sample so the audit has data; TC-15 covers the empty start, the CSV upload and Start Over.
+
 ### Verification snapshot (re-run before trusting this file)
 
 | Check | Command (from repo root) | Last result |
 |---|---|---|
 | AI service tests | `cd ai-service && python -m pytest tests -q` | 289 passed |
 | Workflow evaluation | `cd ai-service && python evals/run_eval.py` | 40 cases (25 representative, 15 adversarial; 14 of them what-if): success 1.00, hallucination 0.00, determinism 1.00, data accuracy 1.00, recovery 1.00 |
-| Gateway tests / build | `cd backend && npx jest && npx tsc --noEmit -p tsconfig.json && npx nest build` | 203 passed (9 suites; 21 boot the whole gateway over HTTP with an in-memory database), builds |
+| Gateway tests / build | `cd backend && npx jest && npx tsc --noEmit -p tsconfig.json && npx nest build` | 205 passed (9 suites; 21 boot the whole gateway over HTTP with an in-memory database), builds |
 | Frontend | `cd frontend && npx tsc -b && npx vite build` | typechecks and builds; `npm test` = 21 Vitest unit tests of the pure logic; UI behaviour is covered by the Playwright audit in `e2e/` |
 | HTTP smoke test of the demo | `python scripts/smoke_demo.py [--gateway URL/api --ai URL --ai-token T]` | 34/34 on the dev stack (empty database; it signs up its own account); 36/36 against the compiled gateway in production mode with the service token enforced |
 | Google sign-in, API level (Firebase Auth emulator) | `cd e2e && python google-signin.emulator.api.py` (needs the emulator and an emulator-mode gateway, see `e2e/README.md`) | 20/20 |
@@ -28,7 +30,7 @@ Update this section at the end of every work session (date, commits, test counts
 | Production startup guards | run `node backend/dist/main` with `NODE_ENV=production` and no/placeholder/fallback `JWT_SECRET`, or `FIREBASE_AUTH_EMULATOR_HOST` set | refuses to start in all 4 cases |
 | Restart resilience (kills and restarts the ai-service) | throwaway script, not in the repo | 18/18 on the dev stack and in production mode: chosen dataset, a 600-row upload and fetched context all survive |
 | Clean install | copy of the working tree, fresh venv from the pinned `requirements-dev.txt`, `npm ci` | ai-service 271 tests + the eval pass; gateway 46 tests + build; frontend typecheck + build (Windows, Python 3.12.10, Node 24.18) |
-| UI audit (Playwright Test, desktop 1536x730 + mobile 375x667) | `cd e2e && npx playwright test` (stack up; registers its own throwaway account) | 50 passed, 2 skipped (keyboard-only cases on mobile) |
+| UI audit (Playwright Test, desktop 1536x730 + mobile 375x667) | `cd e2e && npx playwright test` (stack up; registers its own throwaway account) | 52 passed, 2 skipped (keyboard-only cases on mobile) |
 | Gateway health endpoint | `cd backend && npx jest src/app.controller.spec.ts` | 5 passed (part of the 203-test gateway run) |
 | Browser (Chrome, local stack) | manual, script in `docs/DECISIONFORGE_DEMO.md` | main flow clicked through; the what-if card (table, chips, refusal) checked on both datasets; login page (no demo box, Google button state) checked; no console errors |
 
@@ -43,8 +45,8 @@ cd frontend   && npm run dev                                    # http://localho
 **There is no demo login.** Sign up at `http://localhost:5173/register` (Google once Firebase is configured, or email + password). Setup of Google
 sign-in with your own Firebase project: `docs/AUTHENTICATION.md`. `backend/.env` (git-ignored; copy `backend/.env.example`) should hold a `JWT_SECRET`
 so restarts do not sign everyone out, and `FIREBASE_PROJECT_ID`; `frontend/.env` holds the `VITE_FIREBASE_*` web config (restart Vite after editing).
-The exact demo script: `README.md` and `docs/DECISIONFORGE_DEMO.md`. Always click **Reset Demo Dataset** first (it reloads the dataset and clears that
-user's runs, approvals, query logs and saved policy; the audit log is kept).
+The exact demo script: `README.md` and `docs/DECISIONFORGE_DEMO.md`. A new account has no decision data: load the sample from the *Start here* screen.
+**Start Over** clears that user's dataset, runs, approvals, query logs and saved policy; the audit log is kept.
 
 ### What exists (map)
 
@@ -137,13 +139,13 @@ Done and covered by `e2e/tests/master-ui-audit.spec.ts`: split-zone `MetricCard`
 - [ ] **Shared database for serverless.** SQLite in `/tmp` is per function instance on Vercel, so two instances are two databases (approvals made on one are invisible on another). Fine for one viewer on a warm instance, wrong for anything shared. Either deploy the gateway as a long-running service (Render) or move it to Postgres (`pg` is installed; the code uses better-sqlite3).
 - [x] **Natural-language what-if.** Done: `scenario_simulation` intent, `scenario_parser.py`, UI card, 105 tests, eval cases Q18-Q25 and A10-A15 checked against an independent Twin recomputation.
 - [ ] **Evaluate the LLM planner with a real key** on paraphrased questions (including what-if paraphrases the rules do not catch) and record intent accuracy in `docs/AI_EVALUATION.md`. Blocked: needs an API key. LLM-written explanations remain deferred.
-- [ ] **Docker.** `ai-service/Dockerfile` is empty, the gateway and frontend have none, `docker-compose.yml` starts an unused Postgres and Redis and needs env files that do not exist. Write the Dockerfiles, drop the unused services, and test with Docker Desktop running (ask the owner before starting it).
+- [ ] **Docker.** There are no Docker files (the empty `ai-service/Dockerfile` and the broken `docker-compose.yml` were deleted in session 6). Write them only with Docker Desktop running (ask the owner before starting it).
 - [x] Session 2 and 3 committed and pushed to `hackathon/praveen` (only that branch).
 
 **P1 — gaps against this document**
 
 - [ ] **Sign-in hardening:** rate limiting / lockout on `/auth/login` and `/auth/google`; email verification and password reset for email accounts; session revocation or a short-lived token with refresh; consider an HttpOnly cookie instead of `localStorage`; an invite list or approval step if sign-up should not be open to everyone.
-- [ ] **Finance dashboard empty states:** stop inventing a baseline income for accounts with no data (`backend/src/analytics/analytics.service.ts`, lines with `220000` / `150000`), and show honest empty states; then a check that no finance page shows numbers the person never entered.
+- [x] **Finance dashboard empty states:** done in session 6 (see above). Still synthetic when there *is* data: the weekly split and the budget targets in `getVisualizations` are derived by fixed ratios from the real totals.
 - [ ] Conflict detection between CRM fields and recent notes (§10, §17): negative phrases only lower the intent score today; no conflict is surfaced.
 - [ ] Missing close date / missing owner checks (§10); persist data-quality issues with a resolve workflow.
 - [ ] Analytics tools `get_recent_engagement` and `get_data_quality_summary`; intents `CUSTOMER_ANALYSIS` and `DATA_QUALITY` (§11, §18).
@@ -159,7 +161,7 @@ Done and covered by `e2e/tests/master-ui-audit.spec.ts`: split-zone `MetricCard`
 - [x] `.env.example` mismatch (`VITE_API_BASE_URL` vs `VITE_API_URL`) fixed; `DATABASE_PATH` is now honoured by the gateway.
 - [x] Seeded accounts: removed entirely rather than made switchable. (CORS `*` per environment is still open, above.)
 - [ ] More what-if levers (a maximum deal size, a close-date window, per-rep capacity) and a frontend test for the what-if card; scenario paraphrases beyond the parser's table are refused, not guessed.
-- [ ] ESLint `no-explicit-any` debt; XLSX ingestion; remove the legacy duplicate `data/demo_industrial_crm.*` at the repo root; test Python 3.11 and Node 20/22.
+- [ ] ESLint `no-explicit-any` debt; XLSX ingestion; test Python 3.11 and Node 20/22.
 - [ ] Real dataset: some records cite a rolling topic page (`/topic/openings-expansions/`); replace with fixed article URLs when refreshing, and keep `sales_notes` derived only from cited facts.
 
 ### How to continue a session

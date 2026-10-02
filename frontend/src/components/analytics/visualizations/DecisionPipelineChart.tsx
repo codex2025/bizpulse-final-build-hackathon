@@ -13,47 +13,8 @@ interface Props {
   isLoading?: boolean;
 }
 
-const DEFAULT_RECOMMENDATIONS: Partial<RecommendationItem>[] = [
-  {
-    opportunity_id: 'opp-tata-steel',
-    company_name: 'Tata Steel Tubes Division',
-    deal_value: 3800000,
-    win_probability: 0.88,
-    priority_score: 91,
-    decision_class: 'IMMEDIATE_ACTION',
-    suggested_action: 'Fast-track executive sign-off with pre-approved SLA discount',
-  },
-  {
-    opportunity_id: 'opp-lnt-infotech',
-    company_name: 'L&T Technology Services',
-    deal_value: 2900000,
-    win_probability: 0.74,
-    priority_score: 82,
-    decision_class: 'PROCEED_WITH_QUALIFICATION',
-    suggested_action: 'Conduct technical security review and commercial margin test',
-  },
-  {
-    opportunity_id: 'opp-apollo-health',
-    company_name: 'Apollo Health Enterprises',
-    deal_value: 1750000,
-    win_probability: 0.65,
-    priority_score: 73,
-    decision_class: 'PROCEED_WITH_QUALIFICATION',
-    suggested_action: 'Present tiered pricing model and verify compliance covenants',
-  },
-  {
-    opportunity_id: 'opp-reliance-retail',
-    company_name: 'Reliance Digital Logistics',
-    deal_value: 1200000,
-    win_probability: 0.42,
-    priority_score: 48,
-    decision_class: 'NURTURE_MONITOR',
-    suggested_action: 'Keep in automated bi-weekly cadence; re-qualify upon Q3 budget release',
-  },
-];
-
 export const DecisionPipelineChart: React.FC<Props> = ({
-  recommendations = DEFAULT_RECOMMENDATIONS as RecommendationItem[],
+  recommendations = [],
   pipelineTotalValue,
   weightedPipelineValue,
   isLoading = false,
@@ -67,7 +28,18 @@ export const DecisionPipelineChart: React.FC<Props> = ({
     );
   }
 
-  const items = recommendations.length > 0 ? recommendations : (DEFAULT_RECOMMENDATIONS as RecommendationItem[]);
+  if (recommendations.length === 0) {
+    return (
+      <div data-testid="decision-pipeline-empty" className="card p-8 border border-dashed border-slate-300 rounded-3xl bg-white text-center space-y-2">
+        <Target size={22} className="text-slate-400 mx-auto" />
+        <h3 className="text-sm font-extrabold text-slate-900">No sales data yet</h3>
+        <p className="text-xs text-slate-500 max-w-md mx-auto">Ranked opportunities and pipeline value appear here once you add your opportunities.</p>
+        <Link to="/decision-forge" className="inline-block text-xs font-bold text-violet-700 hover:underline">Add data in DecisionForge</Link>
+      </div>
+    );
+  }
+
+  const items = recommendations;
 
   const totalValue = pipelineTotalValue ?? items.reduce((acc, curr) => acc + (curr.deal_value || 0), 0);
   const weightedValue = weightedPipelineValue ?? items.reduce(

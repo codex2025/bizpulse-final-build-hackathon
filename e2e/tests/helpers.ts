@@ -25,7 +25,7 @@ export interface TestSession {
 }
 
 /** Registers a throwaway account through the public API (there are no built-in accounts). */
-export async function registerThrowaway(persona = 'business'): Promise<TestSession> {
+export async function registerThrowaway(persona = 'business', withSampleData = true): Promise<TestSession> {
   const email = `ui-audit-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
   const res = await fetch(`${API}/auth/register`, {
     method: 'POST',
@@ -40,6 +40,15 @@ export async function registerThrowaway(persona = 'business'): Promise<TestSessi
   });
   if (!res.ok) throw new Error(`register failed: ${res.status} ${await res.text()}`);
   const data = (await res.json()) as { access_token: string; user: { persona_type?: string } };
+  // A new account has no decision data; the audit needs some, so load the labelled sample the way the button does.
+  if (withSampleData) {
+    const load = await fetch(`${API}/decision-forge/reset-demo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.access_token}` },
+      body: JSON.stringify({ dataset: 'real' }),
+    });
+    if (!load.ok) throw new Error(`sample dataset failed: ${load.status} ${await load.text()}`);
+  }
   return { token: data.access_token, email, persona: data.user.persona_type || persona };
 }
 

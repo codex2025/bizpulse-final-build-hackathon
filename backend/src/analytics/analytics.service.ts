@@ -114,6 +114,27 @@ export class AnalyticsService {
       user?.monthly_expense || 0,
     );
 
+    // An account with no income, expenses or invoices has nothing to score: say so instead of grading zeros.
+    if (totalRevenue === 0 && totalExpenses === 0 && pendingAmount === 0 && overdueAmount === 0) {
+      return {
+        currentMonth: currentMonthStr,
+        totalRevenue: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        healthScore: null,
+        financialHealthScore: null,
+        healthStatus: null,
+        healthAssessment: null,
+        pendingAmount: 0,
+        overdueAmount: 0,
+        invoiceCount: 0,
+        persona,
+        hasData: false,
+        insights: [],
+        actionableInsights: [],
+      };
+    }
+
     // 5. Persist snapshot for this month (upsert)
     await this.upsertSnapshot(userId, currentMonthStr, assessment);
 
@@ -886,15 +907,6 @@ export class AnalyticsService {
       monthlyData[key].expenses += Number(exp.amount);
     }
 
-    if (Object.keys(monthlyData).length === 0) {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-      return months.map((m, idx) => ({
-        month: `2026-0${idx + 1}`,
-        revenue: 120000 + (idx * 8000),
-        expenses: 40000 + (idx * 2000),
-      }));
-    }
-
     return Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
   }
 
@@ -904,15 +916,6 @@ export class AnalyticsService {
     for (const exp of expenses) {
       const cat = exp.category ? (exp.category.charAt(0).toUpperCase() + exp.category.slice(1)) : 'Other';
       breakdown[cat] = (breakdown[cat] || 0) + Number(exp.amount);
-    }
-    if (Object.keys(breakdown).length === 0) {
-      return [
-        { category: 'Housing & Rent', amount: 18000 },
-        { category: 'Food & Groceries', amount: 12000 },
-        { category: 'SaaS & Software', amount: 6500 },
-        { category: 'Transport & Fuel', amount: 4500 },
-        { category: 'Utilities & Fiber', amount: 4000 },
-      ];
     }
     return Object.entries(breakdown).map(([category, amount]) => ({ category, amount }));
   }

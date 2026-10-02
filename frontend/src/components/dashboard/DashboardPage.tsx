@@ -42,6 +42,7 @@ import { FinancialChartTooltip } from '../common/ChartContainer';
 
 import { analyticsService } from '../../services/analyticsService';
 import { invoiceService, expenseService } from '../../services/invoiceService';
+import { useDecisionWorkspace } from '../../hooks/useDecisionWorkspace';
 import { decisionForgeService } from '../../services/decisionForgeService';
 import { usePersona } from '../../context/PersonaContext';
 import { ForecastWidget } from './ForecastWidget';
@@ -152,9 +153,11 @@ export const DashboardPage: React.FC = () => {
     queryFn: expenseService.getAll,
   });
 
+  const decisionWorkspace = useDecisionWorkspace();
   const { data: decisionDataset } = useQuery({
     queryKey: ['decision-forge-dataset'],
     queryFn: () => decisionForgeService.getDataset().catch(() => null),
+    enabled: decisionWorkspace.configured,
   });
 
   // Calculate formatted cash flow dataset for charts
@@ -816,11 +819,11 @@ export const DashboardPage: React.FC = () => {
                             {opp.company_name || opp.name || `Opportunity #${idx + 1}`}
                           </p>
                           <p className="text-[10.5px] text-slate-400 font-mono tabular-nums">
-                            {fmt(opp.deal_value || 500000)} • Win: {opp.win_probability ? Math.round(opp.win_probability * 100) : 75}%
+                            {opp.deal_value != null ? fmt(opp.deal_value) : '—'} • Win: {opp.win_probability != null ? `${Math.round(opp.win_probability * 100)}%` : '—'}
                           </p>
                         </div>
                         <Badge variant="violet" size="xs">
-                          Score: {opp.priority_score || 82}
+                          Score: {opp.priority_score ?? '—'}
                         </Badge>
                       </div>
                     ))}

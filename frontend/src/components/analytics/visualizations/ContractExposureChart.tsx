@@ -24,54 +24,23 @@ interface Props {
   isLoading?: boolean;
 }
 
-const DEFAULT_OBLIGATIONS: ContractObligationItem[] = [
-  {
-    id: 'contract-ujjivan-mse',
-    title: 'MSE Secured Business Loan Facility',
-    institution: 'Ujjivan Small Finance Bank',
-    facilityType: 'Secured Term Loan',
-    principalAmount: 7500000,
-    monthlyEmi: 169690,
-    interestRate: 12.75,
-    tenorRemainingMonths: 58,
-    foreclosureFeePercent: 3.5,
-    riskLevel: 'critical',
-    covenants: ['Unilateral MCLR spread revision', 'Machinery hypothecation', 'Personal director guarantee'],
-  },
-  {
-    id: 'contract-aws-enterprise',
-    title: 'Enterprise Cloud Infrastructure Agreement',
-    institution: 'Amazon Web Services Inc',
-    facilityType: 'Annual Compute Commitment',
-    principalAmount: 1800000,
-    monthlyEmi: 150000,
-    interestRate: 0,
-    tenorRemainingMonths: 10,
-    foreclosureFeePercent: 25.0,
-    riskLevel: 'caution',
-    covenants: ['Minimum quarterly consumption threshold', 'USD exchange rate exposure'],
-  },
-  {
-    id: 'contract-workspace-lease',
-    title: 'Commercial Office Lease Agreement',
-    institution: 'Prestige Tech Estates LLP',
-    facilityType: 'Commercial Lease',
-    principalAmount: 2400000,
-    monthlyEmi: 200000,
-    interestRate: 0,
-    tenorRemainingMonths: 22,
-    foreclosureFeePercent: 15.0,
-    riskLevel: 'nominal',
-    covenants: ['3-month security deposit lock-in', '5% annual escalation'],
-  },
-];
-
-export const ContractExposureChart: React.FC<Props> = ({ obligations = DEFAULT_OBLIGATIONS, isLoading = false }) => {
+export const ContractExposureChart: React.FC<Props> = ({ obligations = [], isLoading = false }) => {
   if (isLoading) {
     return (
       <div className="card p-6 border border-slate-200 rounded-3xl bg-white space-y-4 animate-pulse">
         <div className="h-6 bg-slate-100 rounded w-1/3" />
         <div className="h-64 bg-slate-50 rounded-2xl" />
+      </div>
+    );
+  }
+
+  if (obligations.length === 0) {
+    return (
+      <div data-testid="contract-exposure-empty" className="card p-8 border border-dashed border-slate-300 rounded-3xl bg-white text-center space-y-2">
+        <FileText size={22} className="text-slate-400 mx-auto" />
+        <h3 className="text-sm font-extrabold text-slate-900">No contracts analysed yet</h3>
+        <p className="text-xs text-slate-500 max-w-md mx-auto">Monthly commitments, interest and exit fees appear here once a contract has been analysed.</p>
+        <Link to="/contracts" className="inline-block text-xs font-bold text-violet-700 hover:underline">Analyse a contract</Link>
       </div>
     );
   }

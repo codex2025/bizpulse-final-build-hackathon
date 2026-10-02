@@ -1,7 +1,8 @@
 # DecisionForge demo (about 3 minutes)
 
 Every number below was produced by this repository's code on the deterministic datasets and can be reproduced exactly
-after a reset. If you see different numbers, press **Reset Demo Dataset** (it also restores the default policy).
+from a fresh start. A new account has no data: DecisionForge opens on a *Start here* screen. If you see different numbers,
+press **Start Over** (it removes the dataset, runs, approvals and saved policy) and load the dataset again.
 
 ## Setup (once)
 
@@ -25,7 +26,7 @@ Point it at a deployed stack with `--gateway https://.../api`.
 
 | # | Do | You should see |
 |---|---|---|
-| 0 | Click **Reset Demo Dataset**, confirm | Real cited dataset loaded, policy `v1`, no approvals |
+| 0 | On the *Start here* screen click **No file? Use our sample dataset** (press **Start Over** first if data is already loaded) | Real cited dataset loaded, policy `v1`, no approvals |
 | 1 | Look at the four cards | **$6,715,000** pipeline · **$4,341,150** weighted expected value · **6** immediate actions · **2** stale |
 | 2 | Ask: *Which opportunities should we prioritize today?* | Answer lists the top five of the six immediate-action accounts: Chobani (81.8), Amazon (81.2), U.S. Steel (80.8), Ford (79.5), Eli Lilly (78.7); GE Appliances (75.2) is the sixth and appears in the ranked list below. Open **How this answer was produced**: plan, tools, the retrieved rep notes with their ids |
 | 3 | Ask: *Which customers have gone cold?* | Pirelli (46 days) and Toyotetsu Mid America (33 days) — the list filters to those two cards, each with a stale-data warning |
@@ -91,8 +92,8 @@ gives −3.9%). Use the synthetic dataset for the capacity story and say so.
 
 ## Repeatability
 
-`Reset Demo Dataset` reloads the dataset, clears the workspace's RAG index and fetched-context state, deletes your
-decision runs, approvals, query logs and saved policy versions, and keeps the audit log (the reset is itself logged).
+**Start Over** removes the chosen dataset and deletes your decision runs, approvals, query logs and saved policy versions; the
+audit log is kept (the reset is itself logged). Loading a dataset again rebuilds the workspace's RAG index and fetched-context state.
 Tests assert that two resets produce an identical snapshot id and identical rankings for both datasets.
 
 **Restart resilience.** The gateway remembers each user's chosen dataset, uploaded CSV records and fetched-context choices. If the
