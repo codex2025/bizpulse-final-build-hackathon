@@ -92,12 +92,12 @@ export class AnalyticsService {
     let totalExpenses = currentMonthExpenseTotal;
 
     if (persona === 'employee' || persona === 'personal') {
-      totalRevenue = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 150000;
+      totalRevenue = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
     } else if (persona === 'self_employed') {
-      const baseline = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 160000;
+      const baseline = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
       totalRevenue = currentMonthInvoiceRev > 0 ? currentMonthInvoiceRev : baseline;
     } else {
-      const baseline = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 220000;
+      const baseline = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
       totalRevenue = currentMonthInvoiceRev > 0 ? currentMonthInvoiceRev : baseline;
     }
 
@@ -528,7 +528,7 @@ export class AnalyticsService {
   async getForecast(userId: string) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     const persona = user?.persona_type || 'business';
-    const income = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 150000;
+    const income = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
 
     const now = new Date();
     const currentMonthStr = now.toISOString().slice(0, 7);
@@ -654,17 +654,10 @@ export class AnalyticsService {
       categoryMap[cat] = (categoryMap[cat] || 0) + Number(exp.amount || 0);
     }
 
-    if (Object.keys(categoryMap).length === 0) {
-      categoryMap['Rent & Housing'] = 18000;
-      categoryMap['Food & Groceries'] = 12000;
-      categoryMap['Software & Tools'] = 6500;
-      categoryMap['Transit & Fuel'] = 4500;
-      categoryMap['Utilities'] = 4000;
-    }
 
     const totalSpent = Object.values(categoryMap).reduce((s, v) => s + v, 0);
     const monthsCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (30 * 24 * 60 * 60 * 1000)));
-    const baselineMonthlyIncome = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : (persona === 'business' ? 220000 : 150000);
+    const baselineMonthlyIncome = user?.monthly_income && user.monthly_income > 0 ? user.monthly_income : 0;
     const totalIncome = baselineMonthlyIncome * monthsCount;
 
     const categoryHorizontal = Object.entries(categoryMap)

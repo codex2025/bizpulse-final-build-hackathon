@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -29,6 +29,7 @@ export const ProductTour: React.FC = () => {
   const prefersReducedMotion = usePrefersReducedMotion();
   const popoverRef = useRef<HTMLDivElement>(null);
 
+  const [cardHeight, setCardHeight] = useState(320);
   const isFirstStep = currentStepIndex === 0;
   const isLastStep = currentStepIndex === totalSteps - 1;
 
@@ -53,6 +54,11 @@ export const ProductTour: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, nextStep, prevStep, skipTour]);
 
+  // Measure the real card so the footer (Back / Next) can never be pushed below the screen.
+  useLayoutEffect(() => {
+    if (isOpen && popoverRef.current) setCardHeight(popoverRef.current.offsetHeight);
+  }, [isOpen, currentStepIndex]);
+
   // Compute safe popover coordinates guaranteed to stay 100% inside viewport
   const popoverPosition = useMemo(() => {
     if (!targetRect || currentStep.placement === 'center') {
@@ -61,7 +67,7 @@ export const ProductTour: React.FC = () => {
 
     const PADDING = 16;
     const CARD_WIDTH = 380;
-    const CARD_HEIGHT = 320;
+    const CARD_HEIGHT = cardHeight;
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
     const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 730;
 
@@ -116,7 +122,7 @@ export const ProductTour: React.FC = () => {
         width: `${CARD_WIDTH}px`,
       },
     };
-  }, [targetRect, currentStep.placement]);
+  }, [targetRect, currentStep.placement, cardHeight]);
 
   if (!isOpen) return null;
 
@@ -222,7 +228,7 @@ export const ProductTour: React.FC = () => {
                   }
                 : { background: '#ffffff', pointerEvents: 'auto' }
             }
-            className={`bg-white border border-slate-200/80 shadow-[0_16px_48px_-12px_rgba(16,24,47,0.22)] rounded-2xl p-5 text-slate-900 flex flex-col gap-0 ${
+            className={`bg-white border border-slate-200/80 shadow-[0_16px_48px_-12px_rgba(16,24,47,0.22)] rounded-2xl p-5 text-slate-900 flex flex-col gap-0 max-h-[calc(100vh-2rem)] ${
               popoverPosition.type === 'center'
                 ? 'w-full max-w-sm'
                 : popoverPosition.type === 'mobile-dock'
@@ -231,7 +237,7 @@ export const ProductTour: React.FC = () => {
             }`}
           >
             {/* ── Header ── */}
-            <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
@@ -281,7 +287,7 @@ export const ProductTour: React.FC = () => {
             </div>
 
             {/* ── Body ── */}
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 overflow-y-auto min-h-0">
               <div>
                 <h3 className="text-sm font-bold tracking-tight text-slate-900 leading-snug">
                   {currentStep.title}
@@ -319,7 +325,7 @@ export const ProductTour: React.FC = () => {
             </div>
 
             {/* ── Footer ── */}
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
               <button
                 type="button"
                 onClick={skipTour}
@@ -332,7 +338,7 @@ export const ProductTour: React.FC = () => {
                 {!isFirstStep && (
                   <Button
                     variant="secondary"
-                    size="xs"
+                    size="sm"
                     onClick={prevStep}
                     icon={<ChevronLeft size={12} />}
                   >
@@ -342,7 +348,7 @@ export const ProductTour: React.FC = () => {
 
                 <Button
                   variant="gradient"
-                  size="xs"
+                  size="sm"
                   onClick={isLastStep ? finishTour : nextStep}
                   rightIcon={isLastStep ? <CheckCircle2 size={12} /> : <ChevronRight size={12} />}
                 >
