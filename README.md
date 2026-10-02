@@ -68,8 +68,7 @@ React + Vite  ──JWT──►  NestJS gateway (SQLite)  ──workspace id─
 
 The exact numbers to expect at each step: [`docs/DECISIONFORGE_DEMO.md`](docs/DECISIONFORGE_DEMO.md).
 
-> The live gateway keeps its database on the host's temporary disk, so an account can disappear after the host restarts.
-> If a sign-in stops working, sign up again; it takes a few seconds.
+> The live site stores accounts and decisions in a hosted Postgres database, so they persist between visits.
 
 ---
 
@@ -103,7 +102,7 @@ Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORG
 | Language model | Optional. OpenAI (`gpt-4o-mini`) may classify a question into a fixed intent; off by default, rules planner otherwise |
 | Sign-in | Google through Firebase Authentication (ID token verified on the gateway with `jose`), or email and password (`bcryptjs`) |
 | Tests | pytest, Jest + Supertest, Vitest, Playwright |
-| Hosting | Vercel (frontend, gateway and AI service as three projects); `render.yaml` for Render |
+| Hosting | Vercel (frontend, gateway and AI service as three projects) with Neon Postgres; `render.yaml` for Render |
 
 ---
 
@@ -295,7 +294,7 @@ Settings for each service and the trade-offs: [`docs/DEPLOYMENT.md`](docs/DEPLOY
 
 ## 12. Limits, stated plainly
 
-- **Storage on the live site is temporary.** The gateway uses SQLite on the host's temporary disk, so accounts, runs and approvals can be lost when the host restarts, and two server instances do not share data. A persistent disk or Postgres fixes this.
+- **Storage.** The live gateway uses a hosted Postgres database (`DATABASE_URL`). A local run uses a SQLite file. The schema is created automatically (`synchronize`), not by migrations.
 - **Google sign-in** was verified end to end against the Firebase Auth emulator in a real browser, not with a real Google account on the live site. Email sign-up always works.
 - **Retrieval** uses hashed bag-of-words vectors with a lexical rerank, so it matches on wording rather than meaning.
 - **The language-model planner** was tested only with a fake client; no API key was available. The rules planner is what runs.
