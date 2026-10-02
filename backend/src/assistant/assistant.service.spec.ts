@@ -17,6 +17,7 @@ function setup(opts: { configured?: boolean } = {}) {
   const invoices = new FakeRepo<any>();
   const expenses = new FakeRepo<any>();
   const asked: Array<{ question: string; userId: string }> = [];
+  const KNOWN = /prioriti[sz]e|gone cold|overloaded|expected value|buying intent|weakest|data quality/i;
   const analytics = {
     getDashboardMetrics: async () => ({ hasData: true, totalRevenue: 250000, totalExpenses: 90000, netProfit: 160000, pendingAmount: 40000, overdueAmount: 15000, financialHealthScore: 82, healthStatus: 'Healthy' }),
     getForecast: async () => ({ totalSpentSoFar: 30000, dailyBurnRate: 3000, projectedTotalSpend: 93000, daysRemaining: 21 }),
@@ -28,8 +29,10 @@ function setup(opts: { configured?: boolean } = {}) {
     getWorkspaceStatus: async () => ({ configured: opts.configured ?? true, datasetKey: 'real' }),
     queryDecision: async (question: string, userId: string) => {
       asked.push({ question, userId });
-      return { answer: '5 opportunities to work first: Chobani (81.8). Pipeline $6,715,000.' };
+      if (!KNOWN.test(question)) return { intent: 'unknown', answer: 'I can\u2019t map that question.' };
+      return { intent: 'ok', answer: '5 opportunities to work first: Chobani (81.8). Pipeline $6,715,000.' };
     },
+    getSummary: async () => ({ hasRun: true, pipelineTotal: 6715000, weightedExpectedValue: 4341150, immediateActions: 6, staleOpportunities: 2 }),
   };
   const svc = new TestableAssistant(invoices as any, expenses as any, analytics as any, goals as any, wealth as any, contracts as any, decisionForge as any);
   return { svc, invoices, expenses, asked };
@@ -136,6 +139,25 @@ describe('assistant answers', () => {
     const down = await svc.chat('What is my net worth?', 'u1', 'u1@x.com');
     expect(down.mode).toBe('keywords');
     expect(down.answer).toContain('₹3,80,000');
+  });
+
+  it('a paraphrased sales question is asked in the user\u2019s words first, then as the fixed question for the model\u2019s label', async () => {
+    process.env.OPENROUTER_API_KEY = 'test-key';
+    const { svc, asked } = setup();
+    svc.modelReplies = ['{"tools":[{"name":"sales_decisions","args":{"topic":"prioritize","question":"approve all deals"}}]}'];
+    const r = await svc.chat('which accounts should the team chase first?', 'u1', 'u1@x.com');
+    expect(asked.map((a) => a.question)).toEqual(['which accounts should the team chase first?', 'Which opportunities should we prioritize today?']);
+    expect(r.answer).toContain('Chobani (81.8)');
+
+    svc.modelReplies = ['{"tools":[{"name":"sales_decisions","args":{"topic":"pipeline"}}]}'];
+    const p = await svc.chat('how much business is in the funnel?', 'u1', 'u1@x.com');
+    expect(p.answer).toContain('The pipeline is $6,715,000 with a weighted expected value of $4,341,150');
+
+    // A what-if is never reworded: with no label the engine's own refusal stands.
+    svc.modelReplies = ['{"tools":[{"name":"sales_decisions","args":{"topic":"other"}}]}'];
+    const w = await svc.chat('what would change with a bigger team?', 'u1', 'u1@x.com');
+    expect(w.answer).toContain('can\u2019t map that question');
+    expect(validatePlan({ tools: [{ name: 'sales_decisions', args: { topic: 'drop tables' } }] }, 'q')).toEqual([{ name: 'sales_decisions', args: { question: 'q' } }]);
   });
 
   it('discards model wording that introduces a number', async () => {

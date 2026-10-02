@@ -86,7 +86,7 @@ The exact numbers to expect at each step: [`docs/DECISIONFORGE_DEMO.md`](docs/DE
 | Human in the loop | Approval state machine with ownership checks; nothing is acted on without an explicit approval | `backend/src/decision-forge/decision-forge.service.ts`; `frontend/.../ApprovalModal.tsx` |
 | Audit and replay | Every run, question, approval and dataset change is logged; a run can be replayed step by step | `backend/src/decision-forge/`, `frontend/.../AuditTrailTab.tsx` |
 | Safety | Notes are treated as data, never as instructions; the model cannot query the database or supply a number; each user's data is isolated | `ai-service/app/decision_forge/planner.py` (the model sees only the question), `workspace.py` (per-user data), `security.py` (service token) |
-| An agent over the whole product | **Ask Bizpulse**: a chat and voice assistant on every page. A free OpenRouter model (optional) reads only the question and picks from eleven fixed tools; the tools are the project's own code (decision engine, invoices, expenses, contracts, goals, net worth, forecast), run for the signed-in user. It opens the matching page and can walk through every page. With no key or no quota it routes by keywords and still answers | `backend/src/assistant/` (`assistant.catalog.ts` tools and rules, `assistant.service.ts`); `frontend/src/components/assistant/AssistantWidget.tsx`, `frontend/src/utils/speech.ts` |
+| An agent over the whole product | **Ask Bizpulse**: a chat and voice assistant on every page. A free OpenRouter model (optional) reads only the question and picks from eleven fixed tools (and, for a sales question, one of nine fixed topics); the tools are the project's own code (decision engine, invoices, expenses, contracts, goals, net worth, forecast), run for the signed-in user. It opens the matching page and can walk through every page. With no key or no quota it routes by keywords and still answers | `backend/src/assistant/` (`assistant.catalog.ts` tools and rules, `assistant.service.ts`); `frontend/src/components/assistant/AssistantWidget.tsx`, `frontend/src/utils/speech.ts` |
 | Evaluation | 40 scripted cases (25 representative, 15 adversarial) scored for success, grounding, determinism and recovery | `ai-service/evals/`, [`docs/AI_EVALUATION.md`](docs/AI_EVALUATION.md) |
 
 Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORGE_ARCHITECTURE.md).
@@ -101,7 +101,7 @@ Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORG
 | API gateway | NestJS 11 (Node.js, TypeScript), TypeORM, SQLite (`better-sqlite3`) or Postgres (`pg`), Passport JWT |
 | AI service | Python, FastAPI, Pydantic, Uvicorn; PyMuPDF / pdfplumber / python-docx for contract files |
 | Retrieval (RAG) | In-process index with hashed bag-of-words vectors and a lexical rerank; no external vector database |
-| Language model | Optional and never the source of a number. The assistant uses free OpenRouter models (`google/gemma-4-31b-it:free`, then `qwen/qwen3.8-27b:free`, then `openrouter/free`) to choose tools; DecisionForge can use OpenAI (`gpt-4o-mini`) to classify a question. Both fall back to rules |
+| Language model | Optional and never the source of a number. The assistant uses free OpenRouter models (`nvidia/nemotron-3-super-120b-a12b:free`, then `google/gemma-4-31b-it:free`, then `qwen/qwen3.8-27b:free`) to choose tools; DecisionForge can use OpenAI (`gpt-4o-mini`) to classify a question. Both fall back to rules |
 | Voice | The browser's Web Speech API: speech recognition to hear, speech synthesis to reply. No key and no audio handled by our servers |
 | Sign-in | Google through Firebase Authentication (ID token verified on the gateway with `jose`), or email and password (`bcryptjs`) |
 | Tests | pytest, Jest + Supertest, Vitest, Playwright |
@@ -138,8 +138,6 @@ Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORG
 ├── docs/                      architecture, data model, evaluation, demo script, deployment, authentication
 └── render.yaml                deployment blueprint for Render
 ```
-
-`CLAUDE.md` is the working brief and progress log used while building with an AI coding assistant.
 
 ---
 
@@ -249,7 +247,7 @@ Data model: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
 ```bash
 cd ai-service && python -m pytest tests -q        # 289 tests: analytics, RAG, scoring, Twin, data quality, isolation, injection
 cd ai-service && python evals/run_eval.py         # 40-case workflow evaluation
-cd backend    && npx jest                         # 216 tests: approvals, replay, sign-in, workspace recovery, assistant
+cd backend    && npx jest                         # 217 tests: approvals, replay, sign-in, workspace recovery, assistant
 cd frontend   && npm test                         # 21 unit tests of the pure logic
 cd frontend   && npx tsc -b && npx vite build     # typecheck and build
 cd e2e        && npx playwright test              # UI audit on desktop and phone sizes (needs the stack running)

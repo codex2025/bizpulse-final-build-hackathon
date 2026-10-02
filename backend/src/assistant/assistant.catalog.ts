@@ -20,16 +20,33 @@ export type ToolName =
   | 'finance_overview' | 'invoices' | 'expenses' | 'contracts' | 'goals' | 'net_worth'
   | 'cash_forecast' | 'sales_decisions' | 'app_guide' | 'navigate' | 'start_tour';
 
+/**
+ * Sales questions the decision engine is known to answer. The model may label a question with one of these;
+ * if the engine does not understand the user's own wording, the fixed question for that label is asked instead.
+ */
+export const SALES_TOPICS: Record<string, string | null> = {
+  prioritize: 'Which opportunities should we prioritize today?',
+  stale: 'Which customers have gone cold?',
+  rep_capacity: 'Which sales reps are overloaded?',
+  highest_value: 'Which opportunities have the highest expected value?',
+  buying_intent: 'Which customers show strong buying intent?',
+  weakest_region: 'Which region is weakest?',
+  data_quality: 'What are the data quality problems?',
+  pipeline: null,   // answered from the latest run's totals
+  other: null,      // what-if questions and questions about one company: only the user's own words are used
+};
+
 export const TOOLS: Record<ToolName, { description: string; page?: keyof typeof PAGES }> = {
   finance_overview: { description: 'This month: income, expenses, profit, unpaid and overdue invoice amounts, financial health score.', page: 'dashboard' },
-  invoices: { description: 'Invoices and clients: how many, paid / pending / overdue totals, who owes money.', page: 'billing' },
+  invoices: { description: 'Billing only: invoices already issued, paid / pending / overdue totals, who has not paid.', page: 'billing' },
   expenses: { description: 'Expenses: totals, spending by category, largest expenses.', page: 'expenses' },
   contracts: { description: 'Analysed contracts and loans: risky clauses, monthly repayments (EMI).', page: 'contracts' },
   goals: { description: 'Goals and savings targets and their progress.', page: 'goals' },
   net_worth: { description: 'Assets, liabilities and net worth.', page: 'wealth' },
   cash_forecast: { description: 'Projected spending and balance for the rest of this month, daily burn rate.', page: 'analytics' },
   sales_decisions: {
-    description: 'Anything about sales opportunities, deals, pipeline, customers, sales reps, which deals to prioritise, stale deals, evidence for a deal, and what-if questions (for example adding sales reps). args: {"question": the user’s question}.',
+    description: 'The main feature. Anything about sales: opportunities, deals, leads, accounts or customers to pursue, pipeline, sales reps, which to work on first, stale deals, evidence for a deal, and what-if questions (for example hiring sales reps). ' +
+      `args: {"topic": one of ${Object.keys(SALES_TOPICS).join(', ')}}. Use "other" for what-if questions and questions about one named company.`,
     page: 'decision_forge',
   },
   app_guide: { description: 'What the product can do, how to use a page, how to upload data, or a guided walk through every page. args: {"topic": one page name or "all"}.' },
@@ -39,7 +56,7 @@ export const TOOLS: Record<ToolName, { description: string; page?: keyof typeof 
 
 export interface PlannedTool {
   name: ToolName;
-  args: { question?: string; page?: string; topic?: string };
+  args: { question?: string; page?: string; topic?: string };   // topic: a page name (app_guide) or a SALES_TOPICS key
 }
 
 const PAGE_WORDS: Array<[RegExp, keyof typeof PAGES]> = [
@@ -84,7 +101,8 @@ export function planByRules(question: string): PlannedTool[] {
   const tools = TOPIC_RULES.filter(([re]) => re.test(q)).map(([, name]) => name);
   const unique = [...new Set(tools)].slice(0, 3);
   if (unique.length === 0) return [{ name: 'app_guide', args: { topic: 'all_summary' } }];
-  return unique.map((name) => ({ name, args: name === 'sales_decisions' ? { question } : {} }));
+  const salesArgs = /\bpipeline\b/.test(q) ? { question, topic: 'pipeline' } : { question };
+  return unique.map((name) => ({ name, args: name === 'sales_decisions' ? salesArgs : {} }));
 }
 
 /** Accepts a model's plan only if every tool and argument is one we defined; anything else is dropped. */
@@ -97,7 +115,10 @@ export function validatePlan(raw: unknown, question: string): PlannedTool[] | nu
     if (typeof name !== 'string' || !(name in TOOLS)) continue;
     const args = ((item as { args?: unknown }).args || {}) as Record<string, unknown>;
     const tool: PlannedTool = { name: name as ToolName, args: {} };
-    if (name === 'sales_decisions') tool.args.question = question; // always the user's own words, never the model's
+    if (name === 'sales_decisions') {
+      tool.args.question = question; // always the user's own words, never the model's
+      if (typeof args.topic === 'string' && args.topic in SALES_TOPICS && args.topic !== 'other') tool.args.topic = args.topic;
+    }
     if (name === 'navigate') {
       if (typeof args.page !== 'string' || !(args.page in PAGES)) continue;
       tool.args.page = args.page;
