@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { LayoutProvider } from '../../context/LayoutContext';
 import { useLayout } from '../../context/useLayout';
 import { drawerLeft, fadeIn } from '../../utils/motion';
+import { AssistantWidget } from '../assistant/AssistantWidget';
 
 interface LayoutContentProps {
   children: React.ReactNode;
@@ -57,6 +58,8 @@ const LayoutContent: React.FC<LayoutContentProps> = ({ children }) => {
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden relative z-10 [&>*]:min-w-0 [&>*]:max-w-full">
         {children}
       </main>
+
+      <AssistantWidget />
     </div>
   );
 };

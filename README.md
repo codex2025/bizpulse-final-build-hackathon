@@ -65,6 +65,7 @@ React + Vite  ──JWT──►  NestJS gateway (SQLite)  ──workspace id─
 3. **Decision Center:** ask *"Which opportunities should we prioritize today?"* and read the ranked list. Open **View Evidence** on the top deal to see the score formula, the factors and the cited notes.
 4. **Decision Twin:** move the sliders (sales reps, contacts per day, minimum deal value), or ask *"What happens if we add two sales reps?"* to compare baseline and scenario.
 5. **Review & Approve** a recommendation, then open **Evidence & Audit → Replay** to see every step that produced it.
+6. **Ask Bizpulse** (bottom right, on every page): type or press the microphone and ask *"Which deals should we prioritise today?"*, *"Who owes me money?"* or *"Show me around"*. It answers from your data, reads the answer aloud and opens the matching page.
 
 The exact numbers to expect at each step: [`docs/DECISIONFORGE_DEMO.md`](docs/DECISIONFORGE_DEMO.md).
 
@@ -85,6 +86,7 @@ The exact numbers to expect at each step: [`docs/DECISIONFORGE_DEMO.md`](docs/DE
 | Human in the loop | Approval state machine with ownership checks; nothing is acted on without an explicit approval | `backend/src/decision-forge/decision-forge.service.ts`; `frontend/.../ApprovalModal.tsx` |
 | Audit and replay | Every run, question, approval and dataset change is logged; a run can be replayed step by step | `backend/src/decision-forge/`, `frontend/.../AuditTrailTab.tsx` |
 | Safety | Notes are treated as data, never as instructions; the model cannot query the database or supply a number; each user's data is isolated | `ai-service/app/decision_forge/planner.py` (the model sees only the question), `workspace.py` (per-user data), `security.py` (service token) |
+| An agent over the whole product | **Ask Bizpulse**: a chat and voice assistant on every page. A free OpenRouter model (optional) reads only the question and picks from eleven fixed tools; the tools are the project's own code (decision engine, invoices, expenses, contracts, goals, net worth, forecast), run for the signed-in user. It opens the matching page and can walk through every page. With no key or no quota it routes by keywords and still answers | `backend/src/assistant/` (`assistant.catalog.ts` tools and rules, `assistant.service.ts`); `frontend/src/components/assistant/AssistantWidget.tsx`, `frontend/src/utils/speech.ts` |
 | Evaluation | 40 scripted cases (25 representative, 15 adversarial) scored for success, grounding, determinism and recovery | `ai-service/evals/`, [`docs/AI_EVALUATION.md`](docs/AI_EVALUATION.md) |
 
 Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORGE_ARCHITECTURE.md).
@@ -99,7 +101,8 @@ Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORG
 | API gateway | NestJS 11 (Node.js, TypeScript), TypeORM, SQLite (`better-sqlite3`) or Postgres (`pg`), Passport JWT |
 | AI service | Python, FastAPI, Pydantic, Uvicorn; PyMuPDF / pdfplumber / python-docx for contract files |
 | Retrieval (RAG) | In-process index with hashed bag-of-words vectors and a lexical rerank; no external vector database |
-| Language model | Optional. OpenAI (`gpt-4o-mini`) may classify a question into a fixed intent; off by default, rules planner otherwise |
+| Language model | Optional and never the source of a number. The assistant uses free OpenRouter models (`google/gemma-4-31b-it:free`, then `qwen/qwen3.8-27b:free`, then `openrouter/free`) to choose tools; DecisionForge can use OpenAI (`gpt-4o-mini`) to classify a question. Both fall back to rules |
+| Voice | The browser's Web Speech API: speech recognition to hear, speech synthesis to reply. No key and no audio handled by our servers |
 | Sign-in | Google through Firebase Authentication (ID token verified on the gateway with `jose`), or email and password (`bcryptjs`) |
 | Tests | pytest, Jest + Supertest, Vitest, Playwright |
 | Hosting | Vercel (frontend, gateway and AI service as three projects) with Neon Postgres; `render.yaml` for Render |
@@ -121,6 +124,7 @@ Architecture in detail: [`docs/DECISIONFORGE_ARCHITECTURE.md`](docs/DECISIONFORG
 ├── backend/                   NestJS gateway
 │   └── src/
 │       ├── decision-forge/    runs, approvals, policy, audit, replay, workspace recovery
+│       ├── assistant/         Ask Bizpulse: tool list, keyword rules, optional OpenRouter planner
 │       ├── auth/ users/       Google and email sign-in
 │       └── analytics/ invoices/ expenses/ clients/ contracts/ goals/ wealth/
 ├── ai-service/                FastAPI service
@@ -245,7 +249,7 @@ Data model: [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md).
 ```bash
 cd ai-service && python -m pytest tests -q        # 289 tests: analytics, RAG, scoring, Twin, data quality, isolation, injection
 cd ai-service && python evals/run_eval.py         # 40-case workflow evaluation
-cd backend    && npx jest                         # 205 tests: approvals, replay, sign-in, workspace recovery
+cd backend    && npx jest                         # 216 tests: approvals, replay, sign-in, workspace recovery, assistant
 cd frontend   && npm test                         # 21 unit tests of the pure logic
 cd frontend   && npx tsc -b && npx vite build     # typecheck and build
 cd e2e        && npx playwright test              # UI audit on desktop and phone sizes (needs the stack running)
@@ -271,6 +275,9 @@ Every variable is optional for a local run except `JWT_SECRET` in production.
 | `FIREBASE_PROJECT_ID` | backend | Firebase project for Google sign-in. Empty turns Google sign-in off | empty |
 | `VITE_API_URL` | frontend | Gateway address | `http://localhost:3001/api` |
 | `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID` | frontend | Firebase web config (public identifiers, not secrets) | empty |
+| `OPENROUTER_API_KEY` | backend | Turns on AI understanding in the assistant (free models). Without it the assistant routes by keywords | unset |
+| `ASSISTANT_MODELS` | backend | Comma-separated OpenRouter model ids to try in order (up to three) | the three free models above |
+| `ASSISTANT_LLM_WRITER` | backend | `1` lets the model rephrase the answer; its text is discarded if it contains a number that is not in the facts | off |
 | `OPENAI_API_KEY` | ai-service | Turns on the optional language-model question planner | unset |
 | `DECISION_PLANNER_MODEL` | ai-service | Planner model | `gpt-4o-mini` |
 
@@ -300,6 +307,7 @@ Settings for each service and the trade-offs: [`docs/DEPLOYMENT.md`](docs/DEPLOY
 - **The language-model planner** was tested only with a fake client; no API key was available. The rules planner is what runs.
 - **What-if questions** understand a fixed set of levers (reps, contacts per day, minimum deal value, follow-up window, priority cutoff). Anything else gets a clear "can't simulate that".
 - **"Fetch fresh context"** reads a cached, cited snapshot, not a live web crawl.
+- **The assistant.** Without `OPENROUTER_API_KEY`, or when the free daily quota is used up, it routes by keywords, so unusual wording may land on the general help answer. Each question is answered on its own (it does not remember the previous one). Voice input needs a browser with speech recognition (Chrome, Edge, Safari); the browser, not this app, sends the audio to its speech service. In Firefox the microphone button is hidden and typing still works.
 - **Sign-in hardening** is not done: no email verification, password reset or rate limiting on sign-in.
 - **Not tested:** Python 3.11, Node 20 and 22, macOS and Linux, Docker.
 

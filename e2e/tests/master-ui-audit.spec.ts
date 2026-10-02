@@ -420,6 +420,66 @@ test.describe('DecisionForge first run (no data until the user adds it)', () => 
   });
 });
 
+test.describe('Assistant (chat and voice)', () => {
+  test('TC-16 a typed question is answered from the data and opens the matching page', async ({ page }) => {
+    await open(page, '/');
+    await page.getByTestId('assistant-open').click();
+    const panel = page.getByTestId('assistant-panel');
+    await expect(panel).toBeVisible();
+    await expect(page.getByTestId('assistant-mode')).toContainText(/answers from your data/i);
+
+    await page.getByTestId('assistant-input').fill('Which deals should we prioritise today?');
+    await page.getByTestId('assistant-send').click();
+    // The shared account has the sample dataset loaded, so the engine's own ranking comes back.
+    await expect(page.getByTestId('assistant-message').last()).toContainText(/opportunities to work first/i, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/decision-forge$/);
+
+    await page.getByTestId('assistant-input').fill('take me to the contracts page');
+    await page.getByTestId('assistant-send').click();
+    await expect(page).toHaveURL(/\/contracts$/, { timeout: 15_000 });
+    await expect(panel).toBeVisible();
+  });
+
+  test('TC-16b a spoken question is heard, answered aloud, and the microphone reopens', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 1536, height: 730 } });
+    await signIn(ctx, session);
+    // Stand-ins for the browser speech engines: the first time the microphone opens, "hear" one question.
+    await ctx.addInitScript(() => {
+      const w = window as any;
+      w.__spoken = [];
+      w.__micStarts = 0;
+      w.SpeechRecognition = w.webkitSpeechRecognition = class {
+        onresult: any; onend: any; onerror: any;
+        start() {
+          w.__micStarts++;
+          const first = w.__micStarts === 1;
+          setTimeout(() => {
+            if (first) this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'what can you do' } }] });
+            this.onend?.();
+          }, 50);
+        }
+        stop() { this.onend?.(); }
+        abort() {}
+      };
+      Object.defineProperty(window, 'speechSynthesis', {
+        configurable: true,
+        value: { cancel() {}, speak(u: any) { w.__spoken.push(u.text); setTimeout(() => u.onend?.(), 20); } },
+      });
+    });
+    const page = await ctx.newPage();
+    await open(page, '/');
+    await page.getByTestId('assistant-open').click();
+    await page.getByTestId('assistant-mic').click();
+
+    await expect(page.getByTestId('user-message').last()).toHaveText('what can you do', { timeout: 15_000 });
+    await expect(page.getByTestId('assistant-message').last()).toContainText(/I can answer questions from your own data/i, { timeout: 30_000 });
+    await expect.poll(() => page.evaluate(() => (window as any).__spoken.length)).toBeGreaterThan(0);
+    expect(await page.evaluate(() => (window as any).__spoken[0])).toContain('I can answer questions from your own data');
+    await expect.poll(() => page.evaluate(() => (window as any).__micStarts)).toBe(2);   // it listens again after replying
+    await ctx.close();
+  });
+});
+
 test.describe('Every screen: geometry and errors', () => {
   for (const route of ROUTES) {
     test(`TC-08 ${route} has no sideways scroll and no console errors`, async ({ page }) => {

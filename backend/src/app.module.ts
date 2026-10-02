@@ -12,6 +12,7 @@ import { GoalsModule } from './goals/goals.module';
 import { WealthModule } from './wealth/wealth.module';
 import { StatementModule } from './statement/statement.module';
 import { DecisionForgeModule } from './decision-forge/decision-forge.module';
+import { AssistantModule } from './assistant/assistant.module';
 import { join } from 'path';
 
 import { User } from './users/entities/user.entity';
@@ -61,6 +62,7 @@ import { AppService } from './app.service';
     WealthModule,
     StatementModule,
     DecisionForgeModule,
+    AssistantModule,
   ],
   controllers: [AppController],
   providers: [AppService],
