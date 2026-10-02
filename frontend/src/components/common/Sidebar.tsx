@@ -263,7 +263,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
                 type="button"
                 onClick={toggleWorkPersonal}
                 title="Switch Work / Personal View"
-                className="p-1 rounded hover:bg-white text-slate-400 hover:text-violet-600 border border-transparent hover:border-slate-200 transition-colors cursor-pointer flex-shrink-0"
+                className="p-2 -m-1 rounded hover:bg-white text-slate-400 hover:text-violet-600 border border-transparent hover:border-slate-200 transition-colors cursor-pointer flex-shrink-0"
               >
                 <ArrowLeftRight size={11} />
               </button>

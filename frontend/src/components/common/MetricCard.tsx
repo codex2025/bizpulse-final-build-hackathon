@@ -71,8 +71,8 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${currentSentiment.glow}`} />
 
       {/* Zone 1: label + icon on the left, change pill / badge on the right. Nothing here can reach the value. */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5 mb-3">
+        <div className="flex items-center gap-2 min-w-0 flex-1 basis-[9rem]">
           {icon && (
             <div className="p-1.5 rounded-xl bg-slate-50/90 border border-slate-100 text-slate-600 shadow-2xs shrink-0">
               {icon}

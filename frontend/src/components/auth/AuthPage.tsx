@@ -304,8 +304,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
               />
               <button
                 type="button"
+                aria-label={showPass ? "Hide password" : "Show password"}
                 onClick={() => setShowPass(!showPass)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
               >
                 {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
@@ -334,9 +335,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ mode }) => {
           <p className="text-center text-xs text-slate-500 font-medium">
             {mode === 'login' ? (
               <>
-                Don't have an account? <Link to="/register" className="text-cobalt-600 hover:text-cobalt-700 font-bold">Sign up free</Link>
+                Don't have an account? <Link to="/register" className="inline-block py-2 text-cobalt-600 hover:text-cobalt-700 font-bold">Sign up free</Link>
                 <span className="mx-2 text-slate-300">•</span>
-                <button type="button" onClick={() => setShowForgot(true)} className="text-cobalt-600 hover:text-cobalt-700 font-bold cursor-pointer">Forgot password?</button>
+                <button type="button" onClick={() => setShowForgot(true)} className="py-2 text-cobalt-600 hover:text-cobalt-700 font-bold cursor-pointer">Forgot password?</button>
               </>
             ) : (
               <>Already have an account? <Link to="/login" className="text-cobalt-600 hover:text-cobalt-700 font-bold">Sign in</Link></>
