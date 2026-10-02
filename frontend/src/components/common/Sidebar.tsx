@@ -21,7 +21,6 @@ import {
   BrainCircuit,
   ArrowLeftRight,
   X,
-  User,
 } from 'lucide-react';
 import { authService } from '../../services/authService';
 import { usePersona } from '../../context/PersonaContext';
@@ -29,6 +28,7 @@ import { useLayout } from '../../context/useLayout';
 import { SPRING_SMOOTH, usePrefersReducedMotion } from '../../utils/motion';
 import { Tooltip } from './Tooltip';
 import { invoiceService } from '../../services/invoiceService';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { contractService } from '../../services/contractService';
 import { decisionForgeService } from '../../services/decisionForgeService';
 
@@ -62,6 +62,7 @@ const renderPersonaIcon = (personaType: string, size = 12) => {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onCloseMobile }) => {
   const { sidebarCollapsed, toggleSidebar } = useLayout();
+  const currentUser = useCurrentUser();
   const { persona, config, canSwitchToPersonal, toggleWorkPersonal } = usePersona();
   const prefersReducedMotion = usePrefersReducedMotion();
 
@@ -352,11 +353,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileDrawer = false, onClos
         {!collapsed && (
           <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-rose-500 to-violet-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs shadow-xs">
-              <User size={13} />
+              {currentUser.initial}
             </div>
             <div className="min-w-0 flex-1">
               <span className="text-xs font-bold text-ink-900 block truncate leading-tight">
-                Bizpulse Admin
+                {currentUser.name}
               </span>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />

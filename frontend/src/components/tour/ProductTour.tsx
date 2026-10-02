@@ -216,12 +216,13 @@ export const ProductTour: React.FC = () => {
               popoverPosition.type === 'positioned'
                 ? {
                     position: 'absolute',
+                    background: '#ffffff',
                     pointerEvents: 'auto',
                     ...popoverPosition.style,
                   }
-                : { pointerEvents: 'auto' }
+                : { background: '#ffffff', pointerEvents: 'auto' }
             }
-            className={`bg-white/97 backdrop-blur-2xl border border-slate-200/80 shadow-[0_16px_48px_-12px_rgba(16,24,47,0.22)] rounded-2xl p-5 text-slate-900 flex flex-col gap-0 ${
+            className={`bg-white border border-slate-200/80 shadow-[0_16px_48px_-12px_rgba(16,24,47,0.22)] rounded-2xl p-5 text-slate-900 flex flex-col gap-0 ${
               popoverPosition.type === 'center'
                 ? 'w-full max-w-sm'
                 : popoverPosition.type === 'mobile-dock'

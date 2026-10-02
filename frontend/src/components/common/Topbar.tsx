@@ -24,6 +24,7 @@ import { useTour } from '../../context/TourContext';
 import { authService } from '../../services/authService';
 import { dropdownVariants } from '../../utils/motion';
 import { CommandPalette } from './CommandPalette';
+import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { ServiceHealthPill } from './ServiceHealthPill';
 
 interface TopbarProps {
@@ -60,6 +61,7 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toggleMobileMenu } = useLayout();
+  const currentUser = useCurrentUser();
   const { persona, config, accountPersona, setAccountMode, canSwitchToPersonal, toggleWorkPersonal } =
     usePersona();
   const { startTour } = useTour();
@@ -370,7 +372,7 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
             aria-label="User menu"
           >
             <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-violet-500 to-cobalt-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-              S
+              {currentUser.initial}
             </div>
             <ChevronDown size={11} className="text-slate-400 hidden sm:block" />
           </button>
@@ -385,8 +387,8 @@ export const Topbar: React.FC<TopbarProps> = ({ title, subtitle, action }) => {
                 className="absolute right-0 mt-1.5 w-52 bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden p-1.5 z-50"
               >
                 <div className="px-3 py-2 border-b border-slate-100 mb-1">
-                  <p className="text-xs font-bold text-ink-900 truncate">Bizpulse Admin</p>
-                  <p className="text-[10.5px] text-slate-400 truncate">admin@bizpulse.com</p>
+                  <p className="text-xs font-bold text-ink-900 truncate">{currentUser.name}</p>
+                  <p className="text-[10.5px] text-slate-400 truncate">{currentUser.email}</p>
                 </div>
 
                 <div className="space-y-0.5">
